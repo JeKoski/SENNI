@@ -1,6 +1,20 @@
-# Companion
+# SENNI
 
-A portable, local AI companion built on llama.cpp.
+*Still very early in development*
+
+**S.E.N.N.I - Shared Experience Nexus for Neural Intelligence**
+or just *Senni* for short
+
+S.E.N.N.I is a fully local framework for creating and interacting with your own AI assistants and companions
+
+Focus is on:
+- Local & Privacy - Everything happens on your own computer. No cloud
+- Fully GUI driven - A clean interface where you can manage everything without having to touch code or the commandline
+- Ease of use
+- Experience customizability
+- Platform agnostic
+
+---
 
 ## Quick start
 
