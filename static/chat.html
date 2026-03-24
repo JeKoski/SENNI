@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Companion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/chat.css"/>
+  <link rel="stylesheet" href="/static/css/settings.css"/>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-resize-handle" id="sidebar-handle"></div>
+    <div class="companion-header">
+      <div class="avatar" id="companion-avatar">✦</div>
+      <div>
+        <div class="companion-name" id="companion-name">…</div>
+        <div class="companion-status">
+          <svg class="status-dot-svg" width="16" height="16" viewBox="0 0 16 16">
+            <!-- Solid dot with gentle breathe -->
+            <circle cx="8" cy="8" r="3" fill="#6dd4a8">
+              <animate attributeName="fill-opacity" values="0.8;1;0.8" dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+            </circle>
+            <!-- Single radiating ring — thick bloom that dissolves outward -->
+            <circle cx="8" cy="8" r="3" fill="none" stroke="#6dd4a8" stroke-width="4">
+              <animate attributeName="r"            values="3;11"    dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.15 0 0.85 1"/>
+              <animate attributeName="stroke-width" values="4;0.5"   dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.15 0 0.85 1"/>
+              <animate attributeName="opacity"      values="0.35;0"  dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.2 0 1 1"/>
+            </circle>
+          </svg>
+          <span id="status-text">online</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat tabs -->
+    <div class="sidebar-section" id="tabs-section">
+      <div class="sidebar-label" style="display:flex;align-items:center;justify-content:space-between">
+        Chats
+        <button class="new-tab-btn" onclick="newTab()" title="New chat">+</button>
+      </div>
+      <div id="tab-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Memory</div>
+      <div class="memory-item">
+        <div class="mem-folder"><div class="mem-dot" style="background:#a78bfa"></div>soul/</div>
+        <span class="mem-count" id="mem-soul">—</span>
+      </div>
+      <div class="memory-item">
+        <div class="mem-folder"><div class="mem-dot" style="background:#818cf8"></div>mind/</div>
+        <span class="mem-count" id="mem-mind">—</span>
+      </div>
+      <div class="memory-item">
+        <div class="mem-folder"><div class="mem-dot" style="background:#6dd4a8"></div>memory/</div>
+        <span class="mem-count" id="mem-memory">—</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Tools</div>
+      <div id="tool-pills"><span class="tool-pill">loading…</span></div>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div class="sidebar-footer">
+      <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
+      <button class="icon-btn" onclick="restartServer()" id="restart-btn" title="Restart model server">↺</button>
+      <button class="icon-btn" onclick="exportHistory()" title="Export chat history">↓</button>
+      <button class="icon-btn" onclick="importHistory()" title="Import chat history">↑</button>
+      <button class="icon-btn" id="hb-manual-btn" onclick="heartbeatManual()" title="Trigger heartbeat now" style="display:none">✦</button>
+
+    </div>
+  </aside>
+
+  <!-- ── Main chat ────────────────────────────────────────────────────────── -->
+  <main class="chat-area">
+    <div class="messages" id="messages">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-glyph">✦</div>
+        <div class="empty-title">Connecting…</div>
+        <div class="empty-sub">Starting your companion</div>
+      </div>
+    </div>
+
+    <!-- Context usage bar -->
+    <div id="ctx-bar-wrap">
+      <div id="ctx-bar-track">
+        <div id="ctx-bar-fill" class="ctx-bar-fill"></div>
+      </div>
+      <div id="ctx-bar-meta">
+        <span id="ctx-bar-label"></span>
+        <div id="ctx-bar-actions">
+          <button onclick="newChat(true)"  title="Keep visible, reset context">↺ Reset context</button>
+          <button onclick="newChat(false)" title="Clear screen and context">✕ Clear chat</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-bar" id="input-bar">
+      <!-- Attachment preview strip (shown when files are queued) -->
+      <div id="attachment-strip" style="display:none"></div>
+      <div class="input-wrap" id="input-wrap">
+        <button class="attach-btn" id="attach-btn" onclick="openAttachMenu(event)" title="Attach file">+</button>
+        <textarea
+          id="msg-input"
+          placeholder="Say something…"
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+      </div>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()" disabled title="Send">↑</button>
+      <button class="stop-btn" id="stop-btn" onclick="stopGeneration()" title="Stop generation" style="display:none">■</button>
+    </div>
+
+    <!-- Attach menu popup -->
+    <div id="attach-menu" style="display:none">
+      <button onclick="triggerFilePick('image')">🖼 Image</button>
+      <button onclick="triggerFilePick('audio')">🎵 Audio</button>
+      <button onclick="triggerFilePick('text')">📄 Text file</button>
+    </div>
+  </main>
+
+</div>
+
+<!-- ── Settings overlay ──────────────────────────────────────────────────── -->
+<div class="settings-overlay" id="settings-overlay" onclick="closeSettingsIfBg(event)">
+  <div class="settings-panel" id="settings-panel">
+
+    <div class="sp-header">
+      <div class="sp-title">Settings</div>
+      <button class="sp-close" onclick="closeSettings()">✕</button>
+    </div>
+
+    <div class="sp-tabs">
+      <button class="sp-tab active" data-tab="server"     onclick="spSwitchTab('server')">Server</button>
+      <button class="sp-tab"        data-tab="generation" onclick="spSwitchTab('generation')">Generation</button>
+      <button class="sp-tab"        data-tab="companion"  onclick="spSwitchTab('companion')">Companion</button>
+      <button class="sp-tab"        data-tab="about"      onclick="spSwitchTab('about')">About</button>
+    </div>
+
+    <!-- Server tab -->
+    <div class="sp-body tab-body active" id="tab-server">
+      <div class="sp-section-label">Model</div>
+      <div class="sp-file-row">
+        <div class="sp-file-display" id="sp-model-display">—</div>
+        <button class="sp-btn-sm" onclick="spBrowse('model')">Browse</button>
+      </div>
+      <div class="sp-file-row" style="margin-top:8px">
+        <div class="sp-file-display" id="sp-mmproj-display">No mmproj</div>
+        <button class="sp-btn-sm" onclick="spBrowse('mmproj')">mmproj</button>
+        <button class="sp-btn-sm sp-btn-ghost" onclick="spClearMmproj()">Clear</button>
+      </div>
+      <div class="sp-row-2col" style="margin-top:14px">
+        <div>
+          <div class="sp-field-label">GPU</div>
+          <select class="sp-select" id="sp-gpu">
+            <option value="intel">Intel Arc</option>
+            <option value="nvidia">NVIDIA</option>
+            <option value="amd">AMD</option>
+            <option value="cpu">CPU only</option>
+          </select>
+        </div>
+        <div>
+          <div class="sp-field-label">Bridge port</div>
+          <input type="number" class="sp-input" id="sp-port-bridge" value="8000"/>
+        </div>
+        <div>
+          <div class="sp-field-label">Model port</div>
+          <input type="number" class="sp-input" id="sp-port-model" value="8081"/>
+        </div>
+      </div>
+      <div class="sp-section-label" style="margin-top:18px">Built-in arguments</div>
+      <div id="sp-builtin-args"></div>
+      <div class="sp-section-label" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center">
+        Custom arguments
+        <button class="sp-add-btn" onclick="spAddCustomArg()">+ Add</button>
+      </div>
+      <div id="sp-custom-args"></div>
+      <div class="sp-restart-note" id="sp-restart-note" style="display:none">
+        ⚠ A server restart is needed to apply these changes
+      </div>
+      <div class="sp-btn-row">
+        <button class="sp-btn-ghost" onclick="spRestartServer()">Restart server</button>
+        <button class="sp-btn-ghost" onclick="spSaveServer()">Apply</button>
+        <button class="sp-btn-primary" onclick="spSaveServer(true)">Save &amp; close</button>
+      </div>
+    </div>
+
+    <!-- Generation tab -->
+    <div class="sp-body tab-body" id="tab-generation">
+      <p class="sp-note">These apply to every new message — no restart needed.</p>
+      <div class="sp-field-label">Temperature <span class="sp-val-badge" id="lbl-temp">0.8</span></div>
+      <input type="range" class="sp-slider" id="sp-temperature" min="0" max="2" step="0.05" value="0.8"
+        oninput="document.getElementById('lbl-temp').textContent=parseFloat(this.value).toFixed(2)"/>
+      <div class="sp-field-label" style="margin-top:14px">Top-P <span class="sp-val-badge" id="lbl-topp">0.95</span></div>
+      <input type="range" class="sp-slider" id="sp-top-p" min="0" max="1" step="0.01" value="0.95"
+        oninput="document.getElementById('lbl-topp').textContent=parseFloat(this.value).toFixed(2)"/>
+      <div class="sp-field-label" style="margin-top:14px">Top-K <span class="sp-val-badge" id="lbl-topk">40</span></div>
+      <input type="range" class="sp-slider" id="sp-top-k" min="1" max="100" step="1" value="40"
+        oninput="document.getElementById('lbl-topk').textContent=this.value"/>
+      <div class="sp-field-label" style="margin-top:14px">Repeat penalty <span class="sp-val-badge" id="lbl-rpen">1.1</span></div>
+      <input type="range" class="sp-slider" id="sp-repeat-penalty" min="1" max="2" step="0.05" value="1.1"
+        oninput="document.getElementById('lbl-rpen').textContent=parseFloat(this.value).toFixed(2)"/>
+      <div class="sp-field-label" style="margin-top:14px">Max response tokens</div>
+      <input type="number" class="sp-input" id="sp-max-tokens" value="1024" min="64" max="8192" style="width:120px"/>
+      <div class="sp-field-label" style="margin-top:14px">Max tool rounds
+        <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">per message (1–20)</span>
+      </div>
+      <input type="number" class="sp-input" id="sp-max-tool-rounds" value="8" min="1" max="20" style="width:80px"/>
+      <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
+        <div class="sp-tog" id="tog-controls-visible" onclick="spToggleControlsVisible(this)"></div>
+        <span class="sp-field-label" style="margin:0">Always show message controls</span>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+        <div class="sp-tog" id="tog-markdown" onclick="spToggleMarkdown(this)"></div>
+        <span class="sp-field-label" style="margin:0">Render markdown in messages</span>
+      </div>
+      <div class="sp-field-label" style="margin-top:18px">Vision mode
+        <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">how images are handled across turns</span>
+      </div>
+      <div class="sp-radio-group" id="sp-vision-mode">
+        <label class="sp-radio"><input type="radio" name="vision-mode" value="always" checked/> <span>Always re-encode</span> <span class="sp-note">full vision every turn — best with GPU</span></label>
+        <label class="sp-radio"><input type="radio" name="vision-mode" value="once"/>   <span>Once per conversation</span> <span class="sp-note">faster on CPU, loses follow-up vision</span></label>
+        <label class="sp-radio"><input type="radio" name="vision-mode" value="ask"/>    <span>Ask each time</span> <span class="sp-note">prompt appears when attaching an image</span></label>
+      </div>
+      <div class="sp-btn-row">
+        <button class="sp-btn-ghost" onclick="spResetGeneration()">Reset defaults</button>
+        <button class="sp-btn-ghost" onclick="spSaveGeneration()">Apply</button>
+        <button class="sp-btn-primary" onclick="spSaveGeneration(true)">Save &amp; close</button>
+      </div>
+    </div>
+
+    <!-- Companion tab -->
+    <div class="sp-body tab-body" id="tab-companion">
+      <div class="sp-section-label" style="display:flex;justify-content:space-between;align-items:center">
+        Companions
+        <button class="sp-add-btn" onclick="spNewCompanion()">+ New</button>
+      </div>
+      <div id="sp-companion-list" style="margin-bottom:18px"></div>
+      <div id="sp-companion-editor">
+        <div class="sp-section-label">Active companion</div>
+        <div class="sp-avatar-zone" id="sp-avatar-zone"
+          ondragover="event.preventDefault()" ondrop="spAvatarDrop(event)">
+          <div class="sp-avatar-preview" id="sp-avatar-preview">✦</div>
+          <div class="sp-avatar-hint">Drop image or <span class="sp-link" onclick="spAvatarBrowse()">browse</span></div>
+        </div>
+        <input type="file" id="sp-avatar-file" accept="image/*" style="display:none" onchange="spAvatarFile(this)"/>
+        <div id="sp-crop-wrap" style="display:none">
+          <canvas id="sp-crop-canvas" width="240" height="240"
+            onmousedown="cropStart(event)" onmousemove="cropMove(event)"
+            onmouseup="cropEnd()" onmouseleave="cropEnd()"
+            ontouchstart="cropTouchStart(event)" ontouchmove="cropTouchMove(event)" ontouchend="cropEnd()"
+            style="cursor:move;border-radius:12px;display:block;margin:0 auto 10px"></canvas>
+          <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
+            <button class="sp-btn-ghost" onclick="spCropZoom(-0.1)">－ Zoom</button>
+            <button class="sp-btn-ghost" onclick="spCropZoom(0.1)">＋ Zoom</button>
+            <button class="sp-btn-primary" onclick="spCropConfirm()">Use this</button>
+          </div>
+        </div>
+        <div class="sp-field-label">Name</div>
+        <input type="text" class="sp-input" id="sp-companion-name" placeholder="Companion name" style="margin-bottom:14px"/>
+        <div class="sp-section-label">Generation overrides <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim)">(leave blank to use global)</span></div>
+        <div class="sp-row-2col">
+          <div><div class="sp-field-label">Temperature</div><input type="number" class="sp-input" id="sp-c-temp" placeholder="0.8" min="0" max="2" step="0.05"/></div>
+          <div><div class="sp-field-label">Top-P</div><input type="number" class="sp-input" id="sp-c-topp" placeholder="0.95" min="0" max="1" step="0.01"/></div>
+          <div><div class="sp-field-label">Repeat penalty</div><input type="number" class="sp-input" id="sp-c-rpen" placeholder="1.1" min="1" max="2" step="0.05"/></div>
+          <div><div class="sp-field-label">Max response tokens</div><input type="number" class="sp-input" id="sp-c-maxt" placeholder="1024" min="64"/></div>
+        </div>
+        <div class="sp-field-label" style="margin-top:16px">Identity editing
+          <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">what the companion can change about itself</span>
+        </div>
+        <div class="sp-radio-group" id="sp-soul-edit-mode">
+          <label class="sp-radio"><input type="radio" name="soul-edit" value="locked" checked/>
+            <span>Locked</span> <span class="sp-note">companion cannot edit its own identity</span></label>
+          <label class="sp-radio"><input type="radio" name="soul-edit" value="self_notes"/>
+            <span>Self notes</span> <span class="sp-note">can write to soul/self_notes.md — additive only</span></label>
+          <label class="sp-radio"><input type="radio" name="soul-edit" value="agentic"/>
+            <span>Fully agentic</span> <span class="sp-note">can rewrite companion_identity.md — auto-backed up</span></label>
+          <label class="sp-radio"><input type="radio" name="soul-edit" value="chaos"/>
+            <span>Chaos mode 🔥</span> <span class="sp-note">unrestricted — read/write/move files across all folders, all soul/ writes auto-backed up</span></label>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+          <div class="sp-tog on" id="tog-force-read" onclick="this.classList.toggle('on')"></div>
+          <span class="sp-field-label" style="margin:0">Require read before write
+            <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:4px">disable to reduce context burn on move/archive</span>
+          </span>
+        </div>
+
+        <div class="sp-section-label" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+          Soul files
+          <button class="sp-add-btn" onclick="spNewSoulFile()">+ New file</button>
+        </div>
+        <div id="sp-soul-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+        <textarea class="sp-textarea" id="sp-soul-content" placeholder="Select a file above to edit…" rows="7"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:4px">
+          <button class="sp-btn-ghost" id="sp-soul-save-btn" onclick="spSaveSoulFile()" style="display:none">Save file</button>
+        </div>
+        <div class="sp-section-label" style="margin-top:18px">Heartbeat
+          <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">autonomous companion turns</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="sp-tog" id="hb-silent" onclick="this.classList.toggle('on')"></div>
+            <span class="sp-field-label" style="margin:0">Silent tool turns <span class="sp-note">(update notes, research — not shown)</span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="sp-tog" id="hb-message" onclick="this.classList.toggle('on')"></div>
+            <span class="sp-field-label" style="margin:0">Can send messages <span class="sp-note">(companion reaches out)</span></span>
+          </div>
+        </div>
+        <div class="sp-field-label">Triggers</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="sp-tog" id="hb-idle" onclick="this.classList.toggle('on')"></div>
+            <span style="font-size:13px;color:var(--text-muted)">After</span>
+            <input type="number" class="sp-input" id="hb-idle-min" value="15" min="1" max="120" style="width:60px;font-size:13px;padding:4px 8px"/>
+            <span style="font-size:13px;color:var(--text-muted)">minutes idle</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="sp-tog" id="hb-conv-end" onclick="this.classList.toggle('on')"></div>
+            <span class="sp-field-label" style="margin:0">When context is reset</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="sp-tog" id="hb-session" onclick="this.classList.toggle('on')"></div>
+            <span class="sp-field-label" style="margin:0">On session start</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="sp-tog" id="hb-ctx" onclick="this.classList.toggle('on')"></div>
+            <span style="font-size:13px;color:var(--text-muted)">When context reaches</span>
+            <input type="number" class="sp-input" id="hb-ctx-pct" value="75" min="10" max="95" style="width:60px;font-size:13px;padding:4px 8px"/>
+            <span style="font-size:13px;color:var(--text-muted)">%</span>
+          </div>
+        </div>
+        <div class="sp-field-label" style="margin-top:8px">Instructions <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:4px">per-trigger, or leave blank to use default</span></div>
+        <div style="margin-bottom:6px">
+          <div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:3px">Default (all triggers)</div>
+          <textarea class="sp-textarea" id="hb-instr-default" rows="2" placeholder="Reflect on the conversation. Update session notes. Research anything interesting."></textarea>
+        </div>
+        <div id="hb-instr-triggers" style="display:flex;flex-direction:column;gap:6px">
+          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">After idle</div>
+          <textarea class="sp-textarea" id="hb-instr-idle" rows="2" placeholder="(uses default if blank)"></textarea></div>
+          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">Context reset</div>
+          <textarea class="sp-textarea" id="hb-instr-conversation-end" rows="2" placeholder="(uses default if blank)"></textarea></div>
+          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">Session start</div>
+          <textarea class="sp-textarea" id="hb-instr-session-start" rows="2" placeholder="(uses default if blank)"></textarea></div>
+          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">Context filling</div>
+          <textarea class="sp-textarea" id="hb-instr-context-threshold" rows="2" placeholder="(uses default if blank)"></textarea></div>
+          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">Manual trigger</div>
+          <textarea class="sp-textarea" id="hb-instr-manual" rows="2" placeholder="(uses default if blank)"></textarea></div>
+        </div>
+
+        <div class="sp-btn-row">
+          <button class="sp-btn-ghost" onclick="spSaveCompanion()">Apply</button>
+          <button class="sp-btn-primary" onclick="spSaveCompanion(true)">Save &amp; close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- About tab -->
+    <div class="sp-body tab-body" id="tab-about">
+      <div class="sp-section-label">Project</div>
+      <div class="sp-kv"><span>Version</span><span>0.2.0</span></div>
+      <div class="sp-kv"><span>Model</span><span id="about-model" class="sp-mono">—</span></div>
+      <div class="sp-kv"><span>GPU</span><span id="about-gpu">—</span></div>
+      <div class="sp-kv"><span>Ports</span><span id="about-ports">—</span></div>
+      <div class="sp-kv"><span>Companion</span><span id="about-companion">—</span></div>
+      <div class="sp-section-label" style="margin-top:18px">Paths</div>
+      <div class="sp-mono-block" id="about-paths">—</div>
+      <div class="sp-btn-row" style="margin-top:20px">
+        <button class="sp-btn-ghost" onclick="spRestartServer()">↺ Restart server</button>
+        <button class="sp-btn-ghost" onclick="window.location.href='/wizard'">✦ Re-run wizard</button>
+      </div>
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(248,113,113,0.2)">
+        <div class="sp-section-label" style="color:rgba(248,113,113,0.6);margin-bottom:8px">Danger zone</div>
+        <p style="font-size:12.5px;color:var(--text-muted);line-height:1.6;margin-bottom:14px">
+          Factory reset deletes all companions, conversation history, and configuration.
+          The app will restart as if freshly installed.
+        </p>
+        <button class="sp-btn-ghost" onclick="spFactoryReset()"
+          style="border-color:rgba(248,113,113,0.3);color:var(--red)">
+          ⊗ Factory reset
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Native file inputs for model/mmproj in settings -->
+<input type="file" id="pick-model"  accept=".gguf" style="display:none" onchange="spNativePick(this,'model')"/>
+<input type="file" id="pick-mmproj" accept=".gguf" style="display:none" onchange="spNativePick(this,'mmproj')"/>
+<!-- Hidden file inputs for each attachment type -->
+<input type="file" id="file-image" accept="image/*"            style="display:none" multiple onchange="handleFilePick(this,'image')"/>
+<input type="file" id="file-audio" accept="audio/*"            style="display:none" multiple onchange="handleFilePick(this,'audio')"/>
+<input type="file" id="file-text"  accept=".txt,.md,.csv,.log,.py,.js,.json,.html,.css,.xml" style="display:none" multiple onchange="handleFilePick(this,'text')"/>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/attachments.js"></script>
+<script src="/static/js/chat-ui.js"></script>
+<script src="/static/js/chat-tabs.js"></script>
+<script src="/static/js/chat-controls.js"></script>
+<script src="/static/js/chat.js"></script>
+<script src="/static/js/heartbeat.js"></script>
+<script src="/static/js/settings.js"></script>
+</body>
+</html>

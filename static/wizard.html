@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Companion — Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/wizard.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+
+    <div class="dots">
+      <div class="dot active" id="dot-0"></div>
+      <div class="dot"        id="dot-1"></div>
+      <div class="dot"        id="dot-2"></div>
+    </div>
+
+    <!-- ── STEP 0: Model + hardware ──────────────────────────────────── -->
+    <div class="step visible" id="step-0">
+      <div class="eyebrow">Setup — 1 of 2</div>
+      <h1>Let's find your<br><em>model file.</em></h1>
+      <p class="subtitle">
+        Click <strong style="color:var(--text)">Browse</strong> to open a file picker,
+        or use <strong style="color:var(--text)">Scan</strong> to search common locations.
+      </p>
+
+      <span class="field-label">Model file (.gguf)</span>
+      <!-- File chip — shows selected file like attachment chips in chat -->
+      <div class="file-chip-row" id="model-chip-row">
+        <div class="file-chip empty" id="model-chip" onclick="browseFile('model')">
+          <span class="file-chip-icon">📦</span>
+          <span class="file-chip-name" id="model-chip-name">Click to select…</span>
+        </div>
+        <button class="btn-secondary" id="scan-btn" onclick="scanForModels()" style="margin-left:8px;flex-shrink:0">
+          Scan
+        </button>
+      </div>
+      <div class="scan-results" id="scan-results"></div>
+
+      <div class="divider"></div>
+
+      <div class="toggle-row" onclick="toggleMultimodal()">
+        <div class="toggle-track" id="mm-toggle"><div class="toggle-thumb"></div></div>
+        <span class="toggle-label">
+          <strong>Multimodal</strong> — enable image support (requires an mmproj file)
+        </span>
+      </div>
+
+      <div class="mmproj-section" id="mmproj-section">
+        <span class="field-label" style="margin-bottom:9px">Vision projector (mmproj)</span>
+        <div class="file-chip-row">
+          <div class="file-chip empty" id="mmproj-chip" onclick="browseFile('mmproj')">
+            <span class="file-chip-icon">🔭</span>
+            <span class="file-chip-name" id="mmproj-chip-name">Click to select…</span>
+          </div>
+        </div>
+        <div id="mmproj-candidates-wrap" style="display:none">
+          <div style="font-size:11.5px;color:var(--text-muted);margin:8px 0 6px">
+            Possible matches in same folder:
+          </div>
+          <div id="mmproj-candidate-list"></div>
+        </div>
+        <p class="mmproj-note">
+          Must match your model's embedding size exactly.
+          A mismatch will prevent the model from loading.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <span class="field-label">GPU</span>
+      <div class="detected-note" id="detected-note">✓ <span id="detected-label"></span></div>
+      <div class="gpu-row">
+        <div class="gpu-chip" data-gpu="intel"  onclick="selectGPU(this)"><div class="gpu-dot" style="background:#6496f5"></div>Intel Arc</div>
+        <div class="gpu-chip" data-gpu="nvidia" onclick="selectGPU(this)"><div class="gpu-dot" style="background:#76c442"></div>NVIDIA</div>
+        <div class="gpu-chip" data-gpu="amd"    onclick="selectGPU(this)"><div class="gpu-dot" style="background:#e05a3a"></div>AMD</div>
+        <div class="gpu-chip" data-gpu="cpu"    onclick="selectGPU(this)"><div class="gpu-dot" style="background:#888"></div>CPU only</div>
+      </div>
+
+      <div class="adv-toggle" onclick="toggleAdv(this)">
+        <span class="chevron">›</span> Advanced settings
+      </div>
+      <div class="adv-fields">
+        <span class="field-label">GPU layers (ngl)</span>
+        <input type="number" id="ngl" value="99" min="0" max="999"/>
+        <span class="field-label">Ports</span>
+        <div class="adv-row">
+          <div>
+            <span class="field-label" style="margin-bottom:4px">Bridge</span>
+            <input type="number" id="port-bridge" value="8000"/>
+          </div>
+          <div>
+            <span class="field-label" style="margin-bottom:4px">Model server</span>
+            <input type="number" id="port-model" value="8081"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="error-msg" id="err-0"></div>
+      <div class="btn-row">
+        <button class="btn-primary" id="btn-start" onclick="startBoot()" disabled>
+          Start it up →
+        </button>
+      </div>
+    </div>
+
+    <!-- ── STEP 1: Boot ───────────────────────────────────────────────── -->
+    <div class="step" id="step-1">
+      <div class="boot-wrap">
+        <div class="boot-ring" id="boot-ring"></div>
+        <div class="eyebrow" id="boot-eyebrow" style="text-align:center;margin-bottom:10px">Starting up</div>
+        <h1 style="text-align:center;margin-bottom:20px">Bringing your<br><em>companion online…</em></h1>
+      </div>
+      <div class="boot-log" id="boot-log">
+        <span style="color:var(--text-dim)">Waiting for llama-server…</span>
+      </div>
+      <div class="error-msg" id="err-1"></div>
+      <div class="btn-row" id="boot-next-row" style="display:none">
+        <button class="btn-primary" onclick="goTo(2)">Say hello →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: Ready ──────────────────────────────────────────────── -->
+    <div class="step" id="step-2">
+      <div class="ready-icon">✦</div>
+      <div class="eyebrow">Ready</div>
+      <h1>Your companion<br>is <em>waiting for you.</em></h1>
+      <p class="subtitle">
+        Everything's running. Head into chat — they'll introduce themselves
+        and get to know you from there.
+      </p>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="window.location.href='/chat'">Open chat →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Native file inputs for model/mmproj — open GNOME Files / OS picker -->
+<input type="file" id="pick-model"  accept=".gguf" style="display:none" onchange="onNativePick(this,'model')"/>
+<input type="file" id="pick-mmproj" accept=".gguf" style="display:none" onchange="onNativePick(this,'mmproj')"/>
+<script src="/static/js/wizard.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# Ignore temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+.env
+.env.local
+config.json # Personal system settings
+
+# Optional: Ignore your memory folders if you want them separate
+companions/
+
+# Optional: For Python or other runtime caches (if applicable)
+__pycache__/
+node_modules/

@@ -1,0 +1,71 @@
+{
+  "companion_name": "S.E.N.N.I",
+  "companion_folder": "default",
+  "model_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+  "mmproj_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+  "gpu_type": "intel",
+  "port_bridge": 8000,
+  "port_model": 8081,
+  "first_run": false,
+  "server_args": {
+    "ngl": {
+      "flag": "-ngl",
+      "enabled": true,
+      "value": 99
+    },
+    "ctx": {
+      "flag": "-c",
+      "enabled": true,
+      "value": 16384
+    },
+    "np": {
+      "flag": "-np",
+      "enabled": true,
+      "value": 1
+    },
+    "ctk": {
+      "flag": "-ctk",
+      "enabled": true,
+      "value": "q8_0"
+    },
+    "ctv": {
+      "flag": "-ctv",
+      "enabled": true,
+      "value": "q8_0"
+    },
+    "jinja": {
+      "flag": "--jinja",
+      "enabled": true,
+      "value": null
+    },
+    "no_mmap": {
+      "flag": "--no-mmap",
+      "enabled": false,
+      "value": null
+    }
+  },
+  "server_args_custom": [
+    {
+      "flag": "--cache-reuse",
+      "value": "256",
+      "enabled": true
+    },
+    {
+      "flag": "--reasoning-format",
+      "value": "deepseek",
+      "enabled": true
+    }
+  ],
+  "generation": {
+    "temperature": 0.8,
+    "top_p": 0.95,
+    "top_k": 40,
+    "repeat_penalty": 1.1,
+    "max_tokens": 8000,
+    "max_tool_rounds": 20,
+    "vision_mode": "always",
+    "render_markdown": true,
+    "markdown_enabled": true
+  },
+  "ngl": 99
+}

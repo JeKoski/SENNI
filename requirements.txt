@@ -1,0 +1,9 @@
+# Core server
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Tool dependencies
+ddgs>=6.0.0          # web_search
+httpx>=0.27.0        # web_scrape
+beautifulsoup4>=4.12 # web_scrape
