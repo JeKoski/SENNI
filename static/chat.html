@@ -19,7 +19,15 @@
     <div class="companion-header">
       <div class="avatar" id="companion-avatar">✦</div>
       <div>
-        <div class="companion-name" id="companion-name">…</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="companion-name" id="companion-name">…</div>
+          <button class="companion-gear-btn" onclick="openCompanionWindow()" title="Companion settings">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="8" cy="8" r="2.5"/>
+              <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42"/>
+            </svg>
+          </button>
+        </div>
         <div class="companion-status">
           <svg class="status-dot-svg" width="16" height="16" viewBox="0 0 16 16">
             <!-- Solid dot with gentle breathe -->
@@ -139,6 +147,140 @@
 
 </div>
 
+<!-- Companion settings window -->
+<div id="companion-overlay" class="companion-overlay" onclick="closeCompanionIfBg(event)">
+  <div class="companion-panel">
+    <div class="companion-panel-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="cp-avatar-sm" id="cp-header-avatar">✦</div>
+        <div>
+          <div style="font-family:'Lora',serif;font-size:17px;color:#eef0fb" id="cp-header-name">Companion</div>
+          <div style="font-size:11px;color:rgba(221,225,240,0.3)">Companion settings</div>
+        </div>
+      </div>
+      <button class="companion-close-btn" onclick="closeCompanionWindow()">✕</button>
+    </div>
+    <div class="companion-tabs-strip">
+      <button class="cp-tab" data-tab="identity"   onclick="cpSwitchTab('identity')">Identity</button>
+      <button class="cp-tab" data-tab="generation" onclick="cpSwitchTab('generation')">Generation</button>
+      <button class="cp-tab" data-tab="memory"     onclick="cpSwitchTab('memory')">Memory</button>
+      <button class="cp-tab" data-tab="heartbeat"  onclick="cpSwitchTab('heartbeat')">Heartbeat</button>
+      <button class="cp-tab" data-tab="presence"   onclick="cpSwitchTab('presence')" style="color:rgba(167,139,250,0.7)">Presence ✦</button>
+    </div>
+    <!-- Identity -->
+    <div class="cp-tab-body" id="cp-tab-identity">
+      <div class="cp-section">Avatar</div>
+      <div class="cp-avatar-zone" ondragover="event.preventDefault()" ondrop="cpAvatarDrop(event)">
+        <div class="cp-avatar-preview" id="cp-avatar-preview">✦</div>
+        <div class="cp-avatar-hint">Drop image or <span class="cp-link" onclick="cpAvatarBrowse()">browse</span></div>
+      </div>
+      <input type="file" id="cp-avatar-file" accept="image/*" style="display:none" onchange="cpAvatarFile(this)"/>
+      <div id="cp-crop-wrap" style="display:none">
+        <canvas id="cp-crop-canvas" width="240" height="240"
+          onmousedown="cpCropStart(event)" onmousemove="cpCropMove(event)"
+          onmouseup="cpCropEnd()" onmouseleave="cpCropEnd()"
+          style="cursor:move;border-radius:12px;display:block;margin:0 auto 10px"></canvas>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
+          <button class="sp-btn-ghost" onclick="cpCropZoom(-0.1)">－ Zoom</button>
+          <button class="sp-btn-ghost" onclick="cpCropZoom(0.1)">＋ Zoom</button>
+          <button class="sp-btn-primary" onclick="cpCropConfirm()">Use this</button>
+        </div>
+      </div>
+      <div class="cp-section" style="margin-top:16px">Name</div>
+      <input type="text" class="cp-input" id="cp-companion-name" placeholder="Companion name" style="margin-bottom:16px"/>
+      <div class="cp-section">Identity editing <span class="cp-note">what the companion can change about itself</span></div>
+      <div id="cp-soul-edit-mode" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="locked" checked/> <span>Locked</span> <span class="cp-note">companion cannot edit its own identity</span></label>
+        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="self_notes"/> <span>Self notes</span> <span class="cp-note">can write to soul/self_notes.md</span></label>
+        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="agentic"/> <span>Fully agentic</span> <span class="cp-note">can rewrite companion_identity.md — auto-backed up</span></label>
+        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="chaos"/> <span>Chaos mode 🔥</span> <span class="cp-note">unrestricted across all folders</span></label>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="sp-tog on" id="cp-force-read" onclick="this.classList.toggle('on')"></div>
+        <span style="font-size:13px;color:rgba(221,225,240,0.6)">Require read before write <span class="cp-note" style="margin-left:4px">disable to reduce context burn</span></span>
+      </div>
+    </div>
+    <!-- Generation -->
+    <div class="cp-tab-body" id="cp-tab-generation">
+      <div class="cp-section">Core <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400">blank = inherit global</span></div>
+      <div class="cp-row-2">
+        <div><div class="cp-field-label">Temperature</div><input type="number" class="cp-input" id="cp-g-temp" placeholder="global" min="0" max="2" step="0.05"/></div>
+        <div><div class="cp-field-label">Top-P</div><input type="number" class="cp-input" id="cp-g-topp" placeholder="global" min="0" max="1" step="0.01"/></div>
+        <div><div class="cp-field-label">Top-K</div><input type="number" class="cp-input" id="cp-g-topk" placeholder="global" min="0"/></div>
+        <div><div class="cp-field-label">Min-P <span class="cp-badge cp-badge-new">new</span></div><input type="number" class="cp-input" id="cp-g-minp" placeholder="0.0 (off)" min="0" max="1" step="0.01"/></div>
+        <div><div class="cp-field-label">Repeat penalty</div><input type="number" class="cp-input" id="cp-g-rpen" placeholder="global" min="1" max="2" step="0.05"/></div>
+        <div><div class="cp-field-label">Max response tokens</div><input type="number" class="cp-input" id="cp-g-maxt" placeholder="global" min="64"/></div>
+      </div>
+      <div class="cp-section" style="margin-top:14px">Repetition control</div>
+      <div class="cp-row-2">
+        <div><div class="cp-field-label">Presence penalty <span class="cp-badge cp-badge-rec">recommended</span></div><input type="number" class="cp-input" id="cp-g-pres" placeholder="0.0 (off)" min="0" max="2" step="0.05"/></div>
+        <div><div class="cp-field-label">Frequency penalty</div><input type="number" class="cp-input" id="cp-g-freq" placeholder="0.0 (off)" min="0" max="2" step="0.05"/></div>
+      </div>
+      <div class="cp-adv-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.cp-arr').textContent=this.nextElementSibling.classList.contains('open')?'▾':'▸'">
+        <span class="cp-arr">▸</span> <span>DRY sampler</span>
+        <span class="cp-badge cp-badge-adv">advanced</span>
+        <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400;margin-left:2px">prevents repeated sequences</span>
+      </div>
+      <div class="cp-adv-body">
+        <div class="cp-dry-info">DRY penalises repeated <em>sequences</em> of tokens — effective against looping patterns small models fall into.</div>
+        <div class="cp-row-3">
+          <div><div class="cp-field-label">Multiplier</div><input type="number" class="cp-input" id="cp-g-dry-m" placeholder="0.0 (off)" min="0" step="0.1"/></div>
+          <div><div class="cp-field-label">Base</div><input type="number" class="cp-input" id="cp-g-dry-b" placeholder="1.75" min="1" step="0.05"/></div>
+          <div><div class="cp-field-label">Allowed length</div><input type="number" class="cp-input" id="cp-g-dry-l" placeholder="2" min="1"/></div>
+        </div>
+      </div>
+      <div class="cp-section" style="margin-top:14px">Other</div>
+      <div class="cp-row-2">
+        <div><div class="cp-field-label">Max tool rounds</div><input type="number" class="cp-input" id="cp-g-rounds" placeholder="global" min="1" max="20"/></div>
+      </div>
+    </div>
+    <!-- Memory -->
+    <div class="cp-tab-body" id="cp-tab-memory">
+      <div class="cp-section" style="display:flex;justify-content:space-between;align-items:center">Soul files <button class="cp-add-btn" onclick="cpNewSoulFile()">+ New file</button></div>
+      <div id="cp-soul-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+      <textarea class="cp-textarea" id="cp-soul-content" placeholder="Select a file above to edit…" rows="12"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+        <button class="sp-btn-ghost" id="cp-soul-save-btn" onclick="cpSaveSoulFile()" style="display:none">Save file</button>
+      </div>
+    </div>
+    <!-- Heartbeat -->
+    <div class="cp-tab-body" id="cp-tab-heartbeat">
+      <div class="cp-section">Mode</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-silent" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">Silent tool turns <span class="cp-note">(update notes, research)</span></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-message" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">Can send messages <span class="cp-note">(companion reaches out)</span></span></div>
+      </div>
+      <div class="cp-section">Triggers</div>
+      <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-idle" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.5)">After</span><input type="number" class="cp-input" id="cp-hb-idle-min" value="15" min="1" max="120" style="width:58px;font-size:13px;padding:4px 8px"/><span style="font-size:13px;color:rgba(221,225,240,0.5)">minutes idle</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-conv-end" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">When context is reset</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-session" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">On session start</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-ctx" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.5)">When context reaches</span><input type="number" class="cp-input" id="cp-hb-ctx-pct" value="75" min="10" max="95" style="width:58px;font-size:13px;padding:4px 8px"/><span style="font-size:13px;color:rgba(221,225,240,0.5)">%</span></div>
+      </div>
+      <div class="cp-section">Instructions <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400">blank = use default</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.7;margin-bottom:3px">Default (all triggers)</div><textarea class="cp-textarea" id="cp-hb-instr-default" rows="2" placeholder="Reflect on the conversation. Update session notes."></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">After idle</div><textarea class="cp-textarea" id="cp-hb-instr-idle" rows="2" placeholder="(uses default if blank)"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Context reset</div><textarea class="cp-textarea" id="cp-hb-instr-conversation-end" rows="2" placeholder="(uses default if blank)"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Session start</div><textarea class="cp-textarea" id="cp-hb-instr-session-start" rows="2" placeholder="(uses default if blank)"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Context filling</div><textarea class="cp-textarea" id="cp-hb-instr-context-threshold" rows="2" placeholder="(uses default if blank)"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Manual trigger</div><textarea class="cp-textarea" id="cp-hb-instr-manual" rows="2" placeholder="(uses default if blank)"></textarea></div>
+      </div>
+    </div>
+    <!-- Presence (placeholder) -->
+    <div class="cp-tab-body" id="cp-tab-presence">
+      <div style="text-align:center;padding:40px 20px;color:rgba(221,225,240,0.25);font-size:13px">
+        <div style="font-size:28px;margin-bottom:12px">✦</div>Presence settings coming soon
+      </div>
+    </div>
+    <!-- Footer -->
+    <div class="companion-panel-footer">
+      <button class="sp-btn-ghost" onclick="cpSave()">Apply</button>
+      <button class="sp-btn-primary" onclick="cpSave(true)">Save &amp; close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Settings overlay ──────────────────────────────────────────────────── -->
 <div class="settings-overlay" id="settings-overlay" onclick="closeSettingsIfBg(event)">
   <div class="settings-panel" id="settings-panel">
@@ -243,7 +385,11 @@
         Companions
         <button class="sp-add-btn" onclick="spNewCompanion()">+ New</button>
       </div>
-      <div id="sp-companion-list" style="margin-bottom:18px"></div>
+      <div id="sp-companion-list" style="margin-bottom:14px"></div>
+      <button class="sp-btn-ghost" style="width:100%;justify-content:center;gap:8px" onclick="closeSettings();openCompanionWindow()">
+        ⚙ Open companion settings
+      </button>
+      <div style="height:1px;background:rgba(140,145,220,0.1);margin:16px 0"></div>
       <div id="sp-companion-editor">
         <div class="sp-section-label">Active companion</div>
         <div class="sp-avatar-zone" id="sp-avatar-zone"
@@ -420,6 +566,7 @@
 <script src="/static/js/chat-controls.js"></script>
 <script src="/static/js/chat.js"></script>
 <script src="/static/js/heartbeat.js"></script>
+<script src="/static/js/companion.js"></script>
 <script src="/static/js/settings.js"></script>
 </body>
 </html>
