@@ -1,13 +1,13 @@
 # SENNI
 
-*Still very early in development*
+## Still very early in development - Not intended for end-users yet
 
-**S.E.N.N.I - Shared Experience Nexus for Neural Intelligence**
+## S.E.N.N.I - Shared Experience Nexus for Neural Intelligence
 or just *Senni* for short
 
 S.E.N.N.I is a fully local framework for creating and interacting with your own AI assistants and companions
 
-Focus is on:
+## Focus is on:
 - Local & Privacy - Everything happens on your own computer. No cloud
 - Fully GUI driven - A clean interface where you can manage everything without having to touch code or the commandline
 - Ease of use
@@ -16,11 +16,16 @@ Focus is on:
 
 ---
 
-## Quick start
+# WARNING: Installation not yet set-up or supported
+For current early development versions, only Linux & possibly only Intel GPUs via SYCL are supported out the box
+You'll need to tweak config and possibly scripts to set everything up at the moment
 
-1. Install Python 3.10+
-2. pip install -r requirements.txt
-3. python main.py
+1. Install llama.cpp
+2. Install Python 3.10+ (3.12 recommended)
+3. Download a model of your choice in .gguf format
+4. Open terminal at project root (~/SENNI)
+5. Run `pip install -r requirements.txt`
+6. Run `python main.py`
 
 The browser will open automatically.
 First run → setup wizard → configure model path and GPU → chat.
