@@ -1,6 +1,6 @@
 {
-  "companion_name": "Qwenny",
-  "companion_folder": "qwenny",
+  "companion_name": "Senni",
+  "companion_folder": "default",
   "model_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-heretic-v2.Q4_K_M.gguf",
   "mmproj_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-heretic-v2.BF16-mmproj.gguf",
   "gpu_type": "intel",
@@ -38,53 +38,49 @@
       "enabled": true,
       "value": null
     },
-    "reasoning_format": {
-      "flag": "--reasoning-format",
-      "enabled": true,
-      "value": "deepseek"
-    },
-    "cache_reuse": {
-      "flag": "--cache-reuse",
-      "enabled": true,
-      "value": 256
-    },
-    "batch": {
-      "flag": "-b",
-      "enabled": true,
-      "value": 256
-    },
-    "ubatch": {
-      "flag": "-ub",
-      "enabled": true,
-      "value": 256
-    },
-    "flash_attn": {
-      "flag": "--flash-attn",
-      "enabled": false,
-      "value": null
-    },
-    "prompt_cache": {
-      "flag": "--prompt-cache",
-      "enabled": false,
-      "value": "senni.cache"
-    },
-    "mlock": {
-      "flag": "--mlock",
-      "enabled": false,
-      "value": null
-    },
     "no_mmap": {
       "flag": "--no-mmap",
       "enabled": false,
       "value": null
     },
-    "threads": {
-      "flag": "-t",
+    "cache_reuse": {
+      "enabled": true,
+      "value": 256,
+      "flag": "--cache-reuse"
+    },
+    "batch": {
+      "enabled": true,
+      "value": 256,
+      "flag": "-b"
+    },
+    "ubatch": {
+      "enabled": true,
+      "value": 256,
+      "flag": "-ub"
+    },
+    "prompt_cache": {
       "enabled": false,
-      "value": null
+      "value": "senni.cache",
+      "flag": "--prompt-cache"
+    },
+    "mlock": {
+      "enabled": false,
+      "value": null,
+      "flag": "--mlock"
+    },
+    "flash_attn": {
+      "enabled": false,
+      "value": null,
+      "flag": "--flash-attn"
+    },
+    "threads": {
+      "enabled": false,
+      "value": 0,
+      "flag": "-t"
     }
   },
   "server_args_custom": [],
+  "presence_presets": {},
   "generation": {
     "temperature": 0.8,
     "top_p": 0.95,
@@ -96,7 +92,7 @@
     "dry_multiplier": 0.0,
     "dry_base": 1.75,
     "dry_allowed_length": 2,
-    "max_tokens": 2048,
+    "max_tokens": 1024,
     "max_tool_rounds": 16,
     "vision_mode": "always",
     "markdown_enabled": false

@@ -221,38 +221,73 @@ function appendSystemNote(text) {
   scrollToBottom();
 }
 
-// ── Companion status bar ─────────────────────────────────────────────────────
-// States: 'idle' | 'thinking' | 'streaming'
-function setCompanionStatus(state) {
-  const el = document.getElementById('companion-status');
-  if (!el) return;
-  el.className = 'companion-status ' + state;
+// ── Companion orb ─────────────────────────────────────────────────────────────
+// Public API: setPresenceState(state, overrides)
+// states: 'idle' | 'thinking' | 'streaming' | 'heartbeat' | 'chaos' | any custom name
+// overrides: optional object of CSS variable values to set on the orb element
+//   e.g. { '--glow-color': 'rgba(244,114,182,0.45)', '--dot-color': '#f472b6' }
+// All params are CSS custom properties — fully scriptable at runtime.
+
+function setPresenceState(state, overrides = {}) {
+  const orb = document.getElementById('companion-orb');
+  if (!orb) return;
+  // Swap state class (keep any non-state classes)
+  const BASE_STATES = ['idle','thinking','streaming','heartbeat','chaos'];
+  orb.classList.remove(...BASE_STATES);
+  // For built-in states use the class; for custom states fall back to 'thinking' animation
+  if (BASE_STATES.includes(state)) {
+    orb.classList.add(state);
+  } else {
+    orb.classList.add('thinking');  // custom state uses thinking animation by default
+  }
+  // Apply any CSS variable overrides directly on the element
+  Object.entries(overrides).forEach(([prop, val]) => {
+    orb.style.setProperty(prop.startsWith('--') ? prop : '--' + prop, val);
+  });
 }
 
+// Backward compat alias used throughout the codebase
+function setCompanionStatus(state) { setPresenceState(state); }
+
+// Sync the sidebar avatar image into the orb icon
 function syncStatusAvatar() {
-  // Mirror the sidebar avatar into the status bar
-  const src = document.querySelector('#companion-avatar img')?.src;
-  const csAv = document.getElementById('cs-avatar');
-  if (!csAv) return;
+  const src   = document.querySelector('#companion-avatar img')?.src;
+  const icon  = document.getElementById('orb-icon');
+  if (!icon) return;
   if (src) {
-    csAv.innerHTML = `<img src="${src}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
+    icon.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
   } else {
-    csAv.textContent = '✦';
+    icon.textContent = '✦';
   }
+}
+
+// Apply a full presence preset object (from companion config)
+// preset: { state, glowColor, glowMax, glowSpeed, ringSpeed, dotColor, dotSpeed, breathSpeed, orbSize }
+function applyPresencePreset(preset) {
+  if (!preset) return;
+  const overrides = {};
+  if (preset.glowColor)   overrides['--glow-color']   = preset.glowColor;
+  if (preset.glowMax)     overrides['--glow-max']      = preset.glowMax + 'px';
+  if (preset.glowSpeed)   overrides['--glow-speed']    = preset.glowSpeed + 's';
+  if (preset.ringSpeed)   overrides['--ring-speed']    = preset.ringSpeed + 's';
+  if (preset.dotColor)    overrides['--dot-color']     = preset.dotColor;
+  if (preset.dotSpeed)    overrides['--dot-speed']     = preset.dotSpeed + 's';
+  if (preset.breathSpeed) overrides['--breath-speed']  = preset.breathSpeed + 's';
+  if (preset.orbSize)     overrides['--orb-size']      = preset.orbSize + 'px';
+  setPresenceState(preset.state || 'thinking', overrides);
 }
 
 // Keep typing functions working — they now control the status bar instead of DOM rows
 let _typingCounter = 0;
 function showTyping() {
-  setCompanionStatus('thinking');
+  setPresenceState('thinking');
   scrollToBottom();
-  return 'status-' + (++_typingCounter);  // dummy id, not used for DOM removal
+  return 'orb-' + (++_typingCounter);
 }
 
 function removeTyping(id) {
-  // Called when a real reply arrives — status transitions to idle or streaming
-  // Status will be set to 'streaming' by api.js or 'idle' after response finalises
-  setCompanionStatus('idle');
+  // Streaming will transition to 'streaming'; non-stream falls back to idle
+  setPresenceState('idle');
 }
 
 function scrollToBottom() {

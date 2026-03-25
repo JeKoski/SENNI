@@ -59,6 +59,9 @@ function cpPopulate() {
     preview.innerHTML = '✦';
   }
   document.getElementById('cp-crop-wrap').style.display = 'none';
+  // Show/hide reset link
+  const resetWrap = document.getElementById('cp-avatar-reset-wrap');
+  if (resetWrap) resetWrap.style.display = c.avatar_data ? 'inline' : 'none';
 
   const soulMode = c.soul_edit_mode || 'locked';
   document.querySelectorAll('#cp-soul-edit-mode input[name="cp-soul-edit"]').forEach(r => {
@@ -88,6 +91,9 @@ function cpPopulate() {
 
   // ── Memory (soul files) ──
   cpLoadSoulFiles();
+
+  // ── Presence ──
+  cpPresenceInit();
 
   // ── Heartbeat ──
   const hb = c.heartbeat || {};
@@ -237,6 +243,8 @@ function cpCropConfirm() {
   const dataUrl = out.toDataURL('image/png');
   document.getElementById('cp-avatar-preview').innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
   document.getElementById('cp-crop-wrap').style.display = 'none';
+  const rw = document.getElementById('cp-avatar-reset-wrap');
+  if (rw) rw.style.display = 'inline';
   if (cpSettings?.active_companion) cpSettings.active_companion.avatar_data = dataUrl;
 }
 
@@ -244,6 +252,15 @@ function cpCropConfirm() {
 function cpCropStart(e) { _cpCropDragging = true; _cpCropDragStart = {x:e.clientX,y:e.clientY}; _cpCropPosStart = {x:_cpCropX,y:_cpCropY}; }
 function cpCropMove(e)  { if (!_cpCropDragging) return; _cpCropX = _cpCropPosStart.x+(e.clientX-_cpCropDragStart.x); _cpCropY = _cpCropPosStart.y+(e.clientY-_cpCropDragStart.y); cpDrawCrop(); }
 function cpCropEnd()    { _cpCropDragging = false; }
+
+function cpAvatarReset() {
+  const preview = document.getElementById('cp-avatar-preview');
+  if (preview) preview.innerHTML = '✦';
+  const rw = document.getElementById('cp-avatar-reset-wrap');
+  if (rw) rw.style.display = 'none';
+  document.getElementById('cp-crop-wrap').style.display = 'none';
+  if (cpSettings?.active_companion) cpSettings.active_companion.avatar_data = '';
+}
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 async function cpSave(andClose = false) {
@@ -294,7 +311,9 @@ async function cpSave(andClose = false) {
         manual:            getInstr('manual'),
       },
     },
-    set_active: true,
+    set_active:               true,
+    presence_presets:         _cpPresenceData,
+    active_presence_preset:   _cpActivePreset,
   };
 
   try {
@@ -340,6 +359,11 @@ async function cpSave(andClose = false) {
       cpSettings.active_companion.heartbeat               = body.heartbeat;
     }
 
+    // Apply active preset to live orb immediately
+    if (typeof applyPresencePreset === 'function' && _cpPresenceData[_cpActivePreset]) {
+      const livePreset = _cpPresenceData[_cpActivePreset];
+      applyPresencePreset({ state: 'idle', ...(livePreset.idle || {}) });
+    }
     cpShowToast('Companion saved ✓');
     if (andClose) closeCompanionWindow();
   } catch(e) { console.warn('cpSave failed:', e); }
@@ -359,4 +383,428 @@ function cpShowToast(msg) {
   toast.textContent = msg;
   toast.style.opacity = '1';
   _cpToastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2200);
+}
+
+// ── Presence tab ──────────────────────────────────────────────────────────────
+let _cpPresencePresets   = {};   // full merged preset library
+let _cpActivePreset      = 'Default';
+let _cpEditingState      = 'thinking';
+let _cpPresenceDirty     = false; // unsaved changes
+
+function cpPresenceInit() {
+  // Called after cpLoad — populate presets from loaded settings
+  _cpPresencePresets = JSON.parse(JSON.stringify(
+    cpSettings?.presence_presets || { Default: {} }
+  ));
+  _cpActivePreset = cpSettings?.active_companion?.active_presence_preset || 'Default';
+  cpPresenceRenderPresets();
+  cpPresenceLoadState(_cpEditingState);
+  cpPresenceSyncPreview(_cpEditingState);
+  // Mirror companion avatar into preview
+  const avSrc = document.querySelector('#companion-avatar img')?.src;
+  const previewIcon = document.getElementById('cp-preview-icon');
+  if (previewIcon && avSrc) {
+    previewIcon.innerHTML = `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+  }
+}
+
+function cpPresenceRenderPresets() {
+  const bar = document.getElementById('cp-preset-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  const PROTECTED = ['Default','Warm'];  // factory presets can't be deleted
+  Object.keys(_cpPresencePresets).forEach(name => {
+    const chip = document.createElement('div');
+    chip.className = 'cp-preset-chip' + (name === _cpActivePreset ? ' active' : '');
+    const label = document.createTextNode(name);
+    chip.appendChild(label);
+    if (!PROTECTED.includes(name)) {
+      const del = document.createElement('span');
+      del.className = 'cp-preset-del';
+      del.textContent = '×';
+      del.title = 'Delete preset';
+      del.onclick = (e) => { e.stopPropagation(); cpPresenceDeletePreset(name); };
+      chip.appendChild(del);
+    }
+    chip.addEventListener('click', () => cpPresenceSelectPreset(name));
+    bar.appendChild(chip);
+  });
+}
+
+function cpPresenceSelectPreset(name) {
+  _cpActivePreset = name;
+  cpPresenceRenderPresets();
+  cpPresenceLoadState(_cpEditingState);
+  cpPresenceSyncPreview(_cpEditingState);
+  // Apply to live orb immediately for preview
+  const stateVars = _cpGetStateVars(name, _cpEditingState);
+  if (typeof applyPresencePreset === 'function') {
+    applyPresencePreset({ state: _cpEditingState, ...stateVars });
+  }
+}
+
+function cpPresenceNewPreset() {
+  const name = prompt('New preset name:');
+  if (!name?.trim()) return;
+  const n = name.trim();
+  if (_cpPresencePresets[n]) { alert('A preset with that name already exists.'); return; }
+  // Clone Default as starting point
+  _cpPresencePresets[n] = JSON.parse(JSON.stringify(_cpPresencePresets['Default'] || {}));
+  _cpActivePreset = n;
+  cpPresenceRenderPresets();
+  cpPresenceLoadState(_cpEditingState);
+  _cpPresenceDirty = true;
+}
+
+function cpPresenceDeletePreset(name) {
+  if (!confirm(`Delete preset "${name}"?`)) return;
+  delete _cpPresencePresets[name];
+  if (_cpActivePreset === name) _cpActivePreset = 'Default';
+  cpPresenceRenderPresets();
+  cpPresenceLoadState(_cpEditingState);
+  _cpPresenceDirty = true;
+}
+
+function cpPresencePreviewState(btn) {
+  document.querySelectorAll('.cp-state-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _cpEditingState = btn.dataset.state;
+  document.getElementById('cp-editing-state').textContent = _cpEditingState;
+  document.getElementById('cp-preview-state-label').textContent = _cpEditingState;
+  cpPresenceLoadState(_cpEditingState);
+  cpPresenceSyncPreview(_cpEditingState);
+}
+
+function cpPresenceLoadState(state) {
+  // Load the current preset's values for this state into the sliders/color
+  const vars = _cpGetStateVars(_cpActivePreset, state);
+  const set = (id, val, suffix) => {
+    const el = document.getElementById(id);
+    if (el) el.value = parseFloat(val) || el.value;
+    const lbl = document.getElementById(id + '-val');
+    if (lbl) lbl.textContent = (parseFloat(val) || parseFloat(el?.value)) + suffix;
+  };
+  set('cp-s-glow-max',    vars.glowMax    || 16,  'px');
+  set('cp-s-glow-speed',  vars.glowSpeed  || 2.0, 's');
+  set('cp-s-ring-speed',  vars.ringSpeed  || 1.8, 's');
+  set('cp-s-dot-speed',   vars.dotSpeed   || 1.2, 's');
+  set('cp-s-breath-speed',vars.breathSpeed|| 3.0, 's');
+  set('cp-s-orb-size',    vars.orbSize    || 52,  'px');
+  const color = vars.dotColor || '#818cf8';
+  const ci = document.getElementById('cp-color-input');
+  if (ci) ci.value = color;
+  const cd = document.getElementById('cp-color-dot');
+  if (cd) cd.style.background = color;
+}
+
+function cpPresenceSyncPreview(state) {
+  // Update the mini preview orb
+  const orb  = document.getElementById('cp-preview-orb');
+  const dots = document.getElementById('cp-preview-dots');
+  const lbl  = document.getElementById('cp-preview-state-label');
+  if (!orb) return;
+  const STATES = ['thinking','streaming','heartbeat','idle','chaos'];
+  orb.classList.remove(...STATES);
+  orb.classList.add(state);
+  if (lbl) lbl.textContent = state;
+  // Update dot color
+  const vars  = _cpGetStateVars(_cpActivePreset, state);
+  const color = vars.dotColor || '#818cf8';
+  document.querySelectorAll('#cp-preview-dots span').forEach(s => s.style.background = color);
+  // Update preview orb CSS vars
+  if (vars.glowColor) orb.style.setProperty('--glow-color', vars.glowColor);
+  if (vars.glowMax)   orb.style.setProperty('--glow-max',   vars.glowMax + 'px');
+}
+
+function cpPresenceColorInput(val) {
+  const dot = document.getElementById('cp-color-dot');
+  if (dot) dot.style.background = val;
+  if (!/^#[0-9a-fA-F]{6}$/.test(val)) return;
+  // Store in preset
+  if (!_cpPresencePresets[_cpActivePreset]) _cpPresencePresets[_cpActivePreset] = {};
+  if (!_cpPresencePresets[_cpActivePreset][_cpEditingState]) _cpPresencePresets[_cpActivePreset][_cpEditingState] = {};
+  _cpPresencePresets[_cpActivePreset][_cpEditingState].dotColor   = val;
+  _cpPresencePresets[_cpActivePreset][_cpEditingState].glowColor  = val.replace(/^#/, '') && _hexToRgba(val, 0.4);
+  _cpPresenceDirty = true;
+  // Live apply to real orb
+  if (typeof setPresenceState === 'function') {
+    setPresenceState(_cpEditingState, { '--dot-color': val, '--glow-color': _hexToRgba(val, 0.4) });
+  }
+  document.querySelectorAll('#cp-preview-dots span').forEach(s => s.style.background = val);
+}
+
+function cpPresenceSlide(key, val, unit) {
+  if (!_cpPresencePresets[_cpActivePreset]) _cpPresencePresets[_cpActivePreset] = {};
+  if (!_cpPresencePresets[_cpActivePreset][_cpEditingState]) _cpPresencePresets[_cpActivePreset][_cpEditingState] = {};
+  _cpPresencePresets[_cpActivePreset][_cpEditingState][key] = parseFloat(val);
+  _cpPresenceDirty = true;
+  // Live apply CSS var to real orb
+  const cssMap = {
+    glowMax: '--glow-max', glowSpeed: '--glow-speed', ringSpeed: '--ring-speed',
+    dotSpeed: '--dot-speed', breathSpeed: '--breath-speed', orbSize: '--orb-size',
+  };
+  const prop = cssMap[key];
+  if (prop && typeof setPresenceState === 'function') {
+    setPresenceState(_cpEditingState, { [prop]: val + unit });
+  }
+  // Also apply to preview
+  const orb = document.getElementById('cp-preview-orb');
+  if (orb && prop) orb.style.setProperty(prop, val + unit);
+}
+
+function _cpGetStateVars(presetName, state) {
+  // Merge: DEFAULTS base → preset definition
+  const presetLib   = cpSettings?.presence_presets || {};
+  const defaultPreset = presetLib['Default'] || {};
+  const namedPreset   = _cpPresencePresets[presetName] || presetLib[presetName] || {};
+  return { ...(defaultPreset[state] || {}), ...(namedPreset[state] || {}) };
+}
+
+function _hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Called by cpSave — gather presence data to send to server
+function _cpGetPresencePayload() {
+  return {
+    presence_presets:       _cpPresencePresets,
+    active_presence_preset: _cpActivePreset,
+  };
+}
+
+// ── Presence tab ──────────────────────────────────────────────────────────────
+let _cpPresenceData     = {};  // { presetName: { thinking:{...}, streaming:{...}, ... } }
+let _cpActivePreset     = 'Default';
+let _cpEditingState     = 'thinking';
+let _cpPresenceDirty    = false;
+
+// Defaults for each state (used when creating a new preset or missing keys)
+const CP_STATE_DEFAULTS = {
+  thinking:  { glowColor:'rgba(129,140,248,0.4)',  glowMax:16, glowSpeed:2.0, ringSpeed:1.8, dotColor:'#818cf8', dotSpeed:1.2, breathSpeed:3.0, orbSize:52 },
+  streaming: { glowColor:'rgba(109,212,168,0.35)', glowMax:12, glowSpeed:2.5, ringSpeed:2.4, dotColor:'#6dd4a8', dotSpeed:1.4, breathSpeed:3.0, orbSize:52 },
+  heartbeat: { glowColor:'rgba(167,139,250,0.45)', glowMax:20, glowSpeed:1.4, ringSpeed:1.4, dotColor:'#a78bfa', dotSpeed:0.9, breathSpeed:2.0, orbSize:52 },
+  chaos:     { glowColor:'rgba(251,191,36,0.5)',   glowMax:24, glowSpeed:0.8, ringSpeed:0.9, dotColor:'#fbbf24', dotSpeed:0.6, breathSpeed:0.6, orbSize:52 },
+  idle:      { glowColor:'rgba(129,140,248,0.15)', glowMax:6,  glowSpeed:4.0, ringSpeed:4.0, dotColor:'#818cf8', dotSpeed:2.0, breathSpeed:5.0, orbSize:52 },
+};
+
+function cpPresenceInit() {
+  // Pull presets from loaded cpSettings
+  const cfg = cpSettings || {};
+  _cpPresenceData  = JSON.parse(JSON.stringify(cfg.presence_presets || { Default: CP_STATE_DEFAULTS }));
+  _cpActivePreset  = cfg.active_companion?.active_presence_preset || cfg.active_presence_preset || 'Default';
+  _cpEditingState  = 'thinking';
+  cpPresenceRenderPresets();
+  cpPresenceSelectPreset(_cpActivePreset);
+}
+
+function cpPresenceRenderPresets() {
+  const bar = document.getElementById('cp-preset-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  Object.keys(_cpPresenceData).forEach(name => {
+    const chip = document.createElement('div');
+    chip.className = 'cp-preset-chip' + (name === _cpActivePreset ? ' active' : '');
+    chip.innerHTML = `<span onclick="cpPresenceSelectPreset('${name}')">${name}</span>`;
+    if (name !== 'Default') {
+      const del = document.createElement('span');
+      del.className = 'cp-preset-del';
+      del.title = 'Delete preset';
+      del.textContent = '×';
+      del.onclick = (e) => { e.stopPropagation(); cpPresenceDeletePreset(name); };
+      chip.appendChild(del);
+    }
+    bar.appendChild(chip);
+  });
+  // Add btn rendered by HTML
+}
+
+function cpPresenceSelectPreset(name) {
+  if (!_cpPresenceData[name]) return;
+  _cpActivePreset = name;
+  // Update badge + chip highlights
+  const badge = document.getElementById('cp-editing-preset-badge');
+  if (badge) badge.textContent = name;
+  document.querySelectorAll('.cp-preset-chip').forEach(c => {
+    c.classList.toggle('active', c.querySelector('span')?.textContent === name);
+  });
+  // Re-render current state sliders
+  cpPresenceRenderState(_cpEditingState);
+}
+
+function cpPresenceSwitchState(state, btn) {
+  _cpEditingState = state;
+  document.querySelectorAll('.cp-stab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const lbl = document.getElementById('cpp-state-label');
+  if (lbl) lbl.textContent = state;
+  cpPresenceRenderState(state);
+}
+
+function cpPresenceRenderState(state) {
+  const preset = _cpPresenceData[_cpActivePreset] || {};
+  const s = Object.assign({}, CP_STATE_DEFAULTS[state] || CP_STATE_DEFAULTS.thinking, preset[state] || {});
+
+  // Update sliders
+  const setSlider = (id, val, suffix) => {
+    const el = document.getElementById(id);
+    const lbl = document.getElementById(id + '-val');
+    if (el)  el.value = val;
+    if (lbl) lbl.textContent = val + suffix;
+  };
+  setSlider('ps-glow-max',    s.glowMax,    'px');
+  setSlider('ps-glow-speed',  s.glowSpeed,  's');
+  setSlider('ps-ring-speed',  s.ringSpeed,  's');
+  setSlider('ps-dot-speed',   s.dotSpeed,   's');
+  setSlider('ps-breath-speed',s.breathSpeed,'s');
+  setSlider('ps-orb-size',    s.orbSize,    'px');
+
+  // Color
+  const color = s.dotColor || '#818cf8';
+  const ci = document.getElementById('cp-color-input');
+  const cp = document.getElementById('cp-color-picker');
+  const cd = document.getElementById('cp-color-dot');
+  if (ci) ci.value = color;
+  if (cp) cp.value = cpColorToHex(color);
+  if (cd) cd.style.background = color;
+
+  // Update live preview
+  cpPresenceUpdatePreview(s, state);
+}
+
+function cpColorToHex(color) {
+  // Convert rgba(...) to a usable hex for the color picker
+  const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (m) {
+    return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+  }
+  return color.startsWith('#') ? color.slice(0,7) : '#818cf8';
+}
+
+function cpPresenceColorInput(val) {
+  const cd = document.getElementById('cp-color-dot');
+  if (cd) cd.style.background = val;
+  const cp = document.getElementById('cp-color-picker');
+  if (cp && /^#[0-9a-fA-F]{6}$/.test(val)) cp.value = val;
+  cpPresenceSetValue('dotColor', val);
+  // Derive glowColor from dotColor with reduced opacity
+  const gc = cpDeriveGlowColor(val, 0.4);
+  cpPresenceSetValue('glowColor', gc);
+  cpPresenceUpdatePreviewFromCurrent();
+}
+
+function cpPresenceColorPick(hex) {
+  const ci = document.getElementById('cp-color-input');
+  if (ci) ci.value = hex;
+  const cd = document.getElementById('cp-color-dot');
+  if (cd) cd.style.background = hex;
+  cpPresenceSetValue('dotColor', hex);
+  const gc = cpDeriveGlowColor(hex, 0.4);
+  cpPresenceSetValue('glowColor', gc);
+  cpPresenceUpdatePreviewFromCurrent();
+}
+
+function cpDeriveGlowColor(hex, alpha) {
+  if (hex.startsWith('#') && hex.length >= 7) {
+    const r = parseInt(hex.slice(1,3),16);
+    const g = parseInt(hex.slice(3,5),16);
+    const b = parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  return hex;
+}
+
+function cpPresenceSlider(key, input) {
+  const val = parseFloat(input.value);
+  const lbl = document.getElementById(input.id + '-val');
+  const unit = key === 'orbSize' || key === 'glowMax' ? 'px' : 's';
+  if (lbl) lbl.textContent = val + unit;
+  cpPresenceSetValue(key, val);
+  cpPresenceUpdatePreviewFromCurrent();
+}
+
+function cpPresenceSetValue(key, val) {
+  if (!_cpPresenceData[_cpActivePreset]) return;
+  if (!_cpPresenceData[_cpActivePreset][_cpEditingState]) {
+    _cpPresenceData[_cpActivePreset][_cpEditingState] = {};
+  }
+  _cpPresenceData[_cpActivePreset][_cpEditingState][key] = val;
+  _cpPresenceDirty = true;
+}
+
+function cpPresenceUpdatePreviewFromCurrent() {
+  const preset = _cpPresenceData[_cpActivePreset] || {};
+  const s = Object.assign({}, CP_STATE_DEFAULTS[_cpEditingState], preset[_cpEditingState] || {});
+  cpPresenceUpdatePreview(s, _cpEditingState);
+}
+
+let _cppAnimFrame = null;
+function cpPresenceUpdatePreview(s, state) {
+  const orb  = document.getElementById('cpp-orb');
+  const dots = document.getElementById('cpp-dots');
+  const icon = document.getElementById('cpp-icon');
+  const ring = orb?.querySelector('.cpp-ring');
+  if (!orb) return;
+
+  const size = (s.orbSize || 52) + 'px';
+  orb.style.cssText = `
+    width:${size}; height:${size};
+    background:${cpDeriveGlowColor(s.dotColor||'#818cf8', 0.1)};
+    border:2px solid ${cpDeriveGlowColor(s.dotColor||'#818cf8', 0.35)};
+    animation: cppGlow ${s.glowSpeed||2}s ease-in-out infinite,
+               cppBreath ${s.breathSpeed||3}s ease-in-out infinite;
+  `;
+  orb.style.setProperty('--cpp-glow-color', s.glowColor || 'rgba(129,140,248,0.4)');
+  orb.style.setProperty('--cpp-glow-min',   '4px');
+  orb.style.setProperty('--cpp-glow-max',   (s.glowMax||16) + 'px');
+
+  if (ring) {
+    ring.style.cssText = `animation: cppRing ${s.ringSpeed||1.8}s ease-out infinite;`;
+    ring.style.setProperty('--cpp-ring-color', cpDeriveGlowColor(s.dotColor||'#818cf8', 0.3));
+  }
+
+  // Dots
+  if (dots) {
+    dots.style.width = size;
+    dots.querySelectorAll('span').forEach((d, i) => {
+      d.style.background = s.dotColor || '#818cf8';
+      const delay = [0, 0.18, 0.36][i];
+      d.style.cssText += `animation: cppDot ${s.dotSpeed||1.2}s ease-in-out ${delay}s infinite; opacity:1;`;
+    });
+  }
+
+  // Icon
+  if (icon) {
+    icon.style.color    = s.dotColor || '#818cf8';
+    icon.style.fontSize = Math.round((s.orbSize||52) * 0.42) + 'px';
+    // Mirror avatar if present
+    const avSrc = document.querySelector('#companion-avatar img')?.src;
+    if (avSrc && !icon.querySelector('img')) {
+      icon.innerHTML = `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+    }
+  }
+}
+
+function cpPresenceNewPreset() {
+  const name = prompt('Preset name:');
+  if (!name || !name.trim()) return;
+  const n = name.trim();
+  if (_cpPresenceData[n]) { alert('A preset with that name already exists.'); return; }
+  // Deep copy from Default
+  _cpPresenceData[n] = JSON.parse(JSON.stringify(_cpPresenceData['Default'] || CP_STATE_DEFAULTS));
+  cpPresenceRenderPresets();
+  cpPresenceSelectPreset(n);
+  _cpPresenceDirty = true;
+}
+
+function cpPresenceDeletePreset(name) {
+  if (name === 'Default') return;
+  if (!confirm(`Delete preset "${name}"?`)) return;
+  delete _cpPresenceData[name];
+  if (_cpActivePreset === name) _cpActivePreset = 'Default';
+  cpPresenceRenderPresets();
+  cpPresenceSelectPreset(_cpActivePreset);
+  _cpPresenceDirty = true;
 }

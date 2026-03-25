@@ -463,7 +463,7 @@ async function callModel(system, messages, abortSignal = null) {
           accumulated += token;
           const bh = ensureBubble();
           if (bh) {
-            if (typeof setCompanionStatus === "function") setCompanionStatus("streaming");
+            if (typeof setPresenceState === "function") setPresenceState("streaming");
             _updateStreamBubble(bh, accumulated);
           }
 
@@ -481,7 +481,7 @@ async function callModel(system, messages, abortSignal = null) {
       return null;
     }
 
-    if (typeof setCompanionStatus === "function") setCompanionStatus("idle");
+    if (typeof setPresenceState === "function") setPresenceState("idle");
     if (bubbleHandle) {
       _finaliseStreamBubble(bubbleHandle, accumulated);
     }

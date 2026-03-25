@@ -916,84 +916,211 @@ body.controls-always-visible .msg-controls {
 @keyframes blink { 50% { opacity: 0; } }
 
 /* ── Companion status bar ─────────────────────────────────────────────────────── */
-.companion-status {
+/* ── Companion orb ───────────────────────────────────────────────────────────
+   All animation properties are CSS custom properties — set via JS on #companion-orb.
+   Defaults below are the "thinking" state baseline.
+   ────────────────────────────────────────────────────────────────────────── */
+
+#companion-orb {
+  /* CSS variable defaults — overridden per state via JS */
+  --orb-size:       52px;
+  --glow-color:     rgba(129,140,248,0.4);
+  --glow-min:       6px;
+  --glow-max:       16px;
+  --glow-speed:     2s;
+  --ring-color:     rgba(129,140,248,0.3);
+  --ring-speed:     1.8s;
+  --dot-color:      #818cf8;
+  --dot-speed:      1.2s;
+  --dot-opacity:    1;
+  --breath-speed:   3s;
+  --orb-bg:         rgba(129,140,248,0.12);
+  --orb-border:     rgba(129,140,248,0.35);
+}
+
+.companion-orb {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 40px 8px;
+  transition: opacity .4s ease;
+}
+
+/* Dots sit above the orb, centered over it */
+.orb-dots {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  width: var(--orb-size, 52px);
+  margin-bottom: 6px;
+  height: 10px;
   align-items: center;
-  gap: 8px;
-  padding: 6px 40px 2px;
-  transition: opacity .3s ease;
 }
-.companion-status.idle {
-  opacity: 0.18;
-}
-.companion-status.thinking,
-.companion-status.streaming {
-  opacity: 1;
-}
-.cs-avatar {
-  width: 24px;
-  height: 24px;
+.orb-dots span {
+  width: 6px; height: 6px;
   border-radius: 50%;
-  background: rgba(129,140,248,0.12);
-  border: 1px solid rgba(129,140,248,0.2);
+  background: var(--dot-color, #818cf8);
+  opacity: 0;
+  transition: opacity .3s ease, background .4s ease;
+}
+
+/* Orb body */
+.orb-body {
+  position: relative;
+  width: var(--orb-size, 52px);
+  height: var(--orb-size, 52px);
+  border-radius: 50%;
+  background: var(--orb-bg, rgba(129,140,248,0.12));
+  border: 2px solid var(--orb-border, rgba(129,140,248,0.35));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  color: var(--indigo);
-  flex-shrink: 0;
-  overflow: hidden;
-  transition: box-shadow .3s ease, border-color .3s ease;
+  overflow: visible;
+  transition: background .5s ease, border-color .5s ease, box-shadow .5s ease, width .3s ease, height .3s ease;
 }
-.companion-status.thinking .cs-avatar {
-  border-color: rgba(129,140,248,0.5);
-  box-shadow: 0 0 8px rgba(129,140,248,0.25);
-  animation: avatarPulse 2s ease-in-out infinite;
-}
-.companion-status.streaming .cs-avatar {
-  border-color: rgba(109,212,168,0.5);
-  box-shadow: 0 0 8px rgba(109,212,168,0.2);
-}
-@keyframes avatarPulse {
-  0%,100% { box-shadow: 0 0 6px rgba(129,140,248,0.2); }
-  50%      { box-shadow: 0 0 14px rgba(129,140,248,0.45); }
-}
-.cs-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-
-.cs-dots {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-.cs-dots span {
-  width: 5px;
-  height: 5px;
+.orb-ring {
+  position: absolute;
+  width: 100%; height: 100%;
   border-radius: 50%;
-  background: var(--indigo);
+  border: 1.5px solid var(--ring-color, rgba(129,140,248,0.3));
+  pointer-events: none;
   opacity: 0;
-  transition: opacity .2s ease;
 }
-.companion-status.thinking .cs-dots span {
+.orb-icon {
+  font-size: calc(var(--orb-size, 52px) * 0.42);
+  color: var(--dot-color, #818cf8);
+  transition: color .4s ease, font-size .3s ease;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.orb-icon img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* ── Keyframes ── */
+@keyframes orbGlow {
+  0%,100% { box-shadow: 0 0 var(--glow-min, 6px)  var(--glow-color, rgba(129,140,248,0.2)); }
+  50%     { box-shadow: 0 0 var(--glow-max, 16px) var(--glow-color, rgba(129,140,248,0.45)); }
+}
+@keyframes orbBreath {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.04); }
+}
+@keyframes ringPulse {
+  0%   { transform: scale(1);    opacity: .6; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+@keyframes dotBounce {
+  0%,100% { opacity: .25; transform: scale(.78); }
+  50%     { opacity: var(--dot-opacity, 1); transform: scale(1.15); }
+}
+@keyframes dotStream {
+  0%,100% { opacity: .2; }
+  50%     { opacity: .65; }
+}
+
+/* ── State: idle ── */
+.companion-orb.idle { opacity: 0.2; }
+.companion-orb.idle .orb-dots span  { opacity: 0.12; animation: none; }
+.companion-orb.idle .orb-body       { animation: none; }
+.companion-orb.idle .orb-ring       { animation: none; opacity: 0; }
+
+/* ── State: thinking ── */
+.companion-orb.thinking { opacity: 1; }
+.companion-orb.thinking .orb-dots span {
   opacity: 1;
-  animation: csDot 1.2s ease-in-out infinite;
+  animation: dotBounce var(--dot-speed, 1.2s) ease-in-out infinite;
 }
-.companion-status.thinking .cs-dots span:nth-child(2) { animation-delay: .18s; }
-.companion-status.thinking .cs-dots span:nth-child(3) { animation-delay: .36s; }
-.companion-status.streaming .cs-dots span {
-  opacity: 0.4;
-  width: 3px;
-  height: 3px;
-  animation: csStreamDot 1.4s ease-in-out infinite;
+.companion-orb.thinking .orb-dots span:nth-child(2) { animation-delay: .18s; }
+.companion-orb.thinking .orb-dots span:nth-child(3) { animation-delay: .36s; }
+.companion-orb.thinking .orb-body {
+  animation: orbGlow var(--glow-speed, 2s) ease-in-out infinite,
+             orbBreath var(--breath-speed, 3s) ease-in-out infinite;
 }
-.companion-status.streaming .cs-dots span:nth-child(2) { animation-delay: .2s; }
-.companion-status.streaming .cs-dots span:nth-child(3) { animation-delay: .4s; }
-@keyframes csDot {
-  0%,100% { opacity:.25; transform: scale(.75); }
-  50%     { opacity:1;   transform: scale(1.1); }
+.companion-orb.thinking .orb-ring {
+  animation: ringPulse var(--ring-speed, 1.8s) ease-out infinite;
 }
-@keyframes csStreamDot {
-  0%,100% { opacity:.2; }
-  50%     { opacity:.7; }
+
+/* ── State: streaming ── */
+.companion-orb.streaming {
+  opacity: 1;
+  --glow-color:  rgba(109,212,168,0.35);
+  --glow-min:    4px; --glow-max: 12px;
+  --ring-color:  rgba(109,212,168,0.25);
+  --orb-bg:      rgba(109,212,168,0.08);
+  --orb-border:  rgba(109,212,168,0.4);
+  --dot-color:   #6dd4a8;
+}
+.companion-orb.streaming .orb-dots span {
+  opacity: 0.5;
+  animation: dotStream 1.4s ease-in-out infinite;
+}
+.companion-orb.streaming .orb-dots span:nth-child(2) { animation-delay: .2s; }
+.companion-orb.streaming .orb-dots span:nth-child(3) { animation-delay: .4s; }
+.companion-orb.streaming .orb-body {
+  animation: orbGlow var(--glow-speed, 2.5s) ease-in-out infinite;
+}
+.companion-orb.streaming .orb-ring {
+  animation: ringPulse 2.4s ease-out infinite;
+}
+
+/* ── State: heartbeat ── */
+.companion-orb.heartbeat {
+  opacity: 1;
+  --glow-color:  rgba(167,139,250,0.45);
+  --glow-min:    6px; --glow-max: 20px;
+  --glow-speed:  1.4s;
+  --ring-color:  rgba(167,139,250,0.35);
+  --ring-speed:  1.4s;
+  --orb-bg:      rgba(167,139,250,0.1);
+  --orb-border:  rgba(167,139,250,0.5);
+  --dot-color:   #a78bfa;
+  --dot-speed:   0.9s;
+}
+.companion-orb.heartbeat .orb-dots span {
+  opacity: 1;
+  animation: dotBounce var(--dot-speed, 0.9s) ease-in-out infinite;
+}
+.companion-orb.heartbeat .orb-dots span:nth-child(2) { animation-delay: .12s; }
+.companion-orb.heartbeat .orb-dots span:nth-child(3) { animation-delay: .24s; }
+.companion-orb.heartbeat .orb-body {
+  animation: orbGlow var(--glow-speed, 1.4s) ease-in-out infinite,
+             orbBreath var(--breath-speed, 2s) ease-in-out infinite;
+}
+.companion-orb.heartbeat .orb-ring {
+  animation: ringPulse var(--ring-speed, 1.4s) ease-out infinite;
+}
+
+/* ── State: chaos ── */
+.companion-orb.chaos {
+  opacity: 1;
+  --glow-color:  rgba(251,191,36,0.5);
+  --glow-min:    8px; --glow-max: 24px;
+  --glow-speed:  0.8s;
+  --ring-color:  rgba(251,191,36,0.35);
+  --ring-speed:  0.9s;
+  --orb-bg:      rgba(251,191,36,0.08);
+  --orb-border:  rgba(251,191,36,0.5);
+  --dot-color:   #fbbf24;
+  --dot-speed:   0.6s;
+  --breath-speed: 0.6s;
+}
+.companion-orb.chaos .orb-dots span {
+  opacity: 1;
+  animation: dotBounce var(--dot-speed, 0.6s) ease-in-out infinite;
+}
+.companion-orb.chaos .orb-dots span:nth-child(2) { animation-delay: .08s; }
+.companion-orb.chaos .orb-dots span:nth-child(3) { animation-delay: .16s; }
+.companion-orb.chaos .orb-body {
+  animation: orbGlow var(--glow-speed, 0.8s) ease-in-out infinite,
+             orbBreath var(--breath-speed, 0.6s) ease-in-out infinite;
+}
+.companion-orb.chaos .orb-ring {
+  animation: ringPulse var(--ring-speed, 0.9s) ease-out infinite;
 }
 
 /* ── Companion gear button ─────────────────────────────────────────────────── */
@@ -1106,6 +1233,8 @@ body.controls-always-visible .msg-controls {
 .cp-radio { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: rgba(221,225,240,0.65); cursor: pointer; padding: 3px 0; }
 .cp-radio input { margin-top: 3px; accent-color: #818cf8; }
 .cp-link { color: #818cf8; cursor: pointer; text-decoration: underline; }
+.cp-link-muted { color: rgba(221,225,240,0.3); cursor: pointer; text-decoration: underline; transition: color .15s; }
+.cp-link-muted:hover { color: rgba(221,225,240,0.6); }
 .cp-badge { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 10px; font-size: 9.5px; font-weight: 500; margin-left: 5px; vertical-align: middle; }
 .cp-badge-new { background: rgba(109,212,168,0.12); color: #6dd4a8; border: 1px solid rgba(109,212,168,0.2); }
 .cp-badge-rec { background: rgba(129,140,248,0.10); color: #818cf8; border: 1px solid rgba(129,140,248,0.2); }
@@ -1152,3 +1281,273 @@ body.controls-always-visible .msg-controls {
   color: rgba(221,225,240,0.3); cursor: pointer; font-family: 'DM Sans', sans-serif;
 }
 .cp-add-btn:hover { color: rgba(221,225,240,0.6); border-color: rgba(140,145,220,0.35); }
+
+/* ── Presence tab ─────────────────────────────────────────────────────────── */
+.cp-presence-preview {
+  display: flex; flex-direction: column; align-items: center;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(140,145,220,0.1);
+  border-radius: 14px; padding: 16px 16px 12px;
+  margin-bottom: 14px;
+}
+.cp-preview-label {
+  font-size: 10px; font-weight: 500; letter-spacing: .09em; text-transform: uppercase;
+  color: rgba(221,225,240,0.25); margin-bottom: 14px; align-self: flex-start;
+}
+.cp-preview-orb-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.cp-preview-dots { display: flex; gap: 5px; justify-content: center; height: 10px; align-items: center; }
+.cp-preview-dots span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #818cf8; opacity: 0.15;
+  transition: background .4s ease, opacity .3s ease;
+}
+.cp-preview-orb {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(129,140,248,0.12);
+  border: 2px solid rgba(129,140,248,0.35);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: visible;
+  transition: background .5s, border-color .5s, box-shadow .5s;
+}
+.cp-preview-ring {
+  position: absolute; width: 100%; height: 100%; border-radius: 50%;
+  border: 1.5px solid rgba(129,140,248,0.3); pointer-events: none; opacity: 0;
+}
+.cp-preview-icon {
+  font-size: 22px; color: #818cf8;
+  transition: color .4s;
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; overflow: hidden;
+}
+.cp-preview-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+/* Preview state animations — reuse orb keyframes */
+.cp-preview-orb.thinking {
+  animation: orbGlow 2s ease-in-out infinite, orbBreath 3s ease-in-out infinite;
+  --glow-color: rgba(129,140,248,0.4); --glow-min: 6px; --glow-max: 16px;
+}
+.cp-preview-orb.thinking .cp-preview-ring  { animation: ringPulse 1.8s ease-out infinite; }
+.cp-preview-orb.thinking .cp-preview-dots span, .cp-preview-dots.thinking span {
+  opacity: 1; animation: dotBounce 1.2s ease-in-out infinite;
+}
+.cp-preview-orb.streaming { border-color: rgba(109,212,168,0.45); background: rgba(109,212,168,0.08); box-shadow: 0 0 10px rgba(109,212,168,0.25); animation: none; }
+.cp-preview-orb.heartbeat { border-color: rgba(167,139,250,0.5); background: rgba(167,139,250,0.1); animation: orbGlow 1.4s ease-in-out infinite; --glow-color:rgba(167,139,250,0.45);--glow-min:6px;--glow-max:20px; }
+.cp-preview-orb.heartbeat .cp-preview-ring { animation: ringPulse 1.4s ease-out infinite; }
+.cp-preview-orb.chaos { border-color: rgba(251,191,36,0.5); background: rgba(251,191,36,0.08); animation: orbGlow 0.8s ease-in-out infinite, orbBreath 0.6s ease-in-out infinite; --glow-color:rgba(251,191,36,0.5);--glow-min:8px;--glow-max:24px; }
+.cp-preview-orb.chaos .cp-preview-ring { animation: ringPulse 0.9s ease-out infinite; }
+.cp-preview-orb.idle { opacity: 0.25; animation: none; }
+
+.cp-preview-state-label {
+  font-size: 11px; color: rgba(221,225,240,0.3); margin-top: 8px; letter-spacing: .04em;
+}
+.cp-preview-states {
+  display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-top: 12px;
+}
+.cp-state-btn {
+  padding: 4px 10px; border-radius: 16px; font-size: 11.5px;
+  border: 1px solid rgba(140,145,220,0.15);
+  background: rgba(255,255,255,0.03);
+  color: rgba(221,225,240,0.4); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all .15s;
+}
+.cp-state-btn:hover { color: rgba(221,225,240,0.7); background: rgba(255,255,255,0.06); }
+.cp-state-btn.active { background: rgba(129,140,248,0.12); border-color: rgba(129,140,248,0.3); color: #a5b4fc; }
+
+.cp-preset-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.cp-preset-chip {
+  padding: 4px 10px; border-radius: 16px; font-size: 11.5px;
+  border: 1px solid rgba(140,145,220,0.15);
+  background: rgba(255,255,255,0.03); color: rgba(221,225,240,0.45);
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  font-family: 'DM Sans', sans-serif; transition: all .15s;
+}
+.cp-preset-chip:hover { background: rgba(255,255,255,0.06); }
+.cp-preset-chip.active { background: rgba(129,140,248,0.12); border-color: rgba(129,140,248,0.3); color: #a5b4fc; }
+.cp-preset-del { font-size: 11px; color: rgba(221,225,240,0.2); line-height: 1; transition: color .15s; }
+.cp-preset-del:hover { color: rgba(248,113,113,0.7); }
+
+.cp-color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.cp-color-dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; transition: background .2s; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); }
+.cp-color-input {
+  font-family: 'DM Mono', monospace; font-size: 12.5px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(140,145,220,0.13);
+  border-radius: 7px; padding: 4px 9px; color: #dde1f0; width: 100px;
+}
+.cp-color-input:focus { outline: none; border-color: rgba(129,140,248,0.35); }
+
+.cp-slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.cp-slider-label { font-size: 11.5px; color: rgba(221,225,240,0.35); width: 88px; flex-shrink: 0; }
+.cp-slider { flex: 1; accent-color: #818cf8; height: 3px; }
+.cp-slider-val { font-size: 11px; font-family: 'DM Mono', monospace; color: rgba(165,180,252,0.6); width: 36px; text-align: right; }
+
+/* ── Presence tab ─────────────────────────────────────────────────────────── */
+.cp-presence-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(140,145,220,0.1);
+  border-radius: 14px;
+  padding: 20px 24px 16px;
+  margin-bottom: 16px;
+  gap: 0;
+}
+.cpp-orb-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.cpp-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  height: 10px;
+}
+.cpp-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cpp-dot-color, #818cf8);
+  transition: opacity .3s ease, background .4s ease;
+}
+.cpp-orb {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  transition: width .3s ease, height .3s ease, background .5s ease,
+              border-color .5s ease, box-shadow .5s ease;
+  overflow: visible;
+}
+.cpp-ring {
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  border: 1.5px solid var(--cpp-ring-color, rgba(129,140,248,0.3));
+  pointer-events: none;
+  opacity: 0;
+}
+.cpp-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  border-radius: 50%; overflow: hidden;
+  color: var(--cpp-dot-color, #818cf8);
+  font-size: 22px;
+  transition: font-size .3s ease, color .4s ease;
+}
+.cpp-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.cpp-state-label {
+  font-size: 11px;
+  color: rgba(221,225,240,0.3);
+  letter-spacing: .06em;
+  margin-top: 10px;
+  text-transform: lowercase;
+}
+
+/* Preview animation keyframes */
+@keyframes cppGlow {
+  0%,100% { box-shadow: 0 0 var(--cpp-glow-min,6px) var(--cpp-glow-color, rgba(129,140,248,0.2)); }
+  50%     { box-shadow: 0 0 var(--cpp-glow-max,16px) var(--cpp-glow-color, rgba(129,140,248,0.45)); }
+}
+@keyframes cppBreath  { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+@keyframes cppRing    { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.55);opacity:0} }
+@keyframes cppDot     { 0%,100%{opacity:.25;transform:scale(.78)} 50%{opacity:1;transform:scale(1.15)} }
+@keyframes cppStream  { 0%,100%{opacity:.2} 50%{opacity:.65} }
+
+/* Preset bar */
+.cp-preset-bar {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 4px;
+  align-items: center;
+}
+.cp-preset-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 11.5px;
+  border: 1px solid rgba(140,145,220,0.18);
+  background: rgba(255,255,255,0.04);
+  color: rgba(221,225,240,0.45);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+}
+.cp-preset-chip:hover { background: rgba(255,255,255,0.08); color: #dde1f0; }
+.cp-preset-chip.active {
+  background: rgba(129,140,248,0.12);
+  border-color: rgba(129,140,248,0.35);
+  color: #a5b4fc;
+}
+.cp-preset-del {
+  font-size: 12px;
+  color: rgba(221,225,240,0.2);
+  line-height: 1;
+  padding: 0 2px;
+  transition: color .15s;
+}
+.cp-preset-del:hover { color: rgba(248,113,113,0.7); }
+
+/* State sub-tabs */
+.cp-state-tabs {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.cp-stab {
+  padding: 4px 11px; border-radius: 8px;
+  font-size: 11.5px;
+  border: 1px solid rgba(140,145,220,0.15);
+  background: rgba(255,255,255,0.03);
+  color: rgba(221,225,240,0.4);
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+}
+.cp-stab:hover { background: rgba(255,255,255,0.07); color: #dde1f0; }
+.cp-stab.active {
+  background: rgba(129,140,248,0.12);
+  border-color: rgba(129,140,248,0.3);
+  color: #a5b4fc;
+}
+
+/* Controls */
+.cp-presence-controls { display: flex; flex-direction: column; gap: 6px; }
+.cp-color-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.cp-color-dot {
+  width: 20px; height: 20px; border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: background .2s;
+}
+.cp-color-input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(140,145,220,0.14);
+  border-radius: 8px; padding: 4px 9px;
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  color: #dde1f0; width: 100px;
+}
+.cp-color-input:focus { outline: none; border-color: rgba(129,140,248,0.4); }
+.cp-color-picker {
+  width: 28px; height: 28px;
+  border: none; background: none; cursor: pointer;
+  border-radius: 6px; padding: 0;
+  flex-shrink: 0;
+}
+.cp-slider-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.cp-slider-lbl {
+  font-size: 11px;
+  color: rgba(221,225,240,0.3);
+  width: 82px; flex-shrink: 0;
+}
+.cp-slider {
+  flex: 1; accent-color: #818cf8;
+  height: 3px; cursor: pointer;
+}
+.cp-slider-val {
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  color: rgba(165,180,252,0.6);
+  width: 34px; text-align: right;
+}

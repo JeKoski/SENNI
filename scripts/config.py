@@ -66,6 +66,24 @@ DEFAULTS = {
     # Custom args: list of {flag, value, enabled}
     "server_args_custom": [],
 
+    # Global presence preset library — per-companion configs can add/override
+    "presence_presets": {
+        "Default": {
+            "thinking":  {"glowColor":"rgba(129,140,248,0.4)","glowMax":16,"glowSpeed":2.0,"ringSpeed":1.8,"dotColor":"#818cf8","dotSpeed":1.2,"breathSpeed":3.0,"orbSize":52},
+            "streaming": {"glowColor":"rgba(109,212,168,0.35)","glowMax":12,"glowSpeed":2.5,"ringSpeed":2.4,"dotColor":"#6dd4a8","dotSpeed":1.4,"breathSpeed":3.0,"orbSize":52},
+            "heartbeat": {"glowColor":"rgba(167,139,250,0.45)","glowMax":20,"glowSpeed":1.4,"ringSpeed":1.4,"dotColor":"#a78bfa","dotSpeed":0.9,"breathSpeed":2.0,"orbSize":52},
+            "chaos":     {"glowColor":"rgba(251,191,36,0.5)","glowMax":24,"glowSpeed":0.8,"ringSpeed":0.9,"dotColor":"#fbbf24","dotSpeed":0.6,"breathSpeed":0.6,"orbSize":52},
+            "idle":      {"glowColor":"rgba(129,140,248,0.15)","glowMax":6,"glowSpeed":4.0,"ringSpeed":4.0,"dotColor":"#818cf8","dotSpeed":2.0,"breathSpeed":5.0,"orbSize":52},
+        },
+        "Warm": {
+            "thinking":  {"glowColor":"rgba(251,146,60,0.4)","glowMax":18,"glowSpeed":2.2,"ringSpeed":2.0,"dotColor":"#fb923c","dotSpeed":1.3,"breathSpeed":3.5,"orbSize":52},
+            "streaming": {"glowColor":"rgba(250,204,21,0.35)","glowMax":14,"glowSpeed":2.5,"ringSpeed":2.4,"dotColor":"#facc15","dotSpeed":1.4,"breathSpeed":3.5,"orbSize":52},
+            "heartbeat": {"glowColor":"rgba(248,113,113,0.45)","glowMax":20,"glowSpeed":1.6,"ringSpeed":1.6,"dotColor":"#f87171","dotSpeed":1.0,"breathSpeed":2.2,"orbSize":52},
+            "chaos":     {"glowColor":"rgba(239,68,68,0.5)","glowMax":26,"glowSpeed":0.7,"ringSpeed":0.8,"dotColor":"#ef4444","dotSpeed":0.5,"breathSpeed":0.5,"orbSize":52},
+            "idle":      {"glowColor":"rgba(251,146,60,0.15)","glowMax":6,"glowSpeed":4.0,"ringSpeed":4.0,"dotColor":"#fb923c","dotSpeed":2.0,"breathSpeed":5.0,"orbSize":52},
+        },
+    },
+
     # Generation defaults (per-request, no restart needed)
     "generation": {
         "temperature":    0.8,

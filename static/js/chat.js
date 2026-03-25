@@ -55,8 +55,20 @@ async function loadStatus() {
         ? `<img src="${data.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
         : '✦';
     }
-    // Mirror avatar into the persistent companion status bar
+    // Mirror avatar into the persistent companion orb
     if (typeof syncStatusAvatar === 'function') syncStatusAvatar();
+
+    // Load and apply the active presence preset
+    if (data.presence_presets && data.active_presence_preset) {
+      const preset = data.presence_presets[data.active_presence_preset];
+      if (preset && typeof applyPresencePreset === 'function') {
+        // Apply thinking state as the default (shown while idle too, just dimmed)
+        applyPresencePreset({ state: 'idle', ...(preset.idle || {}) });
+      }
+    }
+    // Store presence presets in config for runtime use
+    config.presence_presets       = data.presence_presets || {};
+    config.active_presence_preset = data.active_presence_preset || 'Default';
 
     if (data.context_size) _contextSize = data.context_size;
 

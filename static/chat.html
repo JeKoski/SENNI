@@ -112,11 +112,14 @@
       </div>
     </div>
 
-    <!-- Companion status bar — always visible, reflects current state -->
-    <div id="companion-status" class="companion-status idle">
-      <div class="cs-avatar" id="cs-avatar">✦</div>
-      <div class="cs-dots">
+    <!-- Companion orb — persistent presence indicator, CSS-variable driven -->
+    <div id="companion-orb" class="companion-orb idle">
+      <div class="orb-dots" id="orb-dots">
         <span></span><span></span><span></span>
+      </div>
+      <div class="orb-body" id="orb-body">
+        <div class="orb-ring"></div>
+        <div class="orb-icon" id="orb-icon">✦</div>
       </div>
     </div>
 
@@ -172,7 +175,10 @@
       <div class="cp-section">Avatar</div>
       <div class="cp-avatar-zone" ondragover="event.preventDefault()" ondrop="cpAvatarDrop(event)">
         <div class="cp-avatar-preview" id="cp-avatar-preview">✦</div>
-        <div class="cp-avatar-hint">Drop image or <span class="cp-link" onclick="cpAvatarBrowse()">browse</span></div>
+        <div class="cp-avatar-hint">
+          Drop image or <span class="cp-link" onclick="cpAvatarBrowse()">browse</span>
+          <span id="cp-avatar-reset-wrap" style="display:none"> · <span class="cp-link cp-link-muted" onclick="cpAvatarReset()">reset to default</span></span>
+        </div>
       </div>
       <input type="file" id="cp-avatar-file" accept="image/*" style="display:none" onchange="cpAvatarFile(this)"/>
       <div id="cp-crop-wrap" style="display:none">
@@ -267,13 +273,58 @@
         <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Manual trigger</div><textarea class="cp-textarea" id="cp-hb-instr-manual" rows="2" placeholder="(uses default if blank)"></textarea></div>
       </div>
     </div>
-    <!-- Presence (placeholder) -->
+    <!-- Presence -->
     <div class="cp-tab-body" id="cp-tab-presence">
-      <div style="text-align:center;padding:40px 20px;color:rgba(221,225,240,0.25);font-size:13px">
-        <div style="font-size:28px;margin-bottom:12px">✦</div>Presence settings coming soon
+
+      <!-- Live orb preview -->
+      <div class="cp-presence-preview" id="cp-presence-preview">
+        <div class="cpp-orb-wrap">
+          <div class="cpp-dots" id="cpp-dots"><span></span><span></span><span></span></div>
+          <div class="cpp-orb" id="cpp-orb">
+            <div class="cpp-ring"></div>
+            <div class="cpp-icon" id="cpp-icon">✦</div>
+          </div>
+        </div>
+        <div class="cpp-state-label" id="cpp-state-label">thinking</div>
       </div>
+
+      <!-- Presets -->
+      <div class="cp-section" style="display:flex;align-items:center;justify-content:space-between">
+        Presets
+        <button class="cp-add-btn" onclick="cpPresenceNewPreset()">+ New</button>
+      </div>
+      <div class="cp-preset-bar" id="cp-preset-bar"></div>
+
+      <!-- State editor -->
+      <div class="cp-section" style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        Edit state
+        <span class="cp-badge cp-badge-rec" id="cp-editing-preset-badge">Default</span>
+      </div>
+      <div class="cp-state-tabs" id="cp-state-tabs">
+        <button class="cp-stab active" data-s="thinking" onclick="cpPresenceSwitchState('thinking',this)">Thinking</button>
+        <button class="cp-stab" data-s="streaming" onclick="cpPresenceSwitchState('streaming',this)">Streaming</button>
+        <button class="cp-stab" data-s="heartbeat" onclick="cpPresenceSwitchState('heartbeat',this)">Heartbeat</button>
+        <button class="cp-stab" data-s="idle" onclick="cpPresenceSwitchState('idle',this)">Idle</button>
+        <button class="cp-stab" data-s="chaos" onclick="cpPresenceSwitchState('chaos',this)" style="color:rgba(251,191,36,0.7)">Chaos &#x1F525;</button>
+      </div>
+
+      <div class="cp-presence-controls">
+        <div class="cp-color-row">
+          <div class="cp-color-dot" id="cp-color-dot"></div>
+          <input class="cp-color-input" id="cp-color-input" type="text" maxlength="25" oninput="cpPresenceColorInput(this.value)" placeholder="#818cf8"/>
+          <input class="cp-color-picker" id="cp-color-picker" type="color" value="#818cf8" oninput="cpPresenceColorPick(this.value)"/>
+          <span class="cp-note" style="margin-left:4px">glow &amp; dots</span>
+        </div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Glow intensity</span><input class="cp-slider" type="range" id="ps-glow-max"    min="4"   max="36"  step="1"   oninput="cpPresenceSlider('glowMax',this)"/>  <span class="cp-slider-val" id="ps-glow-max-val">16px</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Glow speed</span>    <input class="cp-slider" type="range" id="ps-glow-speed"  min="0.4" max="6"   step="0.1" oninput="cpPresenceSlider('glowSpeed',this)"/> <span class="cp-slider-val" id="ps-glow-speed-val">2.0s</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Ring speed</span>    <input class="cp-slider" type="range" id="ps-ring-speed"  min="0.4" max="5"   step="0.1" oninput="cpPresenceSlider('ringSpeed',this)"/> <span class="cp-slider-val" id="ps-ring-speed-val">1.8s</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Dot speed</span>     <input class="cp-slider" type="range" id="ps-dot-speed"   min="0.3" max="3"   step="0.1" oninput="cpPresenceSlider('dotSpeed',this)"/>  <span class="cp-slider-val" id="ps-dot-speed-val">1.2s</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Breath speed</span>  <input class="cp-slider" type="range" id="ps-breath-speed" min="0.4" max="7"  step="0.1" oninput="cpPresenceSlider('breathSpeed',this)"/><span class="cp-slider-val" id="ps-breath-speed-val">3.0s</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Orb size</span>      <input class="cp-slider" type="range" id="ps-orb-size"    min="32"  max="80"  step="2"   oninput="cpPresenceSlider('orbSize',this)"/>  <span class="cp-slider-val" id="ps-orb-size-val">52px</span></div>
+      </div>
+
     </div>
-    <!-- Footer -->
+        <!-- Footer -->
     <div class="companion-panel-footer">
       <button class="sp-btn-ghost" onclick="cpSave()">Apply</button>
       <button class="sp-btn-primary" onclick="cpSave(true)">Save &amp; close</button>

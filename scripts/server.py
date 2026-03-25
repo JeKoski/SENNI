@@ -166,6 +166,21 @@ async def api_browse(request: Request):
 
 # ── API: status ────────────────────────────────────────────────────────────────
 
+def _merged_presence_presets(global_cfg: dict, companion_cfg: dict) -> dict:
+    """Merge global presence presets with per-companion additions/overrides."""
+    from scripts.config import DEFAULTS
+    base    = dict(DEFAULTS.get("presence_presets", {}))
+    global_ = global_cfg.get("presence_presets", {})
+    local   = companion_cfg.get("presence_presets", {})
+    # Deep merge: companion presets win, global overrides DEFAULTS, DEFAULTS are base
+    merged  = {**base}
+    for name, states in global_.items():
+        merged[name] = {**(merged.get(name, {})), **states}
+    for name, states in local.items():
+        merged[name] = {**(merged.get(name, {})), **states}
+    return merged
+
+
 @app.get("/api/status")
 async def api_status():
     """Return current config, loaded tool names, and model status."""
@@ -200,6 +215,8 @@ async def api_status():
         "effective_generation": effective_gen,  # global merged with companion overrides
         "companion_generation":     companion_gen,  # companion-only overrides (may be empty)
         "force_read_before_write":   companion_cfg.get("force_read_before_write", True),
+        "presence_presets":          _merged_presence_presets(config, companion_cfg),
+        "active_presence_preset":    companion_cfg.get("active_presence_preset", "Default"),
     }
 
 
@@ -720,7 +737,7 @@ async def api_save_companion_settings(request: Request):
     companion_cfg = load_companion_config(companion_folder)
 
     # Update editable fields
-    for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode", "heartbeat", "force_read_before_write"):
+    for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode", "heartbeat", "force_read_before_write", "presence_presets", "active_presence_preset"):
         if key in body:
             companion_cfg[key] = body[key]
 
