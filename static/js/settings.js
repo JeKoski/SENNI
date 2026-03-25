@@ -522,6 +522,14 @@ function spNewSoulFile() {
 }
 
 async function spSaveCompanion(andClose = false) {
+  // Old companion editor is now hidden — use the companion window instead.
+  // Guard: if editor is hidden, redirect to companion window rather than wiping settings.
+  const editor = document.getElementById('sp-companion-editor');
+  if (!editor || editor.style.display === 'none') {
+    if (andClose) closeSettings();
+    // Don't save anything — companion window owns all saves now
+    return;
+  }
   // Only save fields the user has explicitly set — blank = inherit from global
   const gen = {};
   const t = parseFloat(document.getElementById('sp-c-temp').value);

@@ -117,7 +117,7 @@ def run(args: dict) -> str:
         if not chaos:
             return "Error: 'move' is only available in chaos mode. Enable it in Settings → Companion."
         if not filename or not dest_folder:
-            return "Error: folder, filename and dest_folder required for move."
+            return "Error: filename and dest_folder required for move."
         src = companion_root / folder / filename
         if not src.exists():
             return f"Not found: {folder}/{filename}"
@@ -155,7 +155,10 @@ def run(args: dict) -> str:
             if target.exists():
                 _backup_soul_file(companion_folder, filename, target)
 
-            if filename == "companion_identity.md":
+            if filename == "user_profile.md":
+                pass  # always writable — stores info about the user, not the companion's identity
+
+            elif filename == "companion_identity.md":
                 if soul_mode == "locked":
                     return "Error: companion_identity.md is read-only (locked). The user edits this in Settings."
                 if soul_mode == "self_notes":

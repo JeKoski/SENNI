@@ -70,10 +70,16 @@ DEFAULTS = {
     "generation": {
         "temperature":    0.8,
         "top_p":          0.95,
-        "top_k":          40,
-        "repeat_penalty": 1.1,
-        "max_tokens":     1024,
-        "max_tool_rounds": 8,
+        "top_k":             40,
+        "min_p":             0.0,
+        "repeat_penalty":    1.1,
+        "presence_penalty":  0.0,
+        "frequency_penalty": 0.0,
+        "dry_multiplier":    0.0,   # 0 = disabled
+        "dry_base":          1.75,
+        "dry_allowed_length": 2,
+        "max_tokens":        1024,
+        "max_tool_rounds":   8,
         "vision_mode":       "always",  # "always" | "once" | "ask"
         "markdown_enabled":  False,
     },

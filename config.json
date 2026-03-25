@@ -89,11 +89,17 @@
     "temperature": 0.8,
     "top_p": 0.95,
     "top_k": 40,
+    "min_p": 0.0,
     "repeat_penalty": 1.05,
-    "max_tokens": 1024,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0,
+    "dry_multiplier": 0.0,
+    "dry_base": 1.75,
+    "dry_allowed_length": 2,
+    "max_tokens": 2048,
     "max_tool_rounds": 16,
     "vision_mode": "always",
-    "markdown_enabled": true
+    "markdown_enabled": false
   },
   "ngl": 99
 }

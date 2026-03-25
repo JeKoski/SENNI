@@ -42,6 +42,16 @@ function cpPopulate() {
   // ── Identity ──
   document.getElementById('cp-companion-name').value = c.companion_name || '';
 
+  // Update panel header
+  const headerName = document.getElementById('cp-header-name');
+  if (headerName) headerName.textContent = c.companion_name || 'Companion';
+  const headerAv = document.getElementById('cp-header-avatar');
+  if (headerAv) {
+    headerAv.innerHTML = c.avatar_data
+      ? `<img src="${c.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+      : '✦';
+  }
+
   const preview = document.getElementById('cp-avatar-preview');
   if (c.avatar_data) {
     preview.innerHTML = `<img src="${c.avatar_data}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
@@ -200,13 +210,19 @@ function cpDrawCrop() {
   const scale = _cpCropScale * Math.min(W / _cpCropImg.width, H / _cpCropImg.height);
   const iw = _cpCropImg.width * scale, ih = _cpCropImg.height * scale;
   ctx.drawImage(_cpCropImg, _cpCropX + (W - iw) / 2, _cpCropY + (H - ih) / 2, iw, ih);
+  // Dark overlay outside the circle using evenodd fill rule
   ctx.save();
+  ctx.fillStyle = 'rgba(28,30,38,0.72)';
   ctx.beginPath();
-  ctx.arc(W/2, H/2, W/2, 0, Math.PI*2);
-  ctx.fillStyle = 'rgba(33,35,46,0.55)';
-  ctx.fillRule = 'evenodd';
-  ctx.rect(0, 0, W, H);
-  ctx.fill();
+  ctx.rect(0, 0, W, H);           // outer rectangle
+  ctx.arc(W/2, H/2, W/2, 0, Math.PI*2, true); // circle cut-out (counter-clockwise = hole)
+  ctx.fill('evenodd');
+  // Circle border
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, W/2 - 1, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(129,140,248,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -290,6 +306,20 @@ async function cpSave(andClose = false) {
     // Update live UI
     const nameEl = document.getElementById('companion-name');
     if (nameEl) nameEl.textContent = body.companion_name || 'Companion';
+    // Update sidebar avatar immediately — don't wait for page reload
+    if (body.avatar_data) {
+      const sidebarAv = document.getElementById('companion-avatar');
+      if (sidebarAv) {
+        sidebarAv.innerHTML = `<img src="${body.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
+      }
+    }
+    // Update companion window header too
+    const cpHeaderName = document.getElementById('cp-header-name');
+    if (cpHeaderName) cpHeaderName.textContent = body.companion_name || 'Companion';
+    const cpHeaderAv = document.getElementById('cp-header-avatar');
+    if (cpHeaderAv && body.avatar_data) {
+      cpHeaderAv.innerHTML = `<img src="${body.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
+    }
     if (typeof syncStatusAvatar === 'function') syncStatusAvatar();
     if (typeof heartbeatReload  === 'function') heartbeatReload();
 
