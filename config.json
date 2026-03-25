@@ -1,8 +1,8 @@
 {
-  "companion_name": "S.E.N.N.I",
-  "companion_folder": "default",
-  "model_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
-  "mmproj_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+  "companion_name": "Qwenny",
+  "companion_folder": "qwenny",
+  "model_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-heretic-v2.Q4_K_M.gguf",
+  "mmproj_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-heretic-v2.BF16-mmproj.gguf",
   "gpu_type": "intel",
   "port_bridge": 8000,
   "port_model": 8081,
@@ -38,33 +38,61 @@
       "enabled": true,
       "value": null
     },
+    "reasoning_format": {
+      "flag": "--reasoning-format",
+      "enabled": true,
+      "value": "deepseek"
+    },
+    "cache_reuse": {
+      "flag": "--cache-reuse",
+      "enabled": true,
+      "value": 256
+    },
+    "batch": {
+      "flag": "-b",
+      "enabled": true,
+      "value": 256
+    },
+    "ubatch": {
+      "flag": "-ub",
+      "enabled": true,
+      "value": 256
+    },
+    "flash_attn": {
+      "flag": "--flash-attn",
+      "enabled": false,
+      "value": null
+    },
+    "prompt_cache": {
+      "flag": "--prompt-cache",
+      "enabled": false,
+      "value": "senni.cache"
+    },
+    "mlock": {
+      "flag": "--mlock",
+      "enabled": false,
+      "value": null
+    },
     "no_mmap": {
       "flag": "--no-mmap",
       "enabled": false,
       "value": null
+    },
+    "threads": {
+      "flag": "-t",
+      "enabled": false,
+      "value": null
     }
   },
-  "server_args_custom": [
-    {
-      "flag": "--cache-reuse",
-      "value": "256",
-      "enabled": true
-    },
-    {
-      "flag": "--reasoning-format",
-      "value": "deepseek",
-      "enabled": true
-    }
-  ],
+  "server_args_custom": [],
   "generation": {
     "temperature": 0.8,
     "top_p": 0.95,
     "top_k": 40,
-    "repeat_penalty": 1.1,
-    "max_tokens": 8000,
-    "max_tool_rounds": 20,
+    "repeat_penalty": 1.05,
+    "max_tokens": 1024,
+    "max_tool_rounds": 16,
     "vision_mode": "always",
-    "render_markdown": true,
     "markdown_enabled": true
   },
   "ngl": 99

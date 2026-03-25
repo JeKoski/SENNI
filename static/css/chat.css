@@ -899,3 +899,99 @@ body.controls-always-visible .msg-controls {
   color: rgba(165,180,252,0.35) !important;
   font-size: 10px !important;
 }
+
+/* ── Streaming text ───────────────────────────────────────────────────────────── */
+/* Cursor via ::after on the bubble — always inline with last text, no DOM injection */
+.bubble.stream-bubble::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 0.85em;
+  background: var(--indigo);
+  margin-left: 3px;
+  vertical-align: -0.1em;
+  border-radius: 1px;
+  animation: blink .65s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Companion status bar ─────────────────────────────────────────────────────── */
+.companion-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 40px 2px;
+  transition: opacity .3s ease;
+}
+.companion-status.idle {
+  opacity: 0.18;
+}
+.companion-status.thinking,
+.companion-status.streaming {
+  opacity: 1;
+}
+.cs-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(129,140,248,0.12);
+  border: 1px solid rgba(129,140,248,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--indigo);
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: box-shadow .3s ease, border-color .3s ease;
+}
+.companion-status.thinking .cs-avatar {
+  border-color: rgba(129,140,248,0.5);
+  box-shadow: 0 0 8px rgba(129,140,248,0.25);
+  animation: avatarPulse 2s ease-in-out infinite;
+}
+.companion-status.streaming .cs-avatar {
+  border-color: rgba(109,212,168,0.5);
+  box-shadow: 0 0 8px rgba(109,212,168,0.2);
+}
+@keyframes avatarPulse {
+  0%,100% { box-shadow: 0 0 6px rgba(129,140,248,0.2); }
+  50%      { box-shadow: 0 0 14px rgba(129,140,248,0.45); }
+}
+.cs-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+.cs-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.cs-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--indigo);
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+.companion-status.thinking .cs-dots span {
+  opacity: 1;
+  animation: csDot 1.2s ease-in-out infinite;
+}
+.companion-status.thinking .cs-dots span:nth-child(2) { animation-delay: .18s; }
+.companion-status.thinking .cs-dots span:nth-child(3) { animation-delay: .36s; }
+.companion-status.streaming .cs-dots span {
+  opacity: 0.4;
+  width: 3px;
+  height: 3px;
+  animation: csStreamDot 1.4s ease-in-out infinite;
+}
+.companion-status.streaming .cs-dots span:nth-child(2) { animation-delay: .2s; }
+.companion-status.streaming .cs-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes csDot {
+  0%,100% { opacity:.25; transform: scale(.75); }
+  50%     { opacity:1;   transform: scale(1.1); }
+}
+@keyframes csStreamDot {
+  0%,100% { opacity:.2; }
+  50%     { opacity:.7; }
+}

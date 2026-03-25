@@ -104,6 +104,14 @@
       </div>
     </div>
 
+    <!-- Companion status bar — always visible, reflects current state -->
+    <div id="companion-status" class="companion-status idle">
+      <div class="cs-avatar" id="cs-avatar">✦</div>
+      <div class="cs-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
     <div class="input-bar" id="input-bar">
       <!-- Attachment preview strip (shown when files are queued) -->
       <div id="attachment-strip" style="display:none"></div>
@@ -188,11 +196,6 @@
       <div class="sp-restart-note" id="sp-restart-note" style="display:none">
         ⚠ A server restart is needed to apply these changes
       </div>
-      <div class="sp-btn-row">
-        <button class="sp-btn-ghost" onclick="spRestartServer()">Restart server</button>
-        <button class="sp-btn-ghost" onclick="spSaveServer()">Apply</button>
-        <button class="sp-btn-primary" onclick="spSaveServer(true)">Save &amp; close</button>
-      </div>
     </div>
 
     <!-- Generation tab -->
@@ -231,11 +234,6 @@
         <label class="sp-radio"><input type="radio" name="vision-mode" value="always" checked/> <span>Always re-encode</span> <span class="sp-note">full vision every turn — best with GPU</span></label>
         <label class="sp-radio"><input type="radio" name="vision-mode" value="once"/>   <span>Once per conversation</span> <span class="sp-note">faster on CPU, loses follow-up vision</span></label>
         <label class="sp-radio"><input type="radio" name="vision-mode" value="ask"/>    <span>Ask each time</span> <span class="sp-note">prompt appears when attaching an image</span></label>
-      </div>
-      <div class="sp-btn-row">
-        <button class="sp-btn-ghost" onclick="spResetGeneration()">Reset defaults</button>
-        <button class="sp-btn-ghost" onclick="spSaveGeneration()">Apply</button>
-        <button class="sp-btn-primary" onclick="spSaveGeneration(true)">Save &amp; close</button>
       </div>
     </div>
 
@@ -358,11 +356,23 @@
           <textarea class="sp-textarea" id="hb-instr-manual" rows="2" placeholder="(uses default if blank)"></textarea></div>
         </div>
 
-        <div class="sp-btn-row">
-          <button class="sp-btn-ghost" onclick="spSaveCompanion()">Apply</button>
-          <button class="sp-btn-primary" onclick="spSaveCompanion(true)">Save &amp; close</button>
-        </div>
       </div>
+    </div>
+
+    <!-- Sticky action footer - shown/hidden per active tab -->
+    <div class="sp-footer" id="sp-footer-server" style="display:none">
+      <button class="sp-btn-ghost" onclick="spRestartServer()">Restart server</button>
+      <button class="sp-btn-ghost" onclick="spSaveServer()">Apply</button>
+      <button class="sp-btn-primary" onclick="spSaveServer(true)">Save &amp; close</button>
+    </div>
+    <div class="sp-footer" id="sp-footer-generation" style="display:none">
+      <button class="sp-btn-ghost" onclick="spResetGeneration()">Reset defaults</button>
+      <button class="sp-btn-ghost" onclick="spSaveGeneration()">Apply</button>
+      <button class="sp-btn-primary" onclick="spSaveGeneration(true)">Save &amp; close</button>
+    </div>
+    <div class="sp-footer" id="sp-footer-companion" style="display:none">
+      <button class="sp-btn-ghost" onclick="spSaveCompanion()">Apply</button>
+      <button class="sp-btn-primary" onclick="spSaveCompanion(true)">Save &amp; close</button>
     </div>
 
     <!-- About tab -->

@@ -221,26 +221,38 @@ function appendSystemNote(text) {
   scrollToBottom();
 }
 
+// ── Companion status bar ─────────────────────────────────────────────────────
+// States: 'idle' | 'thinking' | 'streaming'
+function setCompanionStatus(state) {
+  const el = document.getElementById('companion-status');
+  if (!el) return;
+  el.className = 'companion-status ' + state;
+}
+
+function syncStatusAvatar() {
+  // Mirror the sidebar avatar into the status bar
+  const src = document.querySelector('#companion-avatar img')?.src;
+  const csAv = document.getElementById('cs-avatar');
+  if (!csAv) return;
+  if (src) {
+    csAv.innerHTML = `<img src="${src}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
+  } else {
+    csAv.textContent = '✦';
+  }
+}
+
+// Keep typing functions working — they now control the status bar instead of DOM rows
 let _typingCounter = 0;
 function showTyping() {
-  const id  = 'typing-' + (++_typingCounter);
-  const list = document.getElementById('messages');
-  const row  = document.createElement('div');
-  row.className = 'typing-row';
-  row.id = id;
-  row.innerHTML = `<div class="typing-bubble">
-    <div class="typing-dot"></div>
-    <div class="typing-dot"></div>
-    <div class="typing-dot"></div>
-  </div>`;
-  list.appendChild(row);
+  setCompanionStatus('thinking');
   scrollToBottom();
-  return id;
+  return 'status-' + (++_typingCounter);  // dummy id, not used for DOM removal
 }
 
 function removeTyping(id) {
-  if (id) document.getElementById(id)?.remove();
-  else    document.querySelector('.typing-row')?.remove();
+  // Called when a real reply arrives — status transitions to idle or streaming
+  // Status will be set to 'streaming' by api.js or 'idle' after response finalises
+  setCompanionStatus('idle');
 }
 
 function scrollToBottom() {

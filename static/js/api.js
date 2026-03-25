@@ -365,8 +365,172 @@ async function callModel(system, messages, abortSignal = null) {
       }
     }
 
-    // ── Plain reply — done ────────────────────────────────────────────────
-    return rawText;
+    // ── Plain reply — stream it live ─────────────────────────────────────
+    // Re-fetch this round with stream:true for the typing effect
+    const streamedText = await _streamFinalReply(
+      url, system, msgs, gen, abortSignal
+    );
+    return streamedText ?? rawText;
+  }
+
+  // ── Streaming final reply ────────────────────────────────────────────────
+  async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
+    // Bubble is created LAZILY — only when the first content token arrives.
+    // This ensures thinking blocks (which render before content) appear above the bubble.
+    let bubbleHandle = null;
+    let accumulated  = "";
+    let thinkAccum   = "";
+    let thinkShown   = false;
+
+    const ensureBubble = () => {
+      if (!bubbleHandle) {
+        document.querySelector(".typing-row")?.remove();
+        bubbleHandle = _createStreamBubble();
+      }
+      return bubbleHandle;
+    };
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortSignal,
+        body: JSON.stringify({
+          model:          "local",
+          messages:       [{ role: "system", content: system }, ...msgs],
+          tools:          TOOL_DEFINITIONS,
+          tool_choice:    "auto",
+          max_tokens:     gen.max_tokens     || 1024,
+          temperature:    gen.temperature    ?? 0.8,
+          top_p:          gen.top_p          ?? 0.95,
+          repeat_penalty: gen.repeat_penalty ?? 1.1,
+          stream:         true,
+        }),
+      });
+
+      if (!res.ok) return null;
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") break;
+
+          let parsed;
+          try { parsed = JSON.parse(raw); } catch { continue; }
+
+          const delta = parsed.choices?.[0]?.delta;
+          if (!delta) continue;
+
+          // reasoning_content → update thinking block (no bubble yet)
+          if (delta.reasoning_content) {
+            thinkAccum += delta.reasoning_content;
+            if (!thinkShown && typeof onThinking === "function") {
+              onThinking(thinkAccum);
+              thinkShown = true;
+            } else if (thinkShown) {
+              const thinkEl = document.querySelector(".think-wrap:last-of-type .think-content");
+              if (thinkEl) thinkEl.textContent = thinkAccum;
+            }
+            continue;
+          }
+
+          // content tokens — these are the actual reply, never thinking
+          // With --reasoning-format deepseek, content and reasoning_content are separate fields.
+          // We do NOT manually strip <think> here because llama.cpp handles that via reasoning_content.
+          const token = delta.content || "";
+          if (!token) continue;
+
+          accumulated += token;
+          const bh = ensureBubble();
+          if (bh) {
+            if (typeof setCompanionStatus === "function") setCompanionStatus("streaming");
+            _updateStreamBubble(bh, accumulated);
+          }
+
+          if (parsed.usage && typeof onUsageUpdate === "function") {
+            onUsageUpdate(parsed.usage.prompt_tokens || 0);
+          }
+        }
+      }
+    } catch(e) {
+      if (e.name === "AbortError") {
+        if (bubbleHandle) _finaliseStreamBubble(bubbleHandle, accumulated);
+        throw e;
+      }
+      if (bubbleHandle) _removeStreamBubble(bubbleHandle);
+      return null;
+    }
+
+    if (typeof setCompanionStatus === "function") setCompanionStatus("idle");
+    if (bubbleHandle) {
+      _finaliseStreamBubble(bubbleHandle, accumulated);
+    }
+    return accumulated.trim() || null;
+  }
+
+  // ── Stream bubble helpers ─────────────────────────────────────────────────
+  function _createStreamBubble() {
+    // Remove typing indicator if present (we're taking over with the stream bubble)
+    document.querySelector(".typing-row")?.remove();
+
+    const list = document.getElementById("messages");
+    if (!list) return null;
+
+    const row    = document.createElement("div");
+    row.className = "msg-row companion stream-row";
+    row.id        = "stream-bubble-row";
+    const wrap   = document.createElement("div");
+    const bubble = document.createElement("div");
+    bubble.className       = "bubble stream-bubble";
+    bubble.dataset.rawText = "";
+    bubble.innerHTML       = "";
+    const time = document.createElement("div");
+    time.className   = "msg-time";
+    time.textContent = new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+    wrap.appendChild(bubble);
+    wrap.appendChild(time);
+    row.appendChild(wrap);
+    list.appendChild(row);
+
+    if (typeof scrollToBottom === "function") scrollToBottom();
+    return { row, bubble, wrap };
+  }
+
+  function _updateStreamBubble({ bubble }, text) {
+    if (!bubble) return;
+    bubble.dataset.rawText = text;
+    const rendered = typeof renderMarkdown === "function" ? renderMarkdown(text) : text;
+    bubble.innerHTML = rendered;
+    if (typeof scrollToBottom === "function") scrollToBottom();
+  }
+
+  function _finaliseStreamBubble({ row, bubble }, text) {
+    if (!bubble) return;
+    bubble.dataset.rawText = text;
+    bubble.classList.remove("stream-bubble");
+    const rendered = typeof renderMarkdown === "function" ? renderMarkdown(text) : text;
+    bubble.innerHTML = rendered;
+    // Remove stream-row marker so controls can be attached
+    row.classList.remove("stream-row");
+    // Attach message controls
+    if (typeof _attachMessageControls === "function") {
+      _attachMessageControls(row, "companion");
+    }
+  }
+
+  function _removeStreamBubble({ row } = {}) {
+    row?.remove();
+    // Re-show typing indicator removal is handled by caller
   }
 
   // Fallback after max rounds

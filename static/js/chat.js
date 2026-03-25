@@ -55,22 +55,29 @@ async function loadStatus() {
         ? `<img src="${data.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
         : '✦';
     }
+    // Mirror avatar into the persistent companion status bar
+    if (typeof syncStatusAvatar === 'function') syncStatusAvatar();
 
     if (data.context_size) _contextSize = data.context_size;
+
+    // markdown_enabled lives in global generation — read from data.config directly
+    // so companion generation overrides don't accidentally wipe it
     if (data.config?.generation?.markdown_enabled !== undefined) {
       _markdownEnabled = !!data.config.generation.markdown_enabled;
+      if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(_markdownEnabled);
     }
 
     renderToolPills(tools);
     updateMemoryCounts();
     updateContextBar(0);
 
-    // Load heartbeat config from companion settings
+    // Load companion-specific config (heartbeat, force_read)
     try {
       const s = await fetch('/api/settings').then(r => r.json());
       if (s.active_companion?.heartbeat) {
         config.active_heartbeat = s.active_companion.heartbeat;
       }
+      config.force_read_before_write = s.active_companion?.force_read_before_write ?? true;
     } catch {}
 
   } catch (e) {
@@ -511,8 +518,12 @@ async function sendMessage() {
     const reply = await callModel(buildSystemPrompt('chat'), safeHistory, _abortCtrl.signal);
     removeTyping(typingId);
     if (reply) {
-      const compRow = appendMessage('companion', reply);
-      _attachMessageControls(compRow, 'companion');
+      // If streaming already rendered the bubble, skip appendMessage (avoid duplicate)
+      const streamRow = document.getElementById('stream-bubble-row');
+      if (!streamRow) {
+        const compRow = appendMessage('companion', reply);
+        _attachMessageControls(compRow, 'companion');
+      }
       conversationHistory.push({ role: 'assistant', content: reply });
     }
     if (conversationHistory.length > 60) conversationHistory = conversationHistory.slice(-60);

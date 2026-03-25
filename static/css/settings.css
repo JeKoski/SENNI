@@ -68,6 +68,19 @@
       flex: 1;
     }
 
+    /* Sticky action footer */
+    .sp-footer {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 14px 24px;
+      border-top: 1px solid var(--border);
+      background: #21232e;
+      flex-shrink: 0;
+      border-radius: 0 0 20px 20px;
+    }
+
     /* Shared form elements */
     .sp-section-label {
       font-size: 10px; font-weight: 500;

@@ -1,13 +1,24 @@
 // ── Settings panel ────────────────────────────────────────────────────────────
 
 const BUILTIN_ARGS = [
-  { key:'ngl',     flag:'-ngl',      desc:'GPU layers to offload',      type:'number', default:99     },
-  { key:'ctx',     flag:'-c',        desc:'Context window size',         type:'number', default:16384  },
-  { key:'np',      flag:'-np',       desc:'Parallel slots',              type:'number', default:1      },
-  { key:'ctk',     flag:'-ctk',      desc:'KV cache key quantisation',   type:'text',   default:'q8_0' },
-  { key:'ctv',     flag:'-ctv',      desc:'KV cache value quantisation', type:'text',   default:'q8_0' },
-  { key:'jinja',   flag:'--jinja',   desc:'Enable Jinja2 templates',     type:'flag',   default:null   },
-  { key:'no_mmap', flag:'--no-mmap', desc:'Disable memory mapping',      type:'flag',   default:null   },
+  // Core — always recommended on
+  { key:'ngl',              flag:'-ngl',                desc:'GPU layers to offload',                   type:'number', default:99,            defaultOn:true  },
+  { key:'ctx',              flag:'-c',                  desc:'Context window size',                     type:'number', default:16384,          defaultOn:true  },
+  { key:'np',               flag:'-np',                 desc:'Parallel slots',                          type:'number', default:1,              defaultOn:true  },
+  { key:'ctk',              flag:'-ctk',                desc:'KV cache key quantisation',               type:'text',   default:'q8_0',         defaultOn:true  },
+  { key:'ctv',              flag:'-ctv',                desc:'KV cache value quantisation',             type:'text',   default:'q8_0',         defaultOn:true  },
+  { key:'jinja',            flag:'--jinja',             desc:'Jinja2 chat templates (required for most models)', type:'flag', default:null,   defaultOn:true  },
+  { key:'reasoning_format', flag:'--reasoning-format',  desc:'Thinking format (deepseek for Qwen3)',    type:'text',   default:'deepseek',    defaultOn:true  },
+  // KV cache / performance — on by default, broadly safe
+  { key:'cache_reuse',      flag:'--cache-reuse',       desc:'Reuse KV cache across turns (reduces re-processing)', type:'number', default:256, defaultOn:true },
+  { key:'batch',            flag:'-b',                  desc:'Batch size (prompt processing)',          type:'number', default:256,            defaultOn:true  },
+  { key:'ubatch',           flag:'-ub',                 desc:'Micro-batch size',                        type:'number', default:256,            defaultOn:true  },
+  // Off by default — hardware/situation dependent
+  { key:'flash_attn',       flag:'--flash-attn',        desc:'Flash attention — big speed win, needs compatible GPU', type:'flag', default:null, defaultOn:false },
+  { key:'prompt_cache',     flag:'--prompt-cache',      desc:'Persist KV cache to disk (faster cold starts)', type:'text', default:'senni.cache', defaultOn:false },
+  { key:'mlock',            flag:'--mlock',             desc:'Lock model in RAM — prevents swapping',   type:'flag',   default:null,          defaultOn:false },
+  { key:'no_mmap',          flag:'--no-mmap',           desc:'Disable memory mapping',                 type:'flag',   default:null,          defaultOn:false },
+  { key:'threads',          flag:'-t',                  desc:'Thread count (0 = auto)',                 type:'number', default:0,             defaultOn:false },
 ];
 
 let spSettings       = null;   // full settings object from /api/settings
@@ -41,6 +52,11 @@ function spSwitchTab(name) {
     t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-body').forEach(b =>
     b.classList.toggle('active', b.id === 'tab-' + name));
+  // Show the matching sticky footer, hide others
+  ['server','generation','companion'].forEach(tab => {
+    const f = document.getElementById('sp-footer-' + tab);
+    if (f) f.style.display = (tab === name) ? 'flex' : 'none';
+  });
 }
 
 // ── Saved toast ───────────────────────────────────────────────────────────────
@@ -117,7 +133,7 @@ function spPopulateServer() {
   wrap.innerHTML = '';
   BUILTIN_ARGS.forEach(arg => {
     const saved   = savedArgs[arg.key] || {};
-    const enabled = saved.enabled !== undefined ? saved.enabled : (arg.key !== 'no_mmap');
+    const enabled = saved.enabled !== undefined ? saved.enabled : (arg.defaultOn !== false);
     const val     = saved.value   !== undefined ? saved.value   : arg.default;
     const isFlag  = arg.type === 'flag';
 
@@ -551,6 +567,7 @@ async function spSaveCompanion(andClose = false) {
   // Update spSettings cache so spPopulateCompanion re-renders with new values
   if (spSettings?.active_companion) {
     spSettings.active_companion.companion_name  = document.getElementById('sp-companion-name').value.trim();
+    spSettings.active_companion.generation      = gen;  // save the actual overrides object
     spSettings.active_companion.soul_edit_mode          = document.querySelector('#sp-soul-edit-mode input[name="soul-edit"]:checked')?.value || 'locked';
     spSettings.active_companion.force_read_before_write  = document.getElementById('tog-force-read')?.classList.contains('on') ?? true;
     spSettings.active_companion.heartbeat = {
@@ -568,6 +585,7 @@ async function spSaveCompanion(andClose = false) {
 
   // Refresh companion list only (not full reload — avoids delay)
   spPopulateCompanion();
+  if (typeof syncStatusAvatar === "function") syncStatusAvatar();
   spShowSavedToast("Companion saved ✓");
   if (typeof heartbeatReload === "function") heartbeatReload();
   if (andClose) closeSettings();
@@ -770,17 +788,17 @@ async function restartServer() {
       return;
     }
 
-    appendSystemNote('Restarting model server…');
+    // Close settings and show boot overlay as a loading blocker
+    closeSettings();
+    showBootOverlay('Restarting model server…');
+    disableInput();
 
     // watchBootLog is defined in chat.js and shared across both files
     watchBootLog(async () => {
+      hideBootOverlay();
       appendSystemNote('Model server ready ✓');
       await loadStatus();
-      // If stuck on boot overlay, kick the session forward
-      if (document.getElementById('boot-overlay')) {
-        hideBootOverlay();
-        startSession();
-      }
+      enableInput();
     });
 
   } catch (e) {

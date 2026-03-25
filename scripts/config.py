@@ -40,14 +40,27 @@ DEFAULTS = {
 
     # Built-in server args
     "server_args": {
-        "ngl":     {"enabled": True,  "value": 99,     "flag": "-ngl"},
-        "ctx":     {"enabled": True,  "value": 16384,  "flag": "-c"},
-        "np":      {"enabled": True,  "value": 1,      "flag": "-np"},
-        "ctk":     {"enabled": True,  "value": "q8_0", "flag": "-ctk"},
-        "ctv":     {"enabled": True,  "value": "q8_0", "flag": "-ctv"},
-        "jinja":            {"enabled": True,  "value": None,       "flag": "--jinja"},
-        "reasoning_format": {"enabled": True,  "value": "deepseek", "flag": "--reasoning-format"},
-        "no_mmap":          {"enabled": False, "value": None,       "flag": "--no-mmap"},
+        # Core — always on
+        "ngl":              {"enabled": True,  "value": 99,           "flag": "-ngl"},
+        "ctx":              {"enabled": True,  "value": 16384,        "flag": "-c"},
+        "np":               {"enabled": True,  "value": 1,            "flag": "-np"},
+        "ctk":              {"enabled": True,  "value": "q8_0",       "flag": "-ctk"},
+        "ctv":              {"enabled": True,  "value": "q8_0",       "flag": "-ctv"},
+        "jinja":            {"enabled": True,  "value": None,         "flag": "--jinja"},
+        "reasoning_format": {"enabled": True,  "value": "deepseek",   "flag": "--reasoning-format"},
+        # KV cache / performance
+        "cache_reuse":      {"enabled": True,  "value": 256,          "flag": "--cache-reuse"},
+        "batch":            {"enabled": True,  "value": 256,          "flag": "-b"},
+        "ubatch":           {"enabled": True,  "value": 256,          "flag": "-ub"},
+        # Prompt cache — persist KV cache to disk (speeds up repeated system prompts)
+        "prompt_cache":     {"enabled": False, "value": "senni.cache", "flag": "--prompt-cache"},
+        # Memory / safety
+        "mlock":            {"enabled": False, "value": None,          "flag": "--mlock"},
+        "no_mmap":          {"enabled": False, "value": None,          "flag": "--no-mmap"},
+        # Flash attention — big speed win on supported hardware, off by default (compatibility)
+        "flash_attn":       {"enabled": False, "value": None,          "flag": "--flash-attn"},
+        # Thread count — 0 = auto-detect, override if needed
+        "threads":          {"enabled": False, "value": 0,             "flag": "-t"},
     },
 
     # Custom args: list of {flag, value, enabled}
@@ -62,7 +75,6 @@ DEFAULTS = {
         "max_tokens":     1024,
         "max_tool_rounds": 8,
         "vision_mode":       "always",  # "always" | "once" | "ask"
-        "render_markdown": True,
         "markdown_enabled":  False,
     },
 }
@@ -318,7 +330,8 @@ def load_companion_config(companion_folder: str) -> dict:
             base["generation"] = {**base["generation"], **saved["generation"]}
         if "heartbeat" in saved:
             base["heartbeat"] = {**base["heartbeat"], **saved["heartbeat"]}
-        skip = {"generation", "heartbeat", "force_read_before_write"}
+        skip = {"generation", "heartbeat"}
+        # force_read_before_write is a simple key — handled by the final merge above
         return {**base, **{k: v for k, v in saved.items() if k not in skip}}
     except Exception:
         return base
