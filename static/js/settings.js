@@ -161,6 +161,7 @@ function spPopulateServer() {
 
   spServerDirty = false;
   document.getElementById('sp-restart-note').style.display = 'none';
+  spRenderOsPaths(spSettings.config);
 }
 
 function spToggleArg(key, tog) {

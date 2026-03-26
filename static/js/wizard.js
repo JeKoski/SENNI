@@ -1,11 +1,10 @@
-
-  let currentStep = 0;
-  let selectedGPU = '';
-  let modelPath   = '';
-  let mmprojPath  = '';
-  let multimodal  = false;
-  let scanDone    = false;
-  let _scanResults = [];   // full path list from scan, used by onNativePick
+  let currentStep  = 0;
+  let selectedGPU  = '';
+  let modelPath    = '';
+  let mmprojPath   = '';
+  let multimodal   = false;
+  let scanDone     = false;
+  let _scanResults = [];
 
   // ── Navigation ────────────────────────────────────────────────────────────
   function goTo(i) {
@@ -31,7 +30,13 @@
     document.querySelectorAll('.gpu-chip').forEach(c =>
       c.classList.toggle('selected', c.dataset.gpu === gpu)
     );
-    const labels = { intel:'Intel GPU detected', nvidia:'NVIDIA GPU detected', amd:'AMD GPU detected', cpu:'No discrete GPU detected' };
+    const labels = {
+      intel:  'Intel GPU detected',
+      nvidia: 'NVIDIA GPU detected',
+      amd:    'AMD GPU detected',
+      metal:  'Apple GPU detected — Metal ready',
+      cpu:    'No discrete GPU detected',
+    };
     document.getElementById('detected-label').textContent = labels[gpu] || gpu;
     document.getElementById('detected-note').style.display = 'flex';
   }
@@ -47,44 +52,55 @@
   }
 
   // ── File browser ──────────────────────────────────────────────────────────
-  function browseFile(type) {
-    // Trigger the native OS file picker (opens GNOME Files / Finder / Explorer)
-    document.getElementById('pick-' + type)?.click();
-  }
+  // Primary: use /api/browse (opens native OS file picker via tkinter on the server)
+  // Fallback: show a manual path input if the API call fails
+  async function browseFile(type) {
+    const chip = document.getElementById(type + '-chip');
+    const originalHtml = chip?.innerHTML;
 
-  // Called when the native OS file picker returns a selection
-  function onNativePick(input, type) {
-    const file = input.files?.[0];
-    if (!file) return;
-    input.value = '';
+    // Show loading state on the chip
+    if (chip) chip.style.opacity = '0.6';
 
-    const nameOnly = file.name;
+    try {
+      const res  = await fetch('/api/browse', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type }),
+      });
+      const data = await res.json();
 
-    // Try to find the full path from scan results first (zero extra typing)
-    const match = (_scanResults || []).find(f => f.name === nameOnly);
-    if (match) {
-      if (type === 'model') {
-        modelPath = match.path;
-        setFileDisplay('model', match.path, true);
-        if (multimodal) fetchMmprojCandidates(match.path);
-      } else {
-        mmprojPath = match.path;
-        setFileDisplay('mmproj', match.path, true);
+      if (data.ok && data.path) {
+        // Great — got a full path from the native picker
+        _applyPath(type, data.path);
+      } else if (data.reason !== 'cancelled') {
+        // tkinter not available (headless server, etc.) — fall back to text input
+        _showPathFallback(type);
       }
-      // Remove any stale path input
-      document.getElementById(type + '-path-input')?.closest('div')?.remove();
-      updateStartBtn();
-      return;
+      // If cancelled: do nothing, chip stays as-is
+    } catch (e) {
+      // Network error — fall back to text input
+      _showPathFallback(type);
+    } finally {
+      if (chip) chip.style.opacity = '1';
     }
-
-    // Not in scan results — show chip with filename and a pre-filled path input
-    setFileDisplay(type, nameOnly, false);
-    showPathInputWithHint(type, nameOnly);
   }
 
-  function showPathInputWithHint(type, filename) {
-    // Remove any existing path input for this type
-    document.getElementById(type + '-path-input')?.closest('div')?.remove();
+  function _applyPath(type, path) {
+    if (type === 'model') {
+      modelPath = path;
+      if (multimodal) fetchMmprojCandidates(path);
+    } else {
+      mmprojPath = path;
+    }
+    setFileDisplay(type, path, true);
+    // Remove any stale fallback input
+    document.getElementById(type + '-path-wrap')?.remove();
+    updateStartBtn();
+  }
+
+  function _showPathFallback(type) {
+    // Remove any existing fallback for this type
+    document.getElementById(type + '-path-wrap')?.remove();
 
     const chip = document.getElementById(type + '-chip');
     if (!chip) return;
@@ -94,68 +110,18 @@
     wrap.style.cssText = 'margin-top:8px';
     wrap.innerHTML = `
       <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:5px">
-        File not found in scan results — paste the full path to
-        <strong style="color:var(--indigo-hi)">${filename}</strong>:
+        Couldn't open file picker — paste the full path to your
+        ${type === 'model' ? 'model' : 'mmproj'} file:
       </div>
       <input id="${type}-path-input" type="text"
-        placeholder="/path/to/${filename}"
+        placeholder="${type === 'model' ? '/path/to/model.gguf' : '/path/to/mmproj.gguf'}"
         style="width:100%;background:rgba(0,0,0,0.2);border:1px solid rgba(129,140,248,0.3);
                border-radius:10px;color:var(--text);font-family:'DM Mono',monospace;
-               font-size:12px;padding:10px 13px;outline:none;box-sizing:border-box"/>
-      <div style="font-size:11px;color:var(--text-dim);margin-top:5px">
-        Tip: run <code style="background:rgba(0,0,0,0.2);padding:1px 5px;border-radius:4px">find ~ -name "${filename}" 2>/dev/null</code> to find it
-      </div>`;
+               font-size:12px;padding:10px 13px;outline:none;box-sizing:border-box"/>`;
 
     chip.closest('.file-chip-row').insertAdjacentElement('afterend', wrap);
 
     const inp = wrap.querySelector('input');
-    inp.addEventListener('input', () => {
-      const val = inp.value.trim();
-      if (type === 'model') {
-        modelPath = val;
-        setFileDisplay('model', val ? val : filename, !!val);
-        if (multimodal && val) fetchMmprojCandidates(val);
-      } else {
-        mmprojPath = val;
-        setFileDisplay('mmproj', val ? val : filename, !!val);
-      }
-      updateStartBtn();
-    });
-    inp.focus();
-  }
-
-  function setFileDisplay(type, path, isSet) {
-    // Update the chip element (new style)
-    const chip     = document.getElementById(type + '-chip');
-    const chipName = document.getElementById(type + '-chip-name');
-    if (chip && chipName) {
-      chipName.textContent = path ? path.split(/[\\/]/).pop() : 'Click to select…';
-      chipName.title       = path || '';
-      chip.classList.toggle('set', !!path);
-      chip.classList.toggle('empty', !path);
-    }
-  }
-
-  function showPathInput(type) {
-    // When tkinter is unavailable, add a text field under the chip
-    const row = document.getElementById(type + '-chip')?.closest('.file-chip-row');
-    if (!row) return;
-    if (row.querySelector('.path-fallback')) { row.querySelector('.path-fallback').focus(); return; }
-
-    const inp = document.createElement('input');
-    inp.type      = 'text';
-    inp.className = 'path-fallback';
-    inp.placeholder = type === 'model'
-      ? 'Paste full path to .gguf…'
-      : 'Paste full path to mmproj .gguf…';
-    inp.style.cssText = [
-      'flex:1','min-width:0','margin-top:8px',
-      'background:rgba(0,0,0,0.2)',
-      'border:1px solid rgba(129,140,248,0.3)',
-      'border-radius:11px','color:var(--text)',
-      'font-family:"DM Mono",monospace',
-      'font-size:12px','padding:10px 14px','outline:none'
-    ].join(';');
     inp.addEventListener('input', () => {
       const val = inp.value.trim();
       if (type === 'model') {
@@ -168,25 +134,52 @@
       }
       updateStartBtn();
     });
-    // Insert after the chip
-    const chip = document.getElementById(type + '-chip');
-    chip?.insertAdjacentElement('afterend', inp);
     inp.focus();
   }
 
+  // Legacy: called by the hidden <input type="file"> elements
+  // Only used as a last resort if /api/browse is completely unavailable
+  function onNativePick(input, type) {
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = '';
+
+    const nameOnly = file.name;
+
+    // Try to find the full path from scan results (zero extra typing)
+    const match = (_scanResults || []).find(f => f.name === nameOnly);
+    if (match) {
+      _applyPath(type, match.path);
+      return;
+    }
+
+    // Not in scan results — show chip with filename and fallback input
+    setFileDisplay(type, nameOnly, false);
+    _showPathFallback(type);
+  }
+
+  function setFileDisplay(type, path, isSet) {
+    const chip     = document.getElementById(type + '-chip');
+    const chipName = document.getElementById(type + '-chip-name');
+    if (chip && chipName) {
+      chipName.textContent = path ? path.split(/[\\/]/).pop() : 'Click to select…';
+      chipName.title       = path || '';
+      chip.classList.toggle('set',   !!isSet);
+      chip.classList.toggle('empty', !isSet);
+    }
+  }
 
   // ── Scan ──────────────────────────────────────────────────────────────────
   async function scanForModels() {
     const btn = document.getElementById('scan-btn');
 
-    // Second click: toggle visibility of existing results
     if (scanDone) {
       document.getElementById('scan-results').classList.toggle('visible');
       return;
     }
 
     btn.innerHTML = '<span class="mini-spin"></span> Scanning…';
-    btn.disabled = true;
+    btn.disabled  = true;
 
     try {
       const res  = await fetch('/api/scan/models');
@@ -223,10 +216,7 @@
         item.onclick = () => {
           document.querySelectorAll('.scan-item').forEach(i => i.classList.remove('selected'));
           item.classList.add('selected');
-          modelPath = f.path;
-          setFileDisplay('model', f.path, true);
-          if (multimodal) fetchMmprojCandidates(f.path);
-          updateStartBtn();
+          _applyPath('model', f.path);
         };
         wrap.appendChild(item);
       });
@@ -255,9 +245,7 @@
         item.onclick = () => {
           listEl.querySelectorAll('.candidate-item').forEach(d => d.classList.remove('selected'));
           item.classList.add('selected');
-          mmprojPath = c.path;
-          setFileDisplay('mmproj', c.path, true);
-          updateStartBtn();
+          _applyPath('mmproj', c.path);
         };
         listEl.appendChild(item);
       });
@@ -282,15 +270,14 @@
   async function startBoot() {
     clearError('err-0');
 
-    if (!modelPath)             { showError('err-0', 'Please select a model file.');              return; }
-    if (!selectedGPU)           { showError('err-0', 'Please select your GPU type.');             return; }
+    if (!modelPath)                { showError('err-0', 'Please select a model file.');                        return; }
+    if (!selectedGPU)              { showError('err-0', 'Please select your GPU type.');                       return; }
     if (multimodal && !mmprojPath) { showError('err-0', 'Please select an mmproj file, or disable multimodal.'); return; }
 
-    // Shut down any running model server first — wizard may be changing the model
     try { await fetch('/api/shutdown-model', { method: 'POST' }); } catch {}
 
     const res = await fetch('/api/setup', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model_path:  modelPath,
@@ -323,9 +310,9 @@
         const div   = document.createElement('div');
         const lower = data.line.toLowerCase();
         if      (lower.includes('error') || lower.includes('failed')) { div.className='log-err';  div.textContent='✗ '+data.line; }
-        else if (lower.includes('warn'))                              { div.className='log-warn'; div.textContent='  '+data.line; }
-        else if (lower.includes('load') || lower.includes('layer'))  { div.className='log-info'; div.textContent='› '+data.line; }
-        else                                                          {                           div.textContent='  '+data.line; }
+        else if (lower.includes('warn'))                               { div.className='log-warn'; div.textContent='  '+data.line; }
+        else if (lower.includes('load') || lower.includes('layer'))   { div.className='log-info'; div.textContent='› '+data.line; }
+        else                                                           {                           div.textContent='  '+data.line; }
         logEl.appendChild(div);
         logEl.scrollTop = logEl.scrollHeight;
       }
@@ -349,13 +336,27 @@
   function showError(id, msg) { const e=document.getElementById(id); e.textContent=msg; e.classList.add('visible'); }
   function clearError(id)     { const e=document.getElementById(id); e.textContent='';  e.classList.remove('visible'); }
 
-  // ── Init (GPU detect only — no file scan) ─────────────────────────────────
+  // ── Init (GPU detect + add Metal chip if on Mac) ──────────────────────────
   async function init() {
     try {
       const res  = await fetch('/api/scan');
       const data = await res.json();
+
+      // Dynamically add Metal chip if running on macOS
+      if (data.platform === 'Darwin') {
+        const gpuRow = document.querySelector('.gpu-row');
+        if (gpuRow && !gpuRow.querySelector('[data-gpu="metal"]')) {
+          const chip = document.createElement('div');
+          chip.className   = 'gpu-chip';
+          chip.dataset.gpu = 'metal';
+          chip.onclick     = function() { selectGPU(this); };
+          chip.innerHTML   = '<div class="gpu-dot" style="background:#a78bfa"></div>Apple Metal';
+          gpuRow.prepend(chip);
+        }
+      }
+
       if (data.gpu_detected) setDetectedGPU(data.gpu_detected);
-    } catch (e) { /* non-critical — GPU chips are still clickable */ }
+    } catch (e) { /* non-critical */ }
   }
 
   document.addEventListener('DOMContentLoaded', init);

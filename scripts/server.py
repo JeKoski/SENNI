@@ -107,11 +107,15 @@ async def chat():
 @app.get("/api/scan")
 async def api_scan():
     """
-    Return detected GPU only. No longer auto-scans for model files —
-    the wizard now uses explicit file selection + optional local scan.
+    Return detected GPU and current platform.
+    Platform is used by the wizard to show OS-appropriate GPU options
+    (e.g. Apple Metal chip on macOS).
     """
     gpu = detect_gpu()
-    return {"gpu_detected": gpu}
+    return {
+        "gpu_detected": gpu,
+        "platform":     platform.system(),  # "Linux", "Windows", "Darwin"
+    }
 
 
 @app.get("/api/scan/models")
@@ -206,14 +210,14 @@ async def api_status():
     effective_gen = {**global_gen, **companion_gen}
 
     return {
-        "config":              {k: v for k, v in config.items() if k != "first_run"},
-        "tools":               [t["name"] for t in _tool_manifest],
-        "model_running":       model_running,
-        "avatar_data":         companion_cfg.get("avatar_data", ""),
-        "companion_name":      companion_cfg.get("companion_name", config.get("companion_name", "")),
-        "context_size":        int(ctx_size) if ctx_size else 16384,
-        "effective_generation": effective_gen,  # global merged with companion overrides
-        "companion_generation":     companion_gen,  # companion-only overrides (may be empty)
+        "config":                    {k: v for k, v in config.items() if k != "first_run"},
+        "tools":                     [t["name"] for t in _tool_manifest],
+        "model_running":             model_running,
+        "avatar_data":               companion_cfg.get("avatar_data", ""),
+        "companion_name":            companion_cfg.get("companion_name", config.get("companion_name", "")),
+        "context_size":              int(ctx_size) if ctx_size else 16384,
+        "effective_generation":      effective_gen,
+        "companion_generation":      companion_gen,
         "force_read_before_write":   companion_cfg.get("force_read_before_write", True),
         "presence_presets":          _merged_presence_presets(config, companion_cfg),
         "active_presence_preset":    companion_cfg.get("active_presence_preset", "Default"),
@@ -229,7 +233,7 @@ async def api_setup(request: Request):
     Expected JSON body:
     {
         "model_path":    str,
-        "gpu_type":      str,   # intel | nvidia | amd | cpu
+        "gpu_type":      str,   # intel | nvidia | amd | metal | cpu
         "ngl":           int,
         "port_bridge":   int,
         "port_model":    int,
@@ -316,14 +320,21 @@ async def api_boot(request: Request):
 def _build_and_launch(config: dict):
     """Build the llama-server command using config and launch in background thread."""
     IS_WIN = platform.system() == "Windows"
+    IS_MAC = platform.system() == "Darwin"
     gpu    = config.get("gpu_type", "cpu")
 
     # ── Resolve llama-server binary ───────────────────────────────────────────
     model_dir  = Path(config["model_path"]).parent
     server_exe = "llama-server.exe" if IS_WIN else "llama-server"
     candidates = [
+        # Relative to model file (common llama.cpp build layout)
         model_dir.parent.parent / "build" / "bin" / server_exe,
         model_dir.parent / "bin" / server_exe,
+        # macOS: Homebrew and common build locations
+        Path("/usr/local/bin") / server_exe,
+        Path("/opt/homebrew/bin") / server_exe,
+        Path.home() / "llama.cpp" / "build" / "bin" / server_exe,
+        # Fallback: rely on PATH
         Path(server_exe),
     ]
     binary = next((str(c) for c in candidates if Path(c).exists()), server_exe)
@@ -338,9 +349,19 @@ def _build_and_launch(config: dict):
             cmd_str  = " ".join(f'"{a}"' for a in cmd_args)
             full_cmd = f'"{oneapi}" intel64 && {cmd_str}'
         else:
+            # NVIDIA / AMD / CPU on Windows — run directly
             full_cmd = " ".join(f'"{a}"' for a in cmd_args)
         shell_args = {"shell": True}
+
+    elif IS_MAC:
+        # macOS: Metal is the only GPU backend — no environment setup needed.
+        # llama.cpp uses Metal automatically when built with it; -ngl handles offload.
+        safe_cmd   = " ".join(shlex.quote(a) for a in cmd_args)
+        full_cmd   = safe_cmd
+        shell_args = {"shell": True, "executable": "/bin/zsh"}
+
     else:
+        # Linux
         safe_cmd = " ".join(shlex.quote(a) for a in cmd_args)
         if gpu == "intel":
             oneapi   = "/opt/intel/oneapi/setvars.sh"
@@ -350,10 +371,11 @@ def _build_and_launch(config: dict):
         shell_args = {"shell": True, "executable": "/bin/bash"}
 
     env = os.environ.copy()
-    if gpu == "intel":
+    if gpu == "intel" and not IS_MAC:
         env["ONEAPI_DEVICE_SELECTOR"] = "level_zero:gpu"
     elif gpu == "nvidia":
         env.setdefault("CUDA_VISIBLE_DEVICES", "0")
+    # Metal: no extra env vars needed — llama.cpp handles it automatically
 
     threading.Thread(
         target=_run_subprocess,
@@ -444,7 +466,6 @@ async def api_boot_log():
                 ready_sent = True
 
             # After ready, slow down polling to save CPU (1 s instead of 0.2 s)
-            # Before ready, keep 0.2 s for responsive boot feedback
             await asyncio.sleep(1.0 if ready_sent else 0.2)
 
             # Stop streaming if the process has exited — client will reconnect on restart
@@ -497,7 +518,6 @@ async def mcp_handler(request: Request):
 
     # ── tools/list ────────────────────────────────────────────────────────────
     if method == "tools/list":
-        # Strip the internal 'handler' key before sending to the model
         clean = [
             {k: v for k, v in t.items() if k != "handler"}
             for t in _tool_manifest
@@ -694,6 +714,7 @@ async def api_save_server_settings(request: Request):
     """
     Save server-level settings (model path, gpu, ports, server_args).
     These require a server restart — we don't auto-restart here.
+    save_config() automatically writes per-OS path dicts.
     """
     body   = await request.json()
     config = load_config()
@@ -704,7 +725,7 @@ async def api_save_server_settings(request: Request):
         if key in body:
             config[key] = body[key]
 
-    save_config(config)
+    save_config(config)  # update_platform_paths() is called inside save_config()
     return {"ok": True, "restart_required": True}
 
 
@@ -737,7 +758,8 @@ async def api_save_companion_settings(request: Request):
     companion_cfg = load_companion_config(companion_folder)
 
     # Update editable fields
-    for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode", "heartbeat", "force_read_before_write", "presence_presets", "active_presence_preset"):
+    for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode",
+                "heartbeat", "force_read_before_write", "presence_presets", "active_presence_preset"):
         if key in body:
             companion_cfg[key] = body[key]
 
@@ -783,7 +805,7 @@ async def api_get_soul_files(folder: str):
     if soul_dir.exists():
         for f in sorted(soul_dir.glob("*.md")) + sorted(soul_dir.glob("*.txt")):
             content = f.read_text(encoding="utf-8").strip()
-            if content:  # skip blank/empty files (e.g. migrated-away session_notes)
+            if content:  # skip blank/empty files
                 files[f.name] = f.read_text(encoding="utf-8")
     return {"files": files}
 
@@ -795,7 +817,6 @@ async def api_delete_soul_file(folder: str, request: Request):
     filename = body.get("filename", "").strip()
     if not filename or "/" in filename or "\\" in filename:
         return {"ok": False, "error": "Invalid filename"}
-    # Safety: only allow deleting non-core files (not companion_identity or user_profile)
     protected = {"companion_identity.md", "user_profile.md"}
     if filename in protected:
         return {"ok": False, "error": f"{filename} is protected and cannot be deleted"}
