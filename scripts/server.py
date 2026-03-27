@@ -221,6 +221,8 @@ async def api_status():
         "force_read_before_write":   companion_cfg.get("force_read_before_write", True),
         "presence_presets":          _merged_presence_presets(config, companion_cfg),
         "active_presence_preset":    companion_cfg.get("active_presence_preset", "Default"),
+        "moods":                     companion_cfg.get("moods", {}),
+        "active_mood":               companion_cfg.get("active_mood", None),
     }
 
 
@@ -709,6 +711,8 @@ async def api_get_settings():
         "platform":                 platform.system(),   # "Linux", "Windows", "Darwin"
         "presence_presets":         _merged_presence_presets(config, active_cfg),
         "active_presence_preset":   active_cfg.get("active_presence_preset", "Default"),
+        "moods":                    active_cfg.get("moods", {}),
+        "active_mood":              active_cfg.get("active_mood", None),
     }
 
 
@@ -789,7 +793,8 @@ async def api_save_companion_settings(request: Request):
 
     # Update editable fields
     for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode",
-                "heartbeat", "force_read_before_write", "presence_presets", "active_presence_preset"):
+                "heartbeat", "force_read_before_write", "presence_presets", "active_presence_preset",
+                "moods", "active_mood"):
         if key in body:
             companion_cfg[key] = body[key]
 

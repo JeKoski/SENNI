@@ -413,6 +413,9 @@ def load_companion_config(companion_folder: str) -> dict:
                 "manual":            "",
             },
         },
+        # ── Moods ──
+        "moods":        {},    # { mood_name: { dotColor, glowColor, glowSpeed, ... } }
+        "active_mood":  None,  # name of currently active mood, or None
     }
     if not path.exists():
         return base
@@ -422,7 +425,9 @@ def load_companion_config(companion_folder: str) -> dict:
             base["generation"] = {**base["generation"], **saved["generation"]}
         if "heartbeat" in saved:
             base["heartbeat"] = {**base["heartbeat"], **saved["heartbeat"]}
-        skip = {"generation", "heartbeat"}
+        if "moods" in saved:
+            base["moods"] = saved["moods"]
+        skip = {"generation", "heartbeat", "moods"}
         return {**base, **{k: v for k, v in saved.items() if k not in skip}}
     except Exception:
         return base
