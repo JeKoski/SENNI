@@ -706,6 +706,7 @@ async def api_get_settings():
         "companions":       companions,
         "active_companion": active_cfg,
         "defaults":         DEFAULTS,
+        "platform":         platform.system(),   # "Linux", "Windows", "Darwin"
     }
 
 
@@ -727,6 +728,33 @@ async def api_save_server_settings(request: Request):
 
     save_config(config)  # update_platform_paths() is called inside save_config()
     return {"ok": True, "restart_required": True}
+
+@app.delete("/api/settings/os-paths")
+async def api_delete_os_paths(request: Request):
+    """
+    Remove a saved per-OS model/mmproj/gpu entry from config.
+    Body: { "os": "Windows" }  (or "Linux" / "Darwin")
+    """
+    body   = await request.json()
+    os_key = body.get("os", "")
+    if not os_key:
+        return {"ok": False, "error": "No OS specified."}
+
+    config = load_config()
+    changed = False
+    for field in ("model_paths", "mmproj_paths", "gpu_types"):
+        if os_key in config.get(field, {}):
+            del config[field][os_key]
+            changed = True
+
+    if changed:
+        # save_config calls update_platform_paths, which re-syncs the active OS.
+        # We write directly to avoid overwriting the just-deleted entry back in.
+        import json as _json
+        CONFIG_FILE.write_text(_json.dumps(config, indent=2), encoding="utf-8")
+        log.info("Removed OS paths entry for: %s", os_key)
+
+    return {"ok": True, "changed": changed}
 
 
 @app.post("/api/settings/generation")

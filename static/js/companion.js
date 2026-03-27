@@ -16,6 +16,7 @@ async function openCompanionWindow() {
 }
 
 function closeCompanionWindow() {
+  _cpPresenceInitDone = false;  // reset so next open re-fetches fresh data
   document.getElementById('companion-overlay').classList.remove('open');
 }
 
@@ -37,7 +38,6 @@ function cpPopulate() {
   const cfg = cpSettings || {};
   const c   = cfg.active_companion || {};
   const g   = c.generation || {};
-  const gl  = cfg.config?.generation || {};
 
   // ── Identity ──
   document.getElementById('cp-companion-name').value = c.companion_name || '';
@@ -59,7 +59,7 @@ function cpPopulate() {
     preview.innerHTML = '✦';
   }
   document.getElementById('cp-crop-wrap').style.display = 'none';
-  // Show/hide reset link
+
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
   if (resetWrap) resetWrap.style.display = c.avatar_data ? 'inline' : 'none';
 
@@ -71,7 +71,7 @@ function cpPopulate() {
   const frEl = document.getElementById('cp-force-read');
   if (frEl) frEl.classList.toggle('on', c.force_read_before_write !== false);
 
-  // ── Generation ── (show only actual overrides — blank = inherit global)
+  // ── Generation ── (blank = inherit global)
   const setGen = (id, key) => {
     const el = document.getElementById(id);
     if (el) el.value = g[key] !== undefined ? g[key] : '';
@@ -104,15 +104,15 @@ function cpPopulate() {
   hbTog('cp-hb-conv-end', hb.conversation_end_trigger);
   hbTog('cp-hb-session',  hb.session_start_trigger);
   hbTog('cp-hb-ctx',      hb.context_threshold_trigger);
-  const idleMin = document.getElementById('cp-hb-idle-min');  if (idleMin) idleMin.value = hb.idle_minutes ?? 15;
-  const ctxPct  = document.getElementById('cp-hb-ctx-pct');   if (ctxPct)  ctxPct.value  = hb.context_threshold_pct ?? 75;
+  const idleMin = document.getElementById('cp-hb-idle-min'); if (idleMin) idleMin.value = hb.idle_minutes         ?? 15;
+  const ctxPct  = document.getElementById('cp-hb-ctx-pct');  if (ctxPct)  ctxPct.value  = hb.context_threshold_pct ?? 75;
 
-  const instr = hb.instructions || {};
+  const instr    = hb.instructions || {};
   const instrVal = (key) => typeof instr === 'string' ? (key === 'default' ? instr : '') : (instr[key] || '');
   const instrIds = ['default','idle','conversation-end','session-start','context-threshold','manual'];
   instrIds.forEach(key => {
     const el = document.getElementById(`cp-hb-instr-${key}`);
-    if (el) el.value = instrVal(key.replace('-','_'));
+    if (el) el.value = instrVal(key.replace('-', '_'));
   });
 }
 
@@ -120,13 +120,22 @@ function cpPopulate() {
 function cpSwitchTab(tab) {
   document.querySelectorAll('.cp-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.cp-tab-body').forEach(b => b.classList.toggle('active', b.id === `cp-tab-${tab}`));
-  if (tab === 'memory')   cpLoadSoulFiles();
-  if (tab === 'presence') cpPresenceInit();
+  if (tab === 'memory') cpLoadSoulFiles();
+  if (tab === 'presence') {
+    // Only do a full init if presence data hasn't been loaded yet this session.
+    // If already loaded (user made edits), just re-render so changes are preserved.
+    if (!_cpPresenceInitDone) {
+      cpPresenceInit();
+    } else {
+      cpPresenceRenderPresets();
+      cpPresenceRenderState(_cpEditingState);
+    }
+  }
 }
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
-let _cpCropper     = null;
-let _cpAvatarFull  = null;
+let _cpCropper    = null;
+let _cpAvatarFull = null;
 
 function cpAvatarBrowse() {
   const inp = document.createElement('input');
@@ -161,7 +170,6 @@ function cpAvatarLoad(file) {
 
 function cpAvatarCrop() {
   if (!_cpCropper) {
-    // No cropper lib — use full image
     const preview = document.getElementById('cp-avatar-preview');
     if (preview && _cpAvatarFull) {
       preview.innerHTML = `<img src="${_cpAvatarFull}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
@@ -191,8 +199,8 @@ function cpAvatarReset() {
 // ── Soul files ────────────────────────────────────────────────────────────────
 async function cpLoadSoulFiles() {
   try {
-    const res  = await fetch(`/api/settings/soul/${cpFolder}`);
-    const data = await res.json();
+    const res   = await fetch(`/api/settings/soul/${cpFolder}`);
+    const data  = await res.json();
     const files = data.files || {};
     const tabsEl = document.getElementById('cp-soul-tabs');
     if (!tabsEl) return;
@@ -224,7 +232,7 @@ async function cpSaveSoulFile() {
   const content = document.getElementById('cp-soul-content')?.value || '';
   await fetch(`/api/settings/soul/${cpFolder}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename: cpSoulFile, content })
+    body: JSON.stringify({ filename: cpSoulFile, content }),
   });
   cpShowToast('Soul file saved ✓');
 }
@@ -256,43 +264,45 @@ function cpNewSoulFile() {
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 async function cpSave(andClose = false) {
+  // Show toast immediately so UI feels responsive
+  cpShowToast('Saving…');
+
   try {
     const g = {};
     const getGen = (id, key, parser) => {
       const v = document.getElementById(id)?.value;
       if (v !== '' && v !== undefined) g[key] = parser(v);
     };
-    getGen('cp-g-temp',   'temperature',       parseFloat);
-    getGen('cp-g-topp',   'top_p',             parseFloat);
-    getGen('cp-g-topk',   'top_k',             parseInt);
-    getGen('cp-g-minp',   'min_p',             parseFloat);
-    getGen('cp-g-rpen',   'repeat_penalty',    parseFloat);
-    getGen('cp-g-maxt',   'max_tokens',        parseInt);
-    getGen('cp-g-pres',   'presence_penalty',  parseFloat);
-    getGen('cp-g-freq',   'frequency_penalty', parseFloat);
-    getGen('cp-g-rounds', 'max_tool_rounds',   parseInt);
-    getGen('cp-g-dry-m',  'dry_multiplier',    parseFloat);
-    getGen('cp-g-dry-b',  'dry_base',          parseFloat);
-    getGen('cp-g-dry-l',  'dry_allowed_length',parseInt);
+    getGen('cp-g-temp',   'temperature',        parseFloat);
+    getGen('cp-g-topp',   'top_p',              parseFloat);
+    getGen('cp-g-topk',   'top_k',              parseInt);
+    getGen('cp-g-minp',   'min_p',              parseFloat);
+    getGen('cp-g-rpen',   'repeat_penalty',     parseFloat);
+    getGen('cp-g-maxt',   'max_tokens',         parseInt);
+    getGen('cp-g-pres',   'presence_penalty',   parseFloat);
+    getGen('cp-g-freq',   'frequency_penalty',  parseFloat);
+    getGen('cp-g-rounds', 'max_tool_rounds',    parseInt);
+    getGen('cp-g-dry-m',  'dry_multiplier',     parseFloat);
+    getGen('cp-g-dry-b',  'dry_base',           parseFloat);
+    getGen('cp-g-dry-l',  'dry_allowed_length', parseInt);
 
-    // Gather heartbeat
     const tog = id => document.getElementById(id)?.classList.contains('on') ?? false;
     const hb = {
-      silent_enabled:           tog('cp-hb-silent'),
-      message_enabled:          tog('cp-hb-message'),
-      idle_trigger:             tog('cp-hb-idle'),
-      conversation_end_trigger: tog('cp-hb-conv-end'),
-      session_start_trigger:    tog('cp-hb-session'),
-      context_threshold_trigger:tog('cp-hb-ctx'),
-      idle_minutes:    parseInt(document.getElementById('cp-hb-idle-min')?.value) || 15,
-      context_threshold_pct: parseInt(document.getElementById('cp-hb-ctx-pct')?.value) || 75,
+      silent_enabled:            tog('cp-hb-silent'),
+      message_enabled:           tog('cp-hb-message'),
+      idle_trigger:              tog('cp-hb-idle'),
+      conversation_end_trigger:  tog('cp-hb-conv-end'),
+      session_start_trigger:     tog('cp-hb-session'),
+      context_threshold_trigger: tog('cp-hb-ctx'),
+      idle_minutes:              parseInt(document.getElementById('cp-hb-idle-min')?.value) || 15,
+      context_threshold_pct:     parseInt(document.getElementById('cp-hb-ctx-pct')?.value)  || 75,
       instructions: {
-        default:            document.getElementById('cp-hb-instr-default')?.value            || '',
-        idle:               document.getElementById('cp-hb-instr-idle')?.value               || '',
-        conversation_end:   document.getElementById('cp-hb-instr-conversation-end')?.value   || '',
-        session_start:      document.getElementById('cp-hb-instr-session-start')?.value      || '',
-        context_threshold:  document.getElementById('cp-hb-instr-context-threshold')?.value  || '',
-        manual:             document.getElementById('cp-hb-instr-manual')?.value             || '',
+        default:           document.getElementById('cp-hb-instr-default')?.value           || '',
+        idle:              document.getElementById('cp-hb-instr-idle')?.value              || '',
+        conversation_end:  document.getElementById('cp-hb-instr-conversation-end')?.value  || '',
+        session_start:     document.getElementById('cp-hb-instr-session-start')?.value     || '',
+        context_threshold: document.getElementById('cp-hb-instr-context-threshold')?.value || '',
+        manual:            document.getElementById('cp-hb-instr-manual')?.value            || '',
       },
     };
 
@@ -300,23 +310,48 @@ async function cpSave(andClose = false) {
     const avatarData = avatarImg?.src || '';
 
     const body = {
-      folder:                 cpFolder,
-      companion_name:         document.getElementById('cp-companion-name')?.value.trim() || '',
-      avatar_data:            avatarData,
-      generation:             g,
-      soul_edit_mode:         document.querySelector('#cp-soul-edit-mode input[name="cp-soul-edit"]:checked')?.value || 'locked',
-      force_read_before_write:document.getElementById('cp-force-read')?.classList.contains('on') ?? true,
-      heartbeat:              hb,
+      folder:                  cpFolder,
+      companion_name:          document.getElementById('cp-companion-name')?.value.trim() || '',
+      avatar_data:             avatarData,
+      generation:              g,
+      soul_edit_mode:          document.querySelector('#cp-soul-edit-mode input[name="cp-soul-edit"]:checked')?.value || 'locked',
+      force_read_before_write: document.getElementById('cp-force-read')?.classList.contains('on') ?? true,
+      heartbeat:               hb,
       ..._cpGetPresencePayload(),
     };
 
     const res = await fetch('/api/settings/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
-    if (!res.ok) { console.warn('cpSave failed:', await res.text()); return; }
+    if (!res.ok) { console.warn('cpSave failed:', await res.text()); cpShowToast('Save failed ✗'); return; }
 
-    // Update sidebar companion name + avatar immediately
+    // ── Update cpSettings cache so reopening the window shows correct values ──
+    if (cpSettings) {
+      if (!cpSettings.active_companion) cpSettings.active_companion = {};
+      cpSettings.active_companion.companion_name          = body.companion_name;
+      cpSettings.active_companion.avatar_data             = body.avatar_data;
+      cpSettings.active_companion.generation              = body.generation;
+      cpSettings.active_companion.soul_edit_mode          = body.soul_edit_mode;
+      cpSettings.active_companion.force_read_before_write = body.force_read_before_write;
+      cpSettings.active_companion.heartbeat               = body.heartbeat;
+      cpSettings.active_companion.active_presence_preset  = body.active_presence_preset;
+      cpSettings.presence_presets                         = body.presence_presets;
+    }
+
+    // ── Apply the active preset to the live orb right now ──
+    if (typeof applyPresencePreset === 'function') {
+      const livePreset = _cpPresenceData[_cpActivePreset];
+      if (livePreset) {
+        const orbEl      = document.getElementById('companion-orb');
+        const states     = ['thinking', 'streaming', 'heartbeat', 'chaos', 'idle'];
+        const activeState = states.find(s => orbEl?.classList.contains(s)) || 'idle';
+        const stateData   = livePreset[activeState] || livePreset.thinking || {};
+        applyPresencePreset({ state: activeState, ...stateData });
+      }
+    }
+
+    // ── Update sidebar immediately ──
     const nameEl = document.getElementById('companion-name');
     if (nameEl) nameEl.textContent = body.companion_name || 'Companion';
     const avatarEl = document.getElementById('companion-avatar');
@@ -325,7 +360,6 @@ async function cpSave(andClose = false) {
         ? `<img src="${body.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
         : '✦';
     }
-    // Update companion window header too
     const cpHeaderName = document.getElementById('cp-header-name');
     if (cpHeaderName) cpHeaderName.textContent = body.companion_name || 'Companion';
     const cpHeaderAv = document.getElementById('cp-header-avatar');
@@ -335,31 +369,21 @@ async function cpSave(andClose = false) {
     if (typeof syncStatusAvatar === 'function') syncStatusAvatar();
     if (typeof heartbeatReload  === 'function') heartbeatReload();
 
-    // Update config for live gen settings
     if (typeof config !== 'undefined') {
       config.force_read_before_write = body.force_read_before_write;
-      if (body.generation && config.generation) {
-        Object.assign(config.generation, body.generation);
-      }
+      if (body.generation && config.generation) Object.assign(config.generation, body.generation);
     }
 
-    // Update cpSettings cache
-    if (cpSettings?.active_companion) {
-      cpSettings.active_companion.companion_name          = body.companion_name;
-      cpSettings.active_companion.generation              = g;
-      cpSettings.active_companion.soul_edit_mode          = body.soul_edit_mode;
-      cpSettings.active_companion.force_read_before_write = body.force_read_before_write;
-      cpSettings.active_companion.heartbeat               = body.heartbeat;
-    }
-
-    // Apply active preset to live orb immediately
-    if (typeof applyPresencePreset === 'function' && _cpPresenceData[_cpActivePreset]) {
-      const livePreset = _cpPresenceData[_cpActivePreset];
-      applyPresencePreset({ state: 'idle', ...(livePreset.idle || {}) });
-    }
     cpShowToast('Companion saved ✓');
-    if (andClose) closeCompanionWindow();
-  } catch(e) { console.warn('cpSave failed:', e); }
+    if (andClose) {
+      _cpPresenceInitDone = false;
+      closeCompanionWindow();
+    }
+
+  } catch(e) {
+    console.warn('cpSave failed:', e);
+    cpShowToast('Save failed ✗');
+  }
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -374,37 +398,49 @@ function cpShowToast(msg) {
   }
   toast.textContent = msg;
   toast.style.opacity = '1';
+  if (_cpToastTimer) clearTimeout(_cpToastTimer);
   _cpToastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2200);
 }
 
 // ── Presence tab ──────────────────────────────────────────────────────────────
-// Single authoritative declaration of all presence state variables
-let _cpPresenceData  = {};   // { presetName: { thinking:{...}, streaming:{...}, ... } }
-let _cpActivePreset  = 'Default';
-let _cpEditingState  = 'thinking';
-let _cpPresenceDirty = false;
+let _cpPresenceData    = {};        // { presetName: { thinking:{...}, streaming:{...}, ... } }
+let _cpActivePreset    = 'Default';
+let _cpEditingState    = 'thinking';
+let _cpPresenceDirty   = false;
+let _cpPresenceInitDone = false;    // guard — prevents tab-switch from wiping edits
 
-// Defaults for each state (used when creating a new preset or missing keys)
 const CP_STATE_DEFAULTS = {
-  thinking:  { glowColor:'rgba(129,140,248,0.4)',  glowMax:16, glowSpeed:2.0, ringSpeed:1.8, dotColor:'#818cf8', dotSpeed:1.2, breathSpeed:3.0, orbSize:52 },
-  streaming: { glowColor:'rgba(109,212,168,0.35)', glowMax:12, glowSpeed:2.5, ringSpeed:2.4, dotColor:'#6dd4a8', dotSpeed:1.4, breathSpeed:3.0, orbSize:52 },
-  heartbeat: { glowColor:'rgba(167,139,250,0.45)', glowMax:20, glowSpeed:1.4, ringSpeed:1.4, dotColor:'#a78bfa', dotSpeed:0.9, breathSpeed:2.0, orbSize:52 },
-  chaos:     { glowColor:'rgba(251,191,36,0.5)',   glowMax:24, glowSpeed:0.8, ringSpeed:0.9, dotColor:'#fbbf24', dotSpeed:0.6, breathSpeed:0.6, orbSize:52 },
-  idle:      { glowColor:'rgba(129,140,248,0.15)', glowMax:6,  glowSpeed:4.0, ringSpeed:4.0, dotColor:'#818cf8', dotSpeed:2.0, breathSpeed:5.0, orbSize:52 },
+  thinking:  { glowColor:'rgba(129,140,248,0.4)',   glowMax:16, glowSpeed:2.0, ringSpeed:1.8, dotColor:'#818cf8', dotSpeed:1.2, breathSpeed:3.0, orbSize:52 },
+  streaming: { glowColor:'rgba(109,212,168,0.35)',  glowMax:12, glowSpeed:2.5, ringSpeed:2.4, dotColor:'#6dd4a8', dotSpeed:1.4, breathSpeed:3.0, orbSize:52 },
+  heartbeat: { glowColor:'rgba(167,139,250,0.45)',  glowMax:20, glowSpeed:1.4, ringSpeed:1.4, dotColor:'#a78bfa', dotSpeed:0.9, breathSpeed:2.0, orbSize:52 },
+  chaos:     { glowColor:'rgba(251,191,36,0.5)',    glowMax:24, glowSpeed:0.8, ringSpeed:0.9, dotColor:'#fbbf24', dotSpeed:0.6, breathSpeed:0.6, orbSize:52 },
+  idle:      { glowColor:'rgba(129,140,248,0.15)',  glowMax:6,  glowSpeed:4.0, ringSpeed:4.0, dotColor:'#818cf8', dotSpeed:2.0, breathSpeed:5.0, orbSize:52 },
 };
 
 function cpPresenceInit() {
   const cfg = cpSettings || {};
+
   _cpPresenceData = JSON.parse(JSON.stringify(
-    cfg.presence_presets || { Default: CP_STATE_DEFAULTS }
+    cfg.presence_presets || { Default: JSON.parse(JSON.stringify(CP_STATE_DEFAULTS)) }
   ));
+
   _cpActivePreset = cfg.active_companion?.active_presence_preset
+                 || cfg.config?.active_presence_preset
                  || cfg.active_presence_preset
                  || 'Default';
-  _cpEditingState = 'thinking';
+
+  // Ensure the active preset actually exists
+  if (!_cpPresenceData[_cpActivePreset]) {
+    _cpPresenceData[_cpActivePreset] = JSON.parse(JSON.stringify(CP_STATE_DEFAULTS));
+  }
+
+  _cpEditingState     = 'thinking';
+  _cpPresenceInitDone = true;
+
   cpPresenceRenderPresets();
   cpPresenceSelectPreset(_cpActivePreset);
-  // Mirror companion avatar into preview
+
+  // Mirror companion avatar into the preview orb
   const avSrc = document.querySelector('#companion-avatar img')?.src;
   const previewIcon = document.getElementById('cpp-icon');
   if (previewIcon && avSrc) {
@@ -481,7 +517,7 @@ function cpPresenceRenderState(state) {
   cpPresenceUpdatePreview(s, state);
 }
 
-function cpPresenceSlide(id, key, val, suffix) {
+function cpPresenceSlider(id, key, val, suffix) {
   const lbl = document.getElementById(id + '-val');
   if (lbl) lbl.textContent = val + suffix;
   cpPresenceSetValue(key, parseFloat(val));
@@ -509,6 +545,21 @@ function cpPresenceSetColor(hex) {
   cpPresenceUpdatePreviewFromCurrent();
 }
 
+function cpPresenceColorInput(val) {
+  const hex = val.startsWith('#') ? val : '#' + val;
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+    const cp = document.getElementById('cp-color-picker');
+    if (cp) cp.value = hex;
+    cpPresenceSetColor(hex);
+  }
+}
+
+function cpPresenceColorPick(hex) {
+  cpPresenceSetColor(hex);
+  const ci = document.getElementById('cp-color-input');
+  if (ci) ci.value = hex;
+}
+
 function cpPresenceUpdatePreviewFromCurrent() {
   const preset = _cpPresenceData[_cpActivePreset] || {};
   const s = Object.assign({}, CP_STATE_DEFAULTS[_cpEditingState], preset[_cpEditingState] || {});
@@ -525,12 +576,12 @@ function cpPresenceUpdatePreview(s, state) {
   const size = (s.orbSize || 52) + 'px';
   orb.style.width  = size;
   orb.style.height = size;
-  orb.style.background   = cpDeriveGlowColor(s.dotColor || '#818cf8', 0.1);
-  orb.style.border       = `2px solid ${cpDeriveGlowColor(s.dotColor || '#818cf8', 0.35)}`;
-  orb.style.animation    = `cppGlow ${s.glowSpeed||2}s ease-in-out infinite, cppBreath ${s.breathSpeed||3}s ease-in-out infinite`;
+  orb.style.background = cpDeriveGlowColor(s.dotColor || '#818cf8', 0.1);
+  orb.style.border     = `2px solid ${cpDeriveGlowColor(s.dotColor || '#818cf8', 0.35)}`;
+  orb.style.animation  = `cppGlow ${s.glowSpeed||2}s ease-in-out infinite, cppBreath ${s.breathSpeed||3}s ease-in-out infinite`;
   orb.style.setProperty('--cpp-glow-color', s.glowColor || 'rgba(129,140,248,0.4)');
   orb.style.setProperty('--cpp-glow-min',   '4px');
-  orb.style.setProperty('--cpp-glow-max',   (s.glowMax||16) + 'px');
+  orb.style.setProperty('--cpp-glow-max',   (s.glowMax || 16) + 'px');
 
   if (ring) {
     ring.style.animation = `cppRing ${s.ringSpeed||1.8}s ease-out infinite`;
@@ -549,7 +600,7 @@ function cpPresenceUpdatePreview(s, state) {
 
   if (icon) {
     icon.style.color    = s.dotColor || '#818cf8';
-    icon.style.fontSize = Math.round((s.orbSize||52) * 0.42) + 'px';
+    icon.style.fontSize = Math.round((s.orbSize || 52) * 0.42) + 'px';
     const avSrc = document.querySelector('#companion-avatar img')?.src;
     if (avSrc && !icon.querySelector('img')) {
       icon.innerHTML = `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
@@ -582,9 +633,7 @@ function cpPresenceDeletePreset(name) {
 // ── Presence helpers ──────────────────────────────────────────────────────────
 function cpColorToHex(color) {
   const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (m) {
-    return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
-  }
+  if (m) return '#' + [m[1], m[2], m[3]].map(n => parseInt(n).toString(16).padStart(2, '0')).join('');
   return color.startsWith('#') ? color : '#818cf8';
 }
 
@@ -596,13 +645,12 @@ function cpDeriveGlowColor(color, alpha) {
 }
 
 function _hexToRgba(hex, alpha) {
-  const r = parseInt(hex.slice(1,3),16);
-  const g = parseInt(hex.slice(3,5),16);
-  const b = parseInt(hex.slice(5,7),16);
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// Called by cpSave — gather presence data to send to server
 function _cpGetPresencePayload() {
   return {
     presence_presets:       _cpPresenceData,

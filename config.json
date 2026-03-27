@@ -1,20 +1,23 @@
 {
   "companion_name": "Qwenny",
   "companion_folder": "qwenny",
-  "model_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
-  "mmproj_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+  "model_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+  "mmproj_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
   "gpu_type": "intel",
   "port_bridge": 8000,
   "port_model": 8081,
   "first_run": false,
   "model_paths": {
-    "Windows": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf"
+    "Windows": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+    "Linux": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf"
   },
   "mmproj_paths": {
-    "Windows": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf"
+    "Windows": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+    "Linux": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf"
   },
   "gpu_types": {
-    "Windows": "intel"
+    "Windows": "intel",
+    "Linux": "intel"
   },
   "server_args": {
     "ngl": {
@@ -49,7 +52,7 @@
     },
     "reasoning_format": {
       "flag": "--reasoning-format",
-      "enabled": false,
+      "enabled": true,
       "value": "deepseek"
     },
     "cache_reuse": {
@@ -106,10 +109,9 @@
     "dry_multiplier": 0.0,
     "dry_base": 1.75,
     "dry_allowed_length": 2,
-    "max_tokens": 1024,
-    "max_tool_rounds": 8,
+    "max_tokens": 6000,
+    "max_tool_rounds": 20,
     "vision_mode": "always",
     "markdown_enabled": true
-  },
-  "ngl": 99
+  }
 }
