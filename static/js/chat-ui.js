@@ -191,68 +191,6 @@ function removeEmptyState() {
   document.getElementById('empty-state')?.remove();
 }
 
-// ── Companion orb ─────────────────────────────────────────────────────────────
-//
-// A single orb element that moves to the most recent companion .msg-row.
-// Uses absolute positioning — zero changes to the existing message structure,
-// so serialization, history replay, and api.js all work exactly as before.
-//
-// CSS tuning vars in chat.css:
-//   --orb-overlap-x  horizontal overlap into bubble corner (default 8px)
-//   --orb-overlap-y  vertical overlap into bubble corner (default 8px)
-
-let _orbEl              = null;   // single orb DOM element, created once
-let _currentOrbState    = 'idle';
-let _currentOrbOverrides = {};
-
-function _ensureOrb() {
-  if (_orbEl) return _orbEl;
-
-  const orb = document.createElement('div');
-  orb.className = 'companion-orb idle';
-  orb.id = 'companion-orb';
-
-  const dots = document.createElement('div');
-  dots.className = 'orb-dots';
-  dots.innerHTML = '<span></span><span></span><span></span>';
-
-  const body = document.createElement('div');
-  body.className = 'orb-body';
-  body.id = 'orb-body';
-
-  const ring = document.createElement('div');
-  ring.className = 'orb-ring';
-
-  const icon = document.createElement('div');
-  icon.className = 'orb-icon';
-  icon.id = 'orb-icon';
-
-  const avSrc = document.querySelector('#companion-avatar img')?.src;
-  if (avSrc) {
-    icon.innerHTML = `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-  } else {
-    icon.textContent = '✦';
-  }
-
-  body.appendChild(ring);
-  body.appendChild(icon);
-  orb.appendChild(dots);
-  orb.appendChild(body);
-
-  _orbEl = orb;
-  return orb;
-}
-
-// Move the orb into a companion message row
-function _moveOrbToRow(row) {
-  if (!row) return;
-  const orb = _ensureOrb();
-  row.style.position = 'relative';  // needed for absolute child
-  row.appendChild(orb);
-}
-
-// ── appendMessage ─────────────────────────────────────────────────────────────
-// Identical structure to original — .msg-row is preserved so chat-tabs works.
 function appendMessage(role, text) {
   const list = document.getElementById('messages');
   const row  = document.createElement('div');
@@ -270,9 +208,9 @@ function appendMessage(role, text) {
   row.appendChild(wrap);
   list.appendChild(row);
 
+  // Move the orb to this row if companion message
   if (role === 'companion') {
     _moveOrbToRow(row);
-    _applyStateToOrb(_orbEl, _currentOrbState, _currentOrbOverrides);
   }
 
   scrollToBottom();
@@ -288,7 +226,23 @@ function appendSystemNote(text) {
   scrollToBottom();
 }
 
-// ── Orb state ─────────────────────────────────────────────────────────────────
+// ── Companion orb ─────────────────────────────────────────────────────────────
+// One orb element that moves to the latest companion .msg-row.
+// Everything else (serialization, history, api.js) is completely unchanged.
+
+let _currentOrbState    = 'idle';
+let _currentOrbOverrides = {};
+
+// Move the orb element into a row
+function _moveOrbToRow(row) {
+  const orb = document.getElementById('companion-orb');
+  if (!orb || !row) return;
+  row.style.position = 'relative';
+  row.appendChild(orb);
+  // Re-apply current state so it doesn't reset visually
+  _applyStateToOrb(orb, _currentOrbState, _currentOrbOverrides);
+}
+
 function _applyStateToOrb(orbEl, state, overrides = {}) {
   if (!orbEl) return;
   const BASE_STATES = ['idle','thinking','streaming','heartbeat','chaos'];
@@ -306,7 +260,7 @@ function _applyStateToOrb(orbEl, state, overrides = {}) {
 function setPresenceState(state, overrides = {}) {
   _currentOrbState     = state;
   _currentOrbOverrides = overrides;
-  _applyStateToOrb(_ensureOrb(), state, overrides);
+  _applyStateToOrb(document.getElementById('companion-orb'), state, overrides);
 }
 
 function setCompanionStatus(state) { setPresenceState(state); }
@@ -325,7 +279,6 @@ function syncStatusAvatar() {
 function applyPresencePreset(preset, mood = null) {
   if (!preset) return;
   const overrides = {};
-
   if (preset.glowColor)   overrides['--glow-color']   = preset.glowColor;
   if (preset.glowMax)     overrides['--glow-max']      = preset.glowMax + 'px';
   if (preset.glowSpeed)   overrides['--glow-speed']    = preset.glowSpeed + 's';
@@ -334,7 +287,6 @@ function applyPresencePreset(preset, mood = null) {
   if (preset.dotSpeed)    overrides['--dot-speed']     = preset.dotSpeed + 's';
   if (preset.breathSpeed) overrides['--breath-speed']  = preset.breathSpeed + 's';
   if (preset.orbSize)     overrides['--orb-size']      = preset.orbSize + 'px';
-
   if (mood) {
     if (mood.glowColor)   overrides['--glow-color']   = mood.glowColor;
     if (mood.glowMax)     overrides['--glow-max']      = mood.glowMax + 'px';
@@ -345,11 +297,10 @@ function applyPresencePreset(preset, mood = null) {
     if (mood.breathSpeed) overrides['--breath-speed']  = mood.breathSpeed + 's';
     if (mood.orbSize)     overrides['--orb-size']      = mood.orbSize + 'px';
   }
-
   setPresenceState(preset.state || 'idle', overrides);
 }
 
-// ── Typing / streaming ────────────────────────────────────────────────────────
+// ── Typing ────────────────────────────────────────────────────────────────────
 let _typingCounter = 0;
 
 function showTyping() {
@@ -359,7 +310,7 @@ function showTyping() {
 }
 
 function removeTyping(id) {
-  // State will be updated by the stream finaliser or appendMessage
+  // State handled by stream finaliser or appendMessage
 }
 
 function scrollToBottom() {
