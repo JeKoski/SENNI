@@ -80,6 +80,13 @@ async def startup():
     _tool_manifest = load_tools()
     log.info("Server ready. %d tools loaded.", len(_tool_manifest))
 
+    # Auto-backup on every bridge start
+    try:
+        from scripts.auto_backup import run_backup
+        run_backup(PROJECT_ROOT)
+    except Exception as e:
+        log.warning("Auto-backup failed (non-fatal): %s", e)
+
 
 # ── UI routes ──────────────────────────────────────────────────────────────────
 
