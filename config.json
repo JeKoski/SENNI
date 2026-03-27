@@ -110,7 +110,7 @@
     "dry_base": 1.75,
     "dry_allowed_length": 2,
     "max_tokens": 6000,
-    "max_tool_rounds": 20,
+    "max_tool_rounds": 18,
     "vision_mode": "always",
     "markdown_enabled": true
   }

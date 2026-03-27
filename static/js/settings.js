@@ -1,45 +1,83 @@
-// ── Settings panel ────────────────────────────────────────────────────────────
+// settings.js — Settings panel (Server / Generation / Companion / About tabs)
 
+// ── Built-in server args definition ──────────────────────────────────────────
 const BUILTIN_ARGS = [
-  // Core — always recommended on
-  { key:'ngl',              flag:'-ngl',                desc:'GPU layers to offload',                   type:'number', default:99,            defaultOn:true  },
-  { key:'ctx',              flag:'-c',                  desc:'Context window size',                     type:'number', default:16384,          defaultOn:true  },
-  { key:'np',               flag:'-np',                 desc:'Parallel slots',                          type:'number', default:1,              defaultOn:true  },
-  { key:'ctk',              flag:'-ctk',                desc:'KV cache key quantisation',               type:'text',   default:'q8_0',         defaultOn:true  },
-  { key:'ctv',              flag:'-ctv',                desc:'KV cache value quantisation',             type:'text',   default:'q8_0',         defaultOn:true  },
-  { key:'jinja',            flag:'--jinja',             desc:'Jinja2 chat templates (required for most models)', type:'flag', default:null,   defaultOn:true  },
-  { key:'reasoning_format', flag:'--reasoning-format',  desc:'Thinking format (deepseek for Qwen3)',    type:'text',   default:'deepseek',    defaultOn:true  },
-  // KV cache / performance — on by default, broadly safe
-  { key:'cache_reuse',      flag:'--cache-reuse',       desc:'Reuse KV cache across turns (reduces re-processing)', type:'number', default:256, defaultOn:true },
-  { key:'batch',            flag:'-b',                  desc:'Batch size (prompt processing)',          type:'number', default:256,            defaultOn:true  },
-  { key:'ubatch',           flag:'-ub',                 desc:'Micro-batch size',                        type:'number', default:256,            defaultOn:true  },
-  // Off by default — hardware/situation dependent
-  { key:'flash_attn',       flag:'--flash-attn',        desc:'Flash attention — big speed win, needs compatible GPU', type:'flag', default:null, defaultOn:false },
-  { key:'prompt_cache',     flag:'--prompt-cache',      desc:'Persist KV cache to disk (faster cold starts)', type:'text', default:'senni.cache', defaultOn:false },
-  { key:'mlock',            flag:'--mlock',             desc:'Lock model in RAM — prevents swapping',   type:'flag',   default:null,          defaultOn:false },
-  { key:'no_mmap',          flag:'--no-mmap',           desc:'Disable memory mapping',                 type:'flag',   default:null,          defaultOn:false },
-  { key:'threads',          flag:'-t',                  desc:'Thread count (0 = auto)',                 type:'number', default:0,             defaultOn:false },
+  { key:'ngl',              flag:'-ngl',                desc:'GPU layers to offload',                         type:'number', default:99,            defaultOn:true  },
+  { key:'ctx',              flag:'-c',                  desc:'Context window size',                           type:'number', default:16384,          defaultOn:true  },
+  { key:'np',               flag:'-np',                 desc:'Parallel slots',                               type:'number', default:1,              defaultOn:true  },
+  { key:'ctk',              flag:'-ctk',                desc:'KV cache key quantisation',                    type:'text',   default:'q8_0',         defaultOn:true  },
+  { key:'ctv',              flag:'-ctv',                desc:'KV cache value quantisation',                  type:'text',   default:'q8_0',         defaultOn:true  },
+  { key:'jinja',            flag:'--jinja',             desc:'Jinja2 chat templates (required for most models)', type:'flag', default:null,         defaultOn:true  },
+  { key:'reasoning_format', flag:'--reasoning-format',  desc:'Thinking format (deepseek for Qwen3)',          type:'text',   default:'deepseek',    defaultOn:true  },
+  { key:'cache_reuse',      flag:'--cache-reuse',       desc:'Reuse KV cache across turns (reduces re-processing)', type:'number', default:256,    defaultOn:true  },
+  { key:'batch',            flag:'-b',                  desc:'Batch size (prompt processing)',                type:'number', default:256,            defaultOn:true  },
+  { key:'ubatch',           flag:'-ub',                 desc:'Micro-batch size',                             type:'number', default:256,            defaultOn:true  },
+  { key:'flash_attn',       flag:'--flash-attn',        desc:'Flash attention — big speed win, needs compatible GPU', type:'flag', default:null,   defaultOn:false },
+  { key:'prompt_cache',     flag:'--prompt-cache',      desc:'Persist KV cache to disk (faster cold starts)', type:'text',  default:'senni.cache',  defaultOn:false },
+  { key:'mlock',            flag:'--mlock',             desc:'Lock model in RAM — prevents swapping',        type:'flag',   default:null,           defaultOn:false },
+  { key:'no_mmap',          flag:'--no-mmap',           desc:'Disable memory mapping',                      type:'flag',   default:null,           defaultOn:false },
+  { key:'threads',          flag:'-t',                  desc:'Thread count (0 = auto)',                      type:'number', default:0,              defaultOn:false },
 ];
 
-let spSettings       = null;   // full settings object from /api/settings
-let spActiveFolder   = '';
-let spCropImg        = null;   // raw Image for cropping
-let spCropX          = 0;
-let spCropY          = 0;
-let spCropScale      = 1;
-let spCropDragging   = false;
-let spCropDragStart  = null;
-let spCropPosStart   = null;
+// ── State ─────────────────────────────────────────────────────────────────────
+let spSettings        = null;
+let spActiveFolder    = '';
+let spCropImg         = null;
+let spCropX           = 0;
+let spCropY           = 0;
+let spCropScale       = 1;
+let spCropDragging    = false;
+let spCropDragStart   = null;
+let spCropPosStart    = null;
 let spCurrentSoulFile = null;
-let spServerDirty    = false;
+let spServerDirty     = false;
+let spGenerationDirty = false;
+let spCompanionDirty  = false;
 
+// ── Dirty tracking — yellow buttons when unsaved changes exist ────────────────
+function _spSetDirty(tab) {
+  if (tab === 'server')     spServerDirty     = true;
+  if (tab === 'generation') spGenerationDirty = true;
+  if (tab === 'companion')  spCompanionDirty  = true;
+  _spUpdateFooterButtons();
+}
+
+function _spClearDirty(tab) {
+  if (tab === 'server')     spServerDirty     = false;
+  if (tab === 'generation') spGenerationDirty = false;
+  if (tab === 'companion')  spCompanionDirty  = false;
+  _spUpdateFooterButtons();
+}
+
+function _spUpdateFooterButtons() {
+  const map = { server: spServerDirty, generation: spGenerationDirty, companion: spCompanionDirty };
+  Object.entries(map).forEach(([tab, dirty]) => {
+    const footer = document.getElementById('sp-footer-' + tab);
+    if (!footer) return;
+    footer.querySelectorAll('.sp-btn-ghost, .sp-btn-primary').forEach(btn => {
+      // Only colour the Apply / Save buttons, not Restart/Reset
+      if (btn.textContent.includes('Apply') || btn.textContent.includes('Save')) {
+        btn.style.background   = dirty ? 'rgba(251,191,36,0.15)'  : '';
+        btn.style.borderColor  = dirty ? 'rgba(251,191,36,0.5)'   : '';
+        btn.style.color        = dirty ? 'rgba(251,191,36,0.9)'   : '';
+      }
+    });
+  });
+}
+
+// ── Open / close ──────────────────────────────────────────────────────────────
 async function openSettings() {
   document.getElementById('settings-overlay').classList.add('open');
   await spLoad();
-  spSwitchTab('server');  // ensure a tab is always visible on open
+  spSwitchTab('server');
 }
 
 function closeSettings() {
+  const anyDirty = spServerDirty || spGenerationDirty || spCompanionDirty;
+  if (anyDirty) {
+    if (!confirm('You have unsaved changes. Close anyway?')) return;
+  }
+  spServerDirty = spGenerationDirty = spCompanionDirty = false;
   document.getElementById('settings-overlay').classList.remove('open');
 }
 
@@ -52,46 +90,47 @@ function spSwitchTab(name) {
     t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-body').forEach(b =>
     b.classList.toggle('active', b.id === 'tab-' + name));
-  // Show the matching sticky footer, hide others
   ['server','generation','companion'].forEach(tab => {
     const f = document.getElementById('sp-footer-' + tab);
     if (f) f.style.display = (tab === name) ? 'flex' : 'none';
   });
 }
 
-// ── Saved toast ───────────────────────────────────────────────────────────────
+// ── Toast ─────────────────────────────────────────────────────────────────────
 let _toastTimer = null;
-
 function spShowSavedToast(msg = 'Saved ✓') {
-  // Cancel any pending hide timer and reuse existing toast if present
   if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
-
   let toast = document.getElementById('sp-saved-toast');
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'sp-saved-toast';
     toast.style.cssText = [
-      'position:fixed','bottom:28px','left:50%','transform:translateX(-50%) translateY(0)',
+      'position:fixed','bottom:28px','left:50%','transform:translateX(-50%)',
       'background:#21232e','border:1px solid rgba(109,212,168,0.3)',
       'color:rgba(109,212,168,0.9)','font-family:"DM Sans",sans-serif',
       'font-size:13px','font-weight:500','padding:9px 20px',
       'border-radius:20px','z-index:10000',
       'animation:spToastIn .2s ease both',
-      'pointer-events:none','transition:opacity .2s'
+      'pointer-events:none','transition:opacity .2s',
     ].join(';');
     document.body.appendChild(toast);
   }
   toast.textContent = msg;
   toast.style.animation = 'none';
   toast.style.opacity   = '1';
-
   _toastTimer = setTimeout(() => {
     toast.style.animation = 'spToastOut .3s ease forwards';
     _toastTimer = setTimeout(() => { toast.remove(); _toastTimer = null; }, 300);
   }, 1800);
 }
 
+// ── Load — always fetches fresh from server ───────────────────────────────────
 async function spLoad() {
+  // Show a subtle loading state on the panel title
+  const title = document.querySelector('.sp-title');
+  const origTitle = title?.textContent || 'Settings';
+  if (title) title.textContent = 'Loading…';
+
   try {
     const res  = await fetch('/api/settings');
     spSettings = await res.json();
@@ -100,24 +139,29 @@ async function spLoad() {
     spPopulateGeneration();
     spPopulateCompanion();
     spPopulateAbout();
-  } catch(e) { console.warn('Settings load failed:', e); }
+    // Reset all dirty flags after fresh load
+    spServerDirty = spGenerationDirty = spCompanionDirty = false;
+    _spUpdateFooterButtons();
+  } catch(e) {
+    console.warn('Settings load failed:', e);
+  } finally {
+    if (title) title.textContent = origTitle;
+  }
 }
 
 // ── Server tab ────────────────────────────────────────────────────────────────
 function spPopulateServer() {
   const cfg = spSettings.config || {};
 
-  // Pre-load scan results for the native file picker auto-match
   fetch('/api/scan/models').then(r => r.json()).then(d => { _spScanResults = d.gguf_files || []; }).catch(() => {});
 
-  // Model / mmproj
   const mp = cfg.model_path || '';
   const md = document.getElementById('sp-model-display');
   md.textContent = mp ? mp.split(/[\\/]/).pop() : '—';
   md.title = mp;
   md.className = 'sp-file-display' + (mp ? ' set' : '');
 
-  const mm = cfg.mmproj_path || '';
+  const mm  = cfg.mmproj_path || '';
   const mmd = document.getElementById('sp-mmproj-display');
   mmd.textContent = mm ? mm.split(/[\\/]/).pop() : 'No mmproj';
   mmd.title = mm;
@@ -127,7 +171,6 @@ function spPopulateServer() {
   document.getElementById('sp-port-bridge').value = cfg.port_bridge || 8000;
   document.getElementById('sp-port-model').value  = cfg.port_model  || 8081;
 
-  // Built-in args
   const savedArgs = cfg.server_args || {};
   const wrap = document.getElementById('sp-builtin-args');
   wrap.innerHTML = '';
@@ -136,7 +179,6 @@ function spPopulateServer() {
     const enabled = saved.enabled !== undefined ? saved.enabled : (arg.defaultOn !== false);
     const val     = saved.value   !== undefined ? saved.value   : arg.default;
     const isFlag  = arg.type === 'flag';
-
     const row = document.createElement('div');
     row.className = 'sp-arg-row' + (enabled ? '' : ' disabled');
     row.id = 'arg-row-' + arg.key;
@@ -150,17 +192,15 @@ function spPopulateServer() {
         value="${isFlag ? '' : (val ?? '')}"
         placeholder="${isFlag ? '(flag)' : ''}"
         ${isFlag ? 'disabled' : ''}
+        oninput="spMarkServerDirty()"
       />`;
     wrap.appendChild(row);
   });
 
-  // Custom args
   const customWrap = document.getElementById('sp-custom-args');
   customWrap.innerHTML = '';
   (cfg.server_args_custom || []).forEach(c => spAddCustomArg(c.flag, c.value, c.enabled !== false));
 
-  spServerDirty = false;
-  document.getElementById('sp-restart-note').style.display = 'none';
   spRenderOsPaths(spSettings.config);
 }
 
@@ -175,7 +215,7 @@ function spToggleArg(key, tog) {
 }
 
 function spMarkServerDirty() {
-  spServerDirty = true;
+  _spSetDirty('server');
   document.getElementById('sp-restart-note').style.display = 'flex';
 }
 
@@ -193,61 +233,40 @@ function spAddCustomArg(flag='', value='', enabled=true) {
 }
 
 function spBrowse(type) {
-  // Trigger native OS file picker (opens GNOME Files / Finder / Explorer)
   document.getElementById('pick-' + type)?.click();
 }
 
-// Called when native file picker returns a selection
 function spNativePick(input, type) {
   const file = input.files?.[0];
   if (!file) return;
   input.value = '';
-
   const nameOnly = file.name;
   const dispId   = 'sp-' + (type === 'model' ? 'model' : 'mmproj') + '-display';
   const disp     = document.getElementById(dispId);
-
-  // Remove any existing path input for this type
   document.getElementById('sp-' + type + '-path-inp')?.remove();
-
-  // Try to match from scan results (zero extra typing)
   const scanResults = _spScanResults || [];
   const match = scanResults.find(f => f.name === nameOnly);
   if (match) {
-    if (disp) {
-      disp.textContent = nameOnly;
-      disp.title       = match.path;
-      disp.className   = 'sp-file-display set';
-    }
+    if (disp) { disp.textContent = nameOnly; disp.title = match.path; disp.className = 'sp-file-display set'; }
     spMarkServerDirty();
     return;
   }
-
-  // Not in scan — show filename and ask for full path
   if (disp) { disp.textContent = nameOnly; disp.className = 'sp-file-display'; }
-
   const inp = document.createElement('input');
   inp.type        = 'text';
   inp.id          = 'sp-' + type + '-path-inp';
   inp.placeholder = `/path/to/${nameOnly}`;
   inp.style.cssText = 'width:100%;margin-top:6px;background:rgba(0,0,0,0.2);border:1px solid rgba(129,140,248,0.3);border-radius:9px;color:var(--text);font-family:"DM Mono",monospace;font-size:12px;padding:9px 12px;outline:none;display:block';
-
   inp.addEventListener('input', () => {
     const val = inp.value.trim();
-    if (disp) {
-      disp.textContent = val ? val.split(/[\/]/).pop() : nameOnly;
-      disp.title       = val;
-      disp.className   = 'sp-file-display' + (val ? ' set' : '');
-    }
+    if (disp) { disp.textContent = val ? val.split(/[\/]/).pop() : nameOnly; disp.title = val; disp.className = 'sp-file-display' + (val ? ' set' : ''); }
     spMarkServerDirty();
   });
-
   const row = disp?.closest('.sp-file-row');
   if (row) row.insertAdjacentElement('afterend', inp);
   inp.focus();
 }
 
-// Cache scan results for file picker auto-match
 let _spScanResults = [];
 
 function spClearMmproj() {
@@ -267,7 +286,6 @@ async function spSaveServer(andClose = false) {
       value:   arg.type === 'flag' ? null : (inp ? (arg.type==='number' ? Number(inp.value)||null : inp.value||null) : null),
     };
   });
-
   const customArgs = [];
   document.querySelectorAll('#sp-custom-args .sp-custom-row').forEach(row => {
     const tog   = row.querySelector('.sp-tog');
@@ -275,7 +293,6 @@ async function spSaveServer(andClose = false) {
     const value = row.querySelector('.sp-custom-val')?.value?.trim();
     if (flag) customArgs.push({ flag, value: value||null, enabled: tog?.classList.contains('on') ?? true });
   });
-
   await fetch('/api/settings/server', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
@@ -288,9 +305,9 @@ async function spSaveServer(andClose = false) {
       server_args_custom: customArgs,
     })
   });
-
-  spServerDirty = false;
-  spShowSavedToast("Server settings saved ✓ — restart required");
+  _spClearDirty('server');
+  document.getElementById('sp-restart-note').style.display = 'none';
+  spShowSavedToast('Server settings saved ✓ — restart required');
   if (andClose) closeSettings();
 }
 
@@ -299,7 +316,7 @@ function spPopulateGeneration() {
   const gen = spSettings.config?.generation || {};
   const set = (id, lblId, val) => {
     const el = document.getElementById(id);
-    if (el) { el.value = val; }
+    if (el) el.value = val;
     const lbl = document.getElementById(lblId);
     if (lbl) lbl.textContent = parseFloat(val).toFixed(id.includes('topk') || id.includes('tokens') ? 0 : 2);
   };
@@ -310,59 +327,73 @@ function spPopulateGeneration() {
   document.getElementById('sp-max-tokens').value = gen.max_tokens ?? 1024;
   const mtr = document.getElementById('sp-max-tool-rounds');
   if (mtr) mtr.value = gen.max_tool_rounds ?? 8;
-  // Vision mode
   const vmode = gen.vision_mode || 'always';
-  document.querySelectorAll('#sp-vision-mode input[name="vision-mode"]').forEach(r => {
-    r.checked = r.value === vmode;
-  });
+  document.querySelectorAll('#sp-vision-mode input[name="vision-mode"]').forEach(r => { r.checked = r.value === vmode; });
   const togMd = document.getElementById('tog-markdown');
-  if (togMd) togMd.classList.toggle('on', !!gen.markdown_enabled);
-  const tog = document.getElementById('tog-controls-visible');
-  if (tog) tog.classList.toggle('on', localStorage.getItem('controls_always_visible') === 'true');
+  if (togMd) togMd.classList.toggle('on', gen.markdown_enabled !== false);
+  const togCtrl = document.getElementById('tog-controls-visible');
+  if (togCtrl) togCtrl.classList.toggle('on', localStorage.getItem('controls_always_visible') === 'true');
 }
 
-async function spSaveGeneration(andClose = false) {
-  const body = {
-    temperature:    parseFloat(document.getElementById('sp-temperature').value),
-    top_p:          parseFloat(document.getElementById('sp-top-p').value),
-    top_k:          parseInt(document.getElementById('sp-top-k').value),
-    repeat_penalty: parseFloat(document.getElementById('sp-repeat-penalty').value),
-    max_tokens:      parseInt(document.getElementById('sp-max-tokens').value),
-    max_tool_rounds: parseInt(document.getElementById('sp-max-tool-rounds').value) || 8,
-    vision_mode:      document.querySelector('#sp-vision-mode input[name="vision-mode"]:checked')?.value || 'always',
-    markdown_enabled: document.getElementById('tog-markdown')?.classList.contains('on') || false,
-  };
-  await fetch('/api/settings/generation', {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
-  });
-  // Update live config used by chat
-  if (spSettings.config) spSettings.config.generation = body;
-  spShowSavedToast("Generation settings saved ✓");
-  // Sync vision_mode (and other gen settings) back to global config used by chat.js
-  if (typeof config !== 'undefined' && config.generation) {
-    config.generation = { ...config.generation, ...body };
-  }
-  if (andClose) closeSettings();
-}
+function spMarkGenerationDirty() { _spSetDirty('generation'); }
 
 function spToggleControlsVisible(tog) {
   tog.classList.toggle('on');
   const val = tog.classList.contains('on');
   if (typeof setControlsAlwaysVisible === 'function') setControlsAlwaysVisible(val);
+  // Controls-visible is localStorage only, no server save needed — but mark dirty
+  // so the yellow button appears as confirmation feedback
+  _spSetDirty('generation');
 }
 
 function spResetGeneration() {
-  const d = spSettings.defaults?.generation || {};
-  document.getElementById('sp-temperature').value    = d.temperature    ?? 0.8;
-  document.getElementById('sp-top-p').value          = d.top_p          ?? 0.95;
-  document.getElementById('sp-top-k').value          = d.top_k          ?? 40;
-  document.getElementById('sp-repeat-penalty').value = d.repeat_penalty ?? 1.1;
-  document.getElementById('sp-max-tokens').value     = d.max_tokens      ?? 1024;
-  ['lbl-temp','lbl-topp'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = parseFloat(el.textContent || 0).toFixed(2);
-  });
+  if (!confirm('Reset all generation settings to defaults?')) return;
+  spSettings.config = spSettings.config || {};
+  spSettings.config.generation = {};
   spPopulateGeneration();
+  _spSetDirty('generation');
+}
+
+async function spSaveGeneration(andClose = false) {
+  const gen = {
+    temperature:    parseFloat(document.getElementById('sp-temperature')?.value)    ?? 0.8,
+    top_p:          parseFloat(document.getElementById('sp-top-p')?.value)          ?? 0.95,
+    top_k:          parseInt(document.getElementById('sp-top-k')?.value)            ?? 40,
+    repeat_penalty: parseFloat(document.getElementById('sp-repeat-penalty')?.value) ?? 1.1,
+    max_tokens:     parseInt(document.getElementById('sp-max-tokens')?.value)       ?? 1024,
+    max_tool_rounds:parseInt(document.getElementById('sp-max-tool-rounds')?.value)  ?? 8,
+    vision_mode:    document.querySelector('#sp-vision-mode input[name="vision-mode"]:checked')?.value || 'always',
+    markdown_enabled: document.getElementById('tog-markdown')?.classList.contains('on') ?? true,
+  };
+  await fetch('/api/settings/generation', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(gen),
+  });
+  // Update local cache
+  if (spSettings.config) spSettings.config.generation = gen;
+  _spClearDirty('generation');
+  spShowSavedToast('Generation settings saved ✓');
+  if (andClose) closeSettings();
+}
+
+function spToggleMarkdown(el) {
+  el.classList.toggle('on');
+  const enabled = el.classList.contains('on');
+  if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(enabled);
+  if (typeof config !== 'undefined' && config.generation) config.generation.markdown_enabled = enabled;
+  _spSetDirty('generation');
+}
+
+function _spGetHeartbeatInstructions() {
+  const g = (id) => document.getElementById(id)?.value || '';
+  return {
+    default:           g('hb-instr-default'),
+    idle:              g('hb-instr-idle'),
+    conversation_end:  g('hb-instr-conversation-end'),
+    session_start:     g('hb-instr-session-start'),
+    context_threshold: g('hb-instr-context-threshold'),
+    manual:            g('hb-instr-manual'),
+  };
 }
 
 // ── Companion tab ─────────────────────────────────────────────────────────────
@@ -387,20 +418,17 @@ function spPopulateCompanion() {
         ${isActive
           ? `<span style="font-size:11px;color:var(--green)">active</span>`
           : `<button class="sp-btn-sm" onclick="spSetActiveCompanion('${c.folder}');event.stopPropagation()">Switch</button>
-             <button class="sp-btn-sm" style="background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.25);color:var(--red)" onclick="spConfirmDeleteCompanion('${c.folder}','${c.name.replace(/'/g,"\'")}');event.stopPropagation()">Delete</button>`
+             <button class="sp-btn-sm" style="background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.25);color:var(--red)" onclick="spConfirmDeleteCompanion('${c.folder}','${c.name.replace(/'/g,"\\'")}');event.stopPropagation()">Delete</button>`
         }
-      </div>
-    `;
+      </div>`;
     item.onclick = () => spEditCompanion(c.folder);
     listEl.appendChild(item);
   });
-
   spEditCompanion(spActiveFolder);
 }
 
 async function spEditCompanion(folder) {
   spActiveFolder = folder;
-  // Reuse already-loaded settings instead of fetching again
   const cfg = spSettings || {};
   const companions = cfg.companions || [];
   const c = companions.find(x => x.folder === folder) || {};
@@ -408,7 +436,6 @@ async function spEditCompanion(folder) {
 
   document.getElementById('sp-companion-name').value = c.name || '';
 
-  // Avatar
   const preview = document.getElementById('sp-avatar-preview');
   if (c.avatar_data) {
     preview.innerHTML = `<img src="${c.avatar_data}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
@@ -417,25 +444,12 @@ async function spEditCompanion(folder) {
   }
   document.getElementById('sp-crop-wrap').style.display = 'none';
 
-  // Overrides — show only fields the companion has explicitly set (blank = inherits global)
-  // companionCfg.generation now contains only the override keys, not the full merged set
   const gen = companionCfg.generation || {};
   document.getElementById('sp-c-temp').value = gen.temperature    !== undefined ? gen.temperature    : '';
   document.getElementById('sp-c-topp').value = gen.top_p          !== undefined ? gen.top_p          : '';
   document.getElementById('sp-c-rpen').value = gen.repeat_penalty !== undefined ? gen.repeat_penalty : '';
   document.getElementById('sp-c-maxt').value = gen.max_tokens     !== undefined ? gen.max_tokens     : '';
 
-  // Force read toggle
-  const frEl = document.getElementById('tog-force-read');
-  if (frEl) frEl.classList.toggle('on', companionCfg.force_read_before_write !== false);
-
-  // Soul edit mode
-  const soulMode = companionCfg.soul_edit_mode || 'locked';
-  document.querySelectorAll('#sp-soul-edit-mode input[name="soul-edit"]').forEach(r => {
-    r.checked = r.value === soulMode;
-  });
-
-  // Heartbeat settings
   const hb = companionCfg.heartbeat || {};
   const hbTog = (id, val) => { const el = document.getElementById(id); if (el) el.classList.toggle('on', !!val); };
   hbTog('hb-silent',   hb.silent_enabled);
@@ -444,37 +458,31 @@ async function spEditCompanion(folder) {
   hbTog('hb-conv-end', hb.conversation_end_trigger);
   hbTog('hb-session',  hb.session_start_trigger);
   hbTog('hb-ctx',      hb.context_threshold_trigger);
-  const idleMin = document.getElementById('hb-idle-min');  if (idleMin) idleMin.value = hb.idle_minutes ?? 15;
-  const ctxPct  = document.getElementById('hb-ctx-pct');   if (ctxPct)  ctxPct.value  = hb.context_threshold_pct ?? 75;
-  // Per-trigger instructions (handle both old string format and new object format)
-  const instr = hb.instructions || {};
-  const instrVal = (key) => typeof instr === 'string' ? (key === 'default' ? instr : '') : (instr[key] || '');
-  const setInstr = (id, key) => { const el = document.getElementById(id); if (el) el.value = instrVal(key); };
-  setInstr('hb-instr-default',           'default');
-  setInstr('hb-instr-idle',              'idle');
-  setInstr('hb-instr-conversation-end',  'conversation_end');
-  setInstr('hb-instr-session-start',     'session_start');
-  setInstr('hb-instr-context-threshold', 'context_threshold');
-  setInstr('hb-instr-manual',            'manual');
-  // Show manual trigger button if heartbeat is enabled
-  const manBtn = document.getElementById('hb-manual-btn');
-  if (manBtn) manBtn.style.display = (hb.silent_enabled || hb.message_enabled) ? '' : 'none';
+  const idleMin = document.getElementById('hb-idle-min'); if (idleMin) idleMin.value = hb.idle_minutes         ?? 15;
+  const ctxPct  = document.getElementById('hb-ctx-pct');  if (ctxPct)  ctxPct.value  = hb.context_threshold_pct ?? 75;
 
-  // Soul files
+  const instr    = hb.instructions || {};
+  const instrVal = (key) => typeof instr === 'string' ? (key === 'default' ? instr : '') : (instr[key] || '');
+  ['default','idle','conversation-end','session-start','context-threshold','manual'].forEach(key => {
+    const el = document.getElementById(`hb-instr-${key}`);
+    if (el) el.value = instrVal(key.replace('-', '_'));
+  });
+
+  const editorEl = document.getElementById('sp-companion-editor');
+  if (editorEl) editorEl.style.display = '';
   await spLoadSoulFiles(folder);
 }
 
 async function spLoadSoulFiles(folder) {
   try {
-    const res  = await fetch(`/api/settings/soul/${folder}`);
-    const data = await res.json();
+    const res   = await fetch(`/api/settings/soul/${folder}`);
+    const data  = await res.json();
     const files = data.files || {};
     const tabsEl = document.getElementById('sp-soul-tabs');
     tabsEl.innerHTML = '';
     spCurrentSoulFile = null;
     document.getElementById('sp-soul-content').value = '';
     document.getElementById('sp-soul-save-btn').style.display = 'none';
-
     Object.keys(files).forEach(fname => {
       const tab = document.createElement('button');
       tab.className = 'sp-soul-tab';
@@ -496,7 +504,7 @@ async function spSaveSoulFile() {
   const content = document.getElementById('sp-soul-content').value;
   await fetch(`/api/settings/soul/${spActiveFolder}`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ filename: spCurrentSoulFile, content })
+    body: JSON.stringify({ filename: spCurrentSoulFile, content }),
   });
 }
 
@@ -522,16 +530,14 @@ function spNewSoulFile() {
   tab.classList.add('active');
 }
 
+function spMarkCompanionDirty() { _spSetDirty('companion'); }
+
 async function spSaveCompanion(andClose = false) {
-  // Old companion editor is now hidden — use the companion window instead.
-  // Guard: if editor is hidden, redirect to companion window rather than wiping settings.
   const editor = document.getElementById('sp-companion-editor');
   if (!editor || editor.style.display === 'none') {
     if (andClose) closeSettings();
-    // Don't save anything — companion window owns all saves now
     return;
   }
-  // Only save fields the user has explicitly set — blank = inherit from global
   const gen = {};
   const t = parseFloat(document.getElementById('sp-c-temp').value);
   const p = parseFloat(document.getElementById('sp-c-topp').value);
@@ -542,8 +548,17 @@ async function spSaveCompanion(andClose = false) {
   if (!isNaN(r) && document.getElementById('sp-c-rpen').value !== '') gen.repeat_penalty = r;
   if (!isNaN(m) && document.getElementById('sp-c-maxt').value !== '') gen.max_tokens     = m;
 
-  // Save only the overrides — server merges with global at request time
-  const merged = gen;
+  const hb = {
+    silent_enabled:            document.getElementById('hb-silent')?.classList.contains('on')   || false,
+    message_enabled:           document.getElementById('hb-message')?.classList.contains('on')  || false,
+    idle_trigger:              document.getElementById('hb-idle')?.classList.contains('on')     || false,
+    conversation_end_trigger:  document.getElementById('hb-conv-end')?.classList.contains('on') || false,
+    session_start_trigger:     document.getElementById('hb-session')?.classList.contains('on')  || false,
+    context_threshold_trigger: document.getElementById('hb-ctx')?.classList.contains('on')      || false,
+    idle_minutes:    parseInt(document.getElementById('hb-idle-min')?.value) || 15,
+    context_threshold_pct: parseInt(document.getElementById('hb-ctx-pct')?.value) || 75,
+    instructions: _spGetHeartbeatInstructions(),
+  };
 
   await fetch('/api/settings/companion', {
     method: 'POST', headers: {'Content-Type':'application/json'},
@@ -551,62 +566,32 @@ async function spSaveCompanion(andClose = false) {
       folder:          spActiveFolder,
       companion_name:  document.getElementById('sp-companion-name').value.trim(),
       avatar_data:     document.getElementById('sp-avatar-preview').querySelector('img')?.src || '',
-      generation:      merged,
-      soul_edit_mode:           document.querySelector('#sp-soul-edit-mode input[name="soul-edit"]:checked')?.value || 'locked',
-      force_read_before_write:  document.getElementById('tog-force-read')?.classList.contains('on') ?? true,
-      heartbeat: {
-        silent_enabled:            document.getElementById('hb-silent')?.classList.contains('on')   || false,
-        message_enabled:           document.getElementById('hb-message')?.classList.contains('on')  || false,
-        idle_trigger:              document.getElementById('hb-idle')?.classList.contains('on')     || false,
-        idle_minutes:              parseInt(document.getElementById('hb-idle-min')?.value) || 15,
-        conversation_end_trigger:  document.getElementById('hb-conv-end')?.classList.contains('on') || false,
-        session_start_trigger:     document.getElementById('hb-session')?.classList.contains('on')  || false,
-        context_threshold_trigger: document.getElementById('hb-ctx')?.classList.contains('on')      || false,
-        context_threshold_pct:     parseInt(document.getElementById('hb-ctx-pct')?.value) || 75,
-        instructions:              _spGetHeartbeatInstructions(),
-      },
-      set_active:      true,
-    })
+      generation:      gen,
+      soul_edit_mode:  document.querySelector('#sp-soul-edit-mode input[name="soul-edit"]:checked')?.value || 'locked',
+      force_read_before_write: document.getElementById('tog-force-read')?.classList.contains('on') ?? true,
+      heartbeat: hb,
+    }),
   });
 
-  // Update sidebar
-  document.getElementById('companion-name').textContent =
-    document.getElementById('sp-companion-name').value.trim() || 'Companion';
-
-  // Update spSettings cache so spPopulateCompanion re-renders with new values
+  // Update local cache so reopening shows correct values
   if (spSettings?.active_companion) {
-    spSettings.active_companion.companion_name  = document.getElementById('sp-companion-name').value.trim();
-    spSettings.active_companion.generation      = gen;  // save the actual overrides object
-    spSettings.active_companion.soul_edit_mode          = document.querySelector('#sp-soul-edit-mode input[name="soul-edit"]:checked')?.value || 'locked';
-    spSettings.active_companion.force_read_before_write  = document.getElementById('tog-force-read')?.classList.contains('on') ?? true;
-    spSettings.active_companion.heartbeat = {
-      silent_enabled:            document.getElementById('hb-silent')?.classList.contains('on')   || false,
-      message_enabled:           document.getElementById('hb-message')?.classList.contains('on')  || false,
-      idle_trigger:              document.getElementById('hb-idle')?.classList.contains('on')     || false,
-      idle_minutes:              parseInt(document.getElementById('hb-idle-min')?.value) || 15,
-      conversation_end_trigger:  document.getElementById('hb-conv-end')?.classList.contains('on') || false,
-      session_start_trigger:     document.getElementById('hb-session')?.classList.contains('on')  || false,
-      context_threshold_trigger: document.getElementById('hb-ctx')?.classList.contains('on')      || false,
-      context_threshold_pct:     parseInt(document.getElementById('hb-ctx-pct')?.value) || 75,
-      instructions:              _spGetHeartbeatInstructions(),
-    };
+    spSettings.active_companion.generation              = gen;
+    spSettings.active_companion.heartbeat               = hb;
+    spSettings.active_companion.force_read_before_write = document.getElementById('tog-force-read')?.classList.contains('on') ?? true;
   }
 
-  // Refresh companion list only (not full reload — avoids delay)
+  if (typeof heartbeatReload === 'function') heartbeatReload();
   spPopulateCompanion();
-  if (typeof syncStatusAvatar === "function") syncStatusAvatar();
-  spShowSavedToast("Companion saved ✓");
-  if (typeof heartbeatReload === "function") heartbeatReload();
+  if (typeof syncStatusAvatar === 'function') syncStatusAvatar();
+  _spClearDirty('companion');
+  spShowSavedToast('Companion saved ✓');
   if (andClose) closeSettings();
 }
 
 let _switchingCompanion = false;
-
 async function spSetActiveCompanion(folder) {
-  if (_switchingCompanion) return;  // prevent rapid switches
+  if (_switchingCompanion) return;
   _switchingCompanion = true;
-
-  // Show loading overlay over the whole page
   const overlay = document.createElement('div');
   overlay.id = 'companion-switch-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px';
@@ -614,16 +599,12 @@ async function spSetActiveCompanion(folder) {
     <div style="width:32px;height:32px;border-radius:50%;border:2px solid rgba(129,140,248,0.2);border-top-color:#818cf8;animation:spin .8s linear infinite"></div>
     <div style="font-family:'DM Sans',sans-serif;font-size:14px;color:rgba(165,180,252,0.7)">Switching companion…</div>`;
   document.body.appendChild(overlay);
-
   try {
     await fetch('/api/settings/companion', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ folder, set_active: true })
+      body: JSON.stringify({ folder, set_active: true }),
     });
     spActiveFolder = folder;
-
-    // Close settings panel then do a full page reload so chat context, soul files,
-    // companion name, avatar and history all update correctly
     closeSettings?.();
     window.location.reload();
   } catch (e) {
@@ -638,7 +619,7 @@ async function spNewCompanion() {
   if (!name) return;
   const res  = await fetch('/api/settings/companion/new', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ name })
+    body: JSON.stringify({ name }),
   });
   const data = await res.json();
   if (data.ok) await spLoad();
@@ -653,125 +634,89 @@ function spPopulateAbout() {
   document.getElementById('about-companion').textContent = `${cfg.companion_name||'—'} (${cfg.companion_folder||'default'})`;
   document.getElementById('about-paths').innerHTML =
     `model: ${cfg.model_path||'—'}\n` +
-    (cfg.mmproj_path ? `mmproj: ${cfg.mmproj_path}\n` : '') +
-    `companions/: ${cfg.companion_folder||'default'}`;
+    (cfg.mmproj_path ? `mmproj: ${cfg.mmproj_path}\n` : '');
 }
 
-// ── Avatar crop ───────────────────────────────────────────────────────────────
-function spAvatarBrowse() { document.getElementById('sp-avatar-file').click(); }
+// ── Avatar (settings companion tab) ──────────────────────────────────────────
+let spCropDragging2 = false;
 
-function spAvatarDrop(e) {
-  e.preventDefault();
-  document.getElementById('sp-avatar-zone').classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) spLoadAvatarFile(file);
-}
+function spAvatarBrowse() { document.getElementById('sp-avatar-input')?.click(); }
 
-function spAvatarFile(input) {
-  const file = input.files[0];
-  if (file) spLoadAvatarFile(file);
+function spAvatarPick(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => spAvatarStartCrop(ev.target.result);
+  reader.readAsDataURL(file);
   input.value = '';
 }
 
-function spLoadAvatarFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      spCropImg   = img;
-      spCropScale = Math.max(240/img.width, 240/img.height);
-      spCropX     = (240 - img.width  * spCropScale) / 2;
-      spCropY     = (240 - img.height * spCropScale) / 2;
-      document.getElementById('sp-crop-wrap').style.display = 'block';
-      spDrawCrop();
-    };
-    img.src = e.target.result;
+function spAvatarDrop(e) {
+  e.preventDefault();
+  document.getElementById('sp-avatar-zone')?.classList.remove('drag-over');
+  const file = e.dataTransfer.files?.[0];
+  if (file?.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = ev => spAvatarStartCrop(ev.target.result);
+    reader.readAsDataURL(file);
+  }
+}
+
+function spAvatarStartCrop(src) {
+  spCropImg = new Image();
+  spCropImg.onload = () => {
+    spCropX = 0; spCropY = 0; spCropScale = 1;
+    document.getElementById('sp-crop-wrap').style.display = 'block';
+    spDrawCrop();
   };
-  reader.readAsDataURL(file);
+  spCropImg.src = src;
 }
 
 function spDrawCrop() {
   const canvas = document.getElementById('sp-crop-canvas');
-  const ctx    = canvas.getContext('2d');
+  if (!canvas || !spCropImg) return;
+  const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, 240, 240);
-
-  // Circular clip
   ctx.save();
-  ctx.beginPath();
-  ctx.arc(120, 120, 120, 0, Math.PI*2);
-  ctx.clip();
-  ctx.drawImage(spCropImg, spCropX, spCropY, spCropImg.width*spCropScale, spCropImg.height*spCropScale);
+  ctx.translate(spCropX + 120, spCropY + 120);
+  ctx.scale(spCropScale, spCropScale);
+  ctx.drawImage(spCropImg, -spCropImg.width/2, -spCropImg.height/2, spCropImg.width, spCropImg.height);
   ctx.restore();
-
-  // Dim outside circle
-  ctx.fillStyle = 'rgba(28,30,38,0.55)';
-  ctx.fillRect(0,0,240,240);
-  ctx.save();
   ctx.beginPath();
-  ctx.arc(120,120,120,0,Math.PI*2);
-  ctx.clip();
-  ctx.clearRect(0,0,240,240);
-  ctx.drawImage(spCropImg, spCropX, spCropY, spCropImg.width*spCropScale, spCropImg.height*spCropScale);
-  ctx.restore();
-
-  // Guide ring
-  ctx.beginPath();
-  ctx.arc(120,120,119,0,Math.PI*2);
-  ctx.strokeStyle='rgba(129,140,248,0.5)';
-  ctx.lineWidth=1.5; ctx.stroke();
+  ctx.arc(120, 120, 119, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(129,140,248,0.5)';
+  ctx.lineWidth = 1.5; ctx.stroke();
 }
 
-function cropStart(e) {
-  spCropDragging  = true;
-  spCropDragStart = {x: e.clientX, y: e.clientY};
-  spCropPosStart  = {x: spCropX,   y: spCropY};
-}
-function cropMove(e) {
-  if (!spCropDragging) return;
-  spCropX = spCropPosStart.x + (e.clientX - spCropDragStart.x);
-  spCropY = spCropPosStart.y + (e.clientY - spCropDragStart.y);
-  spDrawCrop();
-}
-function cropEnd() { spCropDragging = false; }
+function cropStart(e)  { spCropDragging = true; spCropDragStart = {x:e.clientX,y:e.clientY}; spCropPosStart = {x:spCropX,y:spCropY}; }
+function cropMove(e)   { if (!spCropDragging) return; spCropX = spCropPosStart.x+(e.clientX-spCropDragStart.x); spCropY = spCropPosStart.y+(e.clientY-spCropDragStart.y); spDrawCrop(); }
+function cropEnd()     { spCropDragging = false; }
 function cropTouchStart(e) { cropStart(e.touches[0]); }
 function cropTouchMove(e)  { e.preventDefault(); cropMove(e.touches[0]); }
-
-function spCropZoom(delta) {
-  spCropScale = Math.max(0.1, spCropScale + delta);
-  spDrawCrop();
-}
+function spCropZoom(delta) { spCropScale = Math.max(0.1, spCropScale + delta); spDrawCrop(); }
 
 function spCropConfirm() {
   const canvas = document.getElementById('sp-crop-canvas');
-  const out    = document.createElement('canvas');
+  const out = document.createElement('canvas');
   out.width = out.height = 240;
   const ctx = out.getContext('2d');
   ctx.beginPath(); ctx.arc(120,120,120,0,Math.PI*2); ctx.clip();
   ctx.drawImage(spCropImg, spCropX, spCropY, spCropImg.width*spCropScale, spCropImg.height*spCropScale);
   const dataUrl = out.toDataURL('image/png');
-
-  // Update preview in settings
   const preview = document.getElementById('sp-avatar-preview');
   preview.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-
-  // Update sidebar avatar immediately
   const sidebarAvatar = document.getElementById('companion-avatar');
   if (sidebarAvatar) {
     sidebarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
   }
-
-  // Update spSettings cache so companion list re-renders with new avatar
   const companions = spSettings?.companions || [];
   const c = companions.find(x => x.folder === spActiveFolder);
   if (c) c.avatar_data = dataUrl;
-
-  // Re-render the companion list so the card thumbnail updates immediately
   spPopulateCompanion();
-
   document.getElementById('sp-crop-wrap').style.display = 'none';
+  _spSetDirty('companion');
 }
 
-// ── Avatar drag-over highlight ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const zone = document.getElementById('sp-avatar-zone');
   if (zone) {
@@ -785,62 +730,28 @@ async function restartServer() {
   const btn = document.getElementById('restart-btn');
   btn.textContent = '…';
   btn.disabled = true;
-
   try {
-    const res  = await fetch('/api/boot', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({force:true}) });
+    const res  = await fetch('/api/boot', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({force:true}) });
     const data = await res.json();
-
     if (!data.ok) {
       appendSystemNote(`Could not restart: ${data.error || 'unknown error'}`);
-      btn.textContent = '↺';
-      btn.disabled = false;
+      btn.textContent = '↺'; btn.disabled = false;
       return;
     }
-
-    // Close settings and show boot overlay as a loading blocker
     closeSettings();
     showBootOverlay('Restarting model server…');
     disableInput();
-
-    // watchBootLog is defined in chat.js and shared across both files
     watchBootLog(async () => {
       hideBootOverlay();
       appendSystemNote('Model server ready ✓');
       await loadStatus();
       enableInput();
     });
-
   } catch (e) {
     appendSystemNote(`Restart failed: ${e.message}`);
-    btn.textContent = '↺';
-    btn.disabled = false;
+    btn.textContent = '↺'; btn.disabled = false;
   }
 }
-
-function spToggleMarkdown(el) {
-  el.classList.toggle('on');
-  const enabled = el.classList.contains('on');
-  // Update rendering immediately via chat.js function
-  if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(enabled);
-  // Persist in generation config
-  if (typeof config !== 'undefined' && config.generation) {
-    config.generation.markdown_enabled = enabled;
-  }
-}
-
-function _spGetHeartbeatInstructions() {
-  const g = (id) => document.getElementById(id)?.value || '';
-  return {
-    default:           g('hb-instr-default'),
-    idle:              g('hb-instr-idle'),
-    conversation_end:  g('hb-instr-conversation-end'),
-    session_start:     g('hb-instr-session-start'),
-    context_threshold: g('hb-instr-context-threshold'),
-    manual:            g('hb-instr-manual'),
-  };
-}
-
-// watchBootLog() is defined in chat.js
 
 // ── Companion delete ──────────────────────────────────────────────────────────
 function spConfirmDeleteCompanion(folder, name) {
@@ -856,10 +767,8 @@ function spConfirmDeleteCompanion(folder, name) {
         This will permanently delete <strong style="color:var(--text)">${name}</strong> and all their memory files. This cannot be undone.
       </p>
       <div style="display:flex;gap:10px;justify-content:center">
-        <button id="${id}-cancel"
-          style="background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-family:inherit;font-size:13px;padding:10px 20px;cursor:pointer">Cancel</button>
-        <button id="${id}-confirm"
-          style="background:linear-gradient(135deg,#dc2626,#b91c1c);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:13px;font-weight:500;padding:10px 20px;cursor:pointer">Delete</button>
+        <button id="${id}-cancel" style="background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-family:inherit;font-size:13px;padding:10px 20px;cursor:pointer">Cancel</button>
+        <button id="${id}-confirm" style="background:linear-gradient(135deg,#dc2626,#b91c1c);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:13px;font-weight:500;padding:10px 20px;cursor:pointer">Delete</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -893,10 +802,8 @@ function spFactoryReset() {
       </ul>
       <p style="font-size:13px;color:var(--red);margin-bottom:22px;font-weight:500">This cannot be undone.</p>
       <div style="display:flex;gap:10px;justify-content:center">
-        <button id="${id}-cancel"
-          style="background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-family:inherit;font-size:14px;padding:11px 24px;cursor:pointer">Cancel</button>
-        <button id="${id}-confirm"
-          style="background:linear-gradient(135deg,#dc2626,#b91c1c);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:500;padding:11px 24px;cursor:pointer">Reset everything</button>
+        <button id="${id}-cancel" style="background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-family:inherit;font-size:14px;padding:11px 24px;cursor:pointer">Cancel</button>
+        <button id="${id}-confirm" style="background:linear-gradient(135deg,#dc2626,#b91c1c);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:500;padding:11px 24px;cursor:pointer">Reset everything</button>
       </div>
     </div>`;
   document.body.appendChild(modal);

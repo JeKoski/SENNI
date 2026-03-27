@@ -397,22 +397,22 @@
       <p class="sp-note">These apply to every new message — no restart needed.</p>
       <div class="sp-field-label">Temperature <span class="sp-val-badge" id="lbl-temp">0.8</span></div>
       <input type="range" class="sp-slider" id="sp-temperature" min="0" max="2" step="0.05" value="0.8"
-        oninput="document.getElementById('lbl-temp').textContent=parseFloat(this.value).toFixed(2)"/>
+        oninput="document.getElementById('lbl-temp').textContent=parseFloat(this.value).toFixed(2);spMarkGenerationDirty()"/>
       <div class="sp-field-label" style="margin-top:14px">Top-P <span class="sp-val-badge" id="lbl-topp">0.95</span></div>
       <input type="range" class="sp-slider" id="sp-top-p" min="0" max="1" step="0.01" value="0.95"
-        oninput="document.getElementById('lbl-topp').textContent=parseFloat(this.value).toFixed(2)"/>
+        oninput="document.getElementById('lbl-topp').textContent=parseFloat(this.value).toFixed(2);spMarkGenerationDirty()"/>
       <div class="sp-field-label" style="margin-top:14px">Top-K <span class="sp-val-badge" id="lbl-topk">40</span></div>
       <input type="range" class="sp-slider" id="sp-top-k" min="1" max="100" step="1" value="40"
-        oninput="document.getElementById('lbl-topk').textContent=this.value"/>
+        oninput="document.getElementById('lbl-topk').textContent=this.value;spMarkGenerationDirty()"/>
       <div class="sp-field-label" style="margin-top:14px">Repeat penalty <span class="sp-val-badge" id="lbl-rpen">1.1</span></div>
       <input type="range" class="sp-slider" id="sp-repeat-penalty" min="1" max="2" step="0.05" value="1.1"
-        oninput="document.getElementById('lbl-rpen').textContent=parseFloat(this.value).toFixed(2)"/>
+        oninput="document.getElementById('lbl-rpen').textContent=parseFloat(this.value).toFixed(2);spMarkGenerationDirty()"/>
       <div class="sp-field-label" style="margin-top:14px">Max response tokens</div>
-      <input type="number" class="sp-input" id="sp-max-tokens" value="1024" min="64" max="8192" style="width:120px"/>
+      <input type="number" class="sp-input" id="sp-max-tokens" value="1024" min="64" max="8192" style="width:120px" oninput="spMarkGenerationDirty()"/>
       <div class="sp-field-label" style="margin-top:14px">Max tool rounds
         <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">per message (1–20)</span>
       </div>
-      <input type="number" class="sp-input" id="sp-max-tool-rounds" value="8" min="1" max="20" style="width:80px"/>
+      <input type="number" class="sp-input" id="sp-max-tool-rounds" value="8" min="1" max="20" style="width:80px" oninput="spMarkGenerationDirty()"/>
       <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
         <div class="sp-tog" id="tog-controls-visible" onclick="spToggleControlsVisible(this)"></div>
         <span class="sp-field-label" style="margin:0">Always show message controls</span>
@@ -466,8 +466,8 @@
         <input type="text" class="sp-input" id="sp-companion-name" placeholder="Companion name" style="margin-bottom:14px"/>
         <div class="sp-section-label">Generation overrides <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim)">(leave blank to use global)</span></div>
         <div class="sp-row-2col">
-          <div><div class="sp-field-label">Temperature</div><input type="number" class="sp-input" id="sp-c-temp" placeholder="0.8" min="0" max="2" step="0.05"/></div>
-          <div><div class="sp-field-label">Top-P</div><input type="number" class="sp-input" id="sp-c-topp" placeholder="0.95" min="0" max="1" step="0.01"/></div>
+          <div><div class="sp-field-label">Temperature</div><input type="number" class="sp-input" id="sp-c-temp" placeholder="0.8" min="0" max="2" step="0.05" oninput="spMarkCompanionDirty()"/></div>
+          <div><div class="sp-field-label">Top-P</div><input type="number" class="sp-input" id="sp-c-topp" placeholder="0.95" min="0" max="1" step="0.01" oninput="spMarkCompanionDirty()"/></div>
           <div><div class="sp-field-label">Repeat penalty</div><input type="number" class="sp-input" id="sp-c-rpen" placeholder="1.1" min="1" max="2" step="0.05"/></div>
           <div><div class="sp-field-label">Max response tokens</div><input type="number" class="sp-input" id="sp-c-maxt" placeholder="1024" min="64"/></div>
         </div>

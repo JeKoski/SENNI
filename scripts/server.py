@@ -702,11 +702,13 @@ async def api_get_settings():
     companions = list_companions()
     active_cfg = load_companion_config(config.get("companion_folder", "default"))
     return {
-        "config":           config,
-        "companions":       companions,
-        "active_companion": active_cfg,
-        "defaults":         DEFAULTS,
-        "platform":         platform.system(),   # "Linux", "Windows", "Darwin"
+        "config":                   config,
+        "companions":               companions,
+        "active_companion":         active_cfg,
+        "defaults":                 DEFAULTS,
+        "platform":                 platform.system(),   # "Linux", "Windows", "Darwin"
+        "presence_presets":         _merged_presence_presets(config, active_cfg),
+        "active_presence_preset":   active_cfg.get("active_presence_preset", "Default"),
     }
 
 
