@@ -191,30 +191,26 @@ function removeEmptyState() {
   document.getElementById('empty-state')?.remove();
 }
 
-// ── Companion orb — inline per-message system ─────────────────────────────────
+// ── Companion orb ─────────────────────────────────────────────────────────────
 //
-// The orb lives inside the most recent companion message only.
-// Structure per companion message:
+// A single orb element that moves to the most recent companion .msg-row.
+// Uses absolute positioning — zero changes to the existing message structure,
+// so serialization, history replay, and api.js all work exactly as before.
 //
-//   .msg-group                          ← flex column wrapper
-//     .msg-orb-row                      ← 2×2 CSS grid
-//       .msg-orb-cell .companion-orb    ← bottom-left cell, holds the orb
-//       .bubble                         ← top-right cell, shifted by overlap vars
-//     .msg-time-orb                     ← timestamp below, indented to bubble edge
-//
-// When a new companion message arrives, the orb is stripped from the previous
-// one so only the active message shows it.
+// CSS tuning vars in chat.css:
+//   --orb-overlap-x  horizontal overlap into bubble corner (default 8px)
+//   --orb-overlap-y  vertical overlap into bubble corner (default 8px)
 
-let _activeOrbGroup = null;   // the .msg-group that currently has the orb
+let _orbEl              = null;   // single orb DOM element, created once
+let _currentOrbState    = 'idle';
+let _currentOrbOverrides = {};
 
-// Build the orb element (dots + body + icon/avatar)
-function _buildOrbElement() {
-  const sz     = _getOrbSize();
-  const avSrc  = document.querySelector('#companion-avatar img')?.src;
+function _ensureOrb() {
+  if (_orbEl) return _orbEl;
 
-  const cell = document.createElement('div');
-  cell.className = 'msg-orb-cell companion-orb idle';
-  cell.style.setProperty('--orb-sz', sz + 'px');
+  const orb = document.createElement('div');
+  orb.className = 'companion-orb idle';
+  orb.id = 'companion-orb';
 
   const dots = document.createElement('div');
   dots.className = 'orb-dots';
@@ -222,8 +218,7 @@ function _buildOrbElement() {
 
   const body = document.createElement('div');
   body.className = 'orb-body';
-  body.style.width  = sz + 'px';
-  body.style.height = sz + 'px';
+  body.id = 'orb-body';
 
   const ring = document.createElement('div');
   ring.className = 'orb-ring';
@@ -231,6 +226,8 @@ function _buildOrbElement() {
   const icon = document.createElement('div');
   icon.className = 'orb-icon';
   icon.id = 'orb-icon';
+
+  const avSrc = document.querySelector('#companion-avatar img')?.src;
   if (avSrc) {
     icon.innerHTML = `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
   } else {
@@ -239,112 +236,47 @@ function _buildOrbElement() {
 
   body.appendChild(ring);
   body.appendChild(icon);
-  cell.appendChild(dots);
-  cell.appendChild(body);
-  return cell;
+  orb.appendChild(dots);
+  orb.appendChild(body);
+
+  _orbEl = orb;
+  return orb;
 }
 
-// Get orb size from active presence preset (falls back to 36px)
-function _getOrbSize() {
-  try {
-    const presets    = config?.presence_presets || {};
-    const activeKey  = config?.active_presence_preset || 'Default';
-    const preset     = presets[activeKey] || {};
-    const idleState  = preset.idle || preset.thinking || {};
-    return idleState.orbSize || 36;
-  } catch { return 36; }
+// Move the orb into a companion message row
+function _moveOrbToRow(row) {
+  if (!row) return;
+  const orb = _ensureOrb();
+  row.style.position = 'relative';  // needed for absolute child
+  row.appendChild(orb);
 }
 
-// Strip the orb from the previous active message (called before adding a new one)
-function _detachOrbFromPrevious() {
-  if (!_activeOrbGroup) return;
-  const oldCell = _activeOrbGroup.querySelector('.msg-orb-cell');
-  const oldRow  = _activeOrbGroup.querySelector('.msg-orb-row');
-  if (!oldCell || !oldRow) return;
-
-  // Replace grid row with a plain bubble-only row so old message looks normal
-  const bubble = oldRow.querySelector('.bubble');
-  if (bubble) {
-    const plain = document.createElement('div');
-    plain.appendChild(bubble);
-    oldRow.replaceWith(plain);
-  } else {
-    oldRow.remove();
-  }
-  _activeOrbGroup = null;
-}
-
-// Create a full companion message group with orb
-function _buildCompanionGroup(text) {
-  const sz = _getOrbSize();
-
-  const group = document.createElement('div');
-  group.className = 'msg-group';
-
-  const row = document.createElement('div');
-  row.className = 'msg-orb-row';
-  row.style.setProperty('--orb-sz', sz + 'px');
-
-  const orbCell = _buildOrbElement();
-
+// ── appendMessage ─────────────────────────────────────────────────────────────
+// Identical structure to original — .msg-row is preserved so chat-tabs works.
+function appendMessage(role, text) {
+  const list = document.getElementById('messages');
+  const row  = document.createElement('div');
+  row.className = `msg-row ${role}`;
   const bubble = document.createElement('div');
   bubble.className      = 'bubble';
   bubble.dataset.rawText = text;
   bubble.innerHTML      = renderMarkdown(text);
-
   const time = document.createElement('div');
-  time.className   = 'msg-time-orb';
-  time.style.setProperty('--orb-sz', sz + 'px');
+  time.className   = 'msg-time';
   time.textContent = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-
-  row.appendChild(orbCell);
-  row.appendChild(bubble);
-  group.appendChild(row);
-  group.appendChild(time);
-
-  return { group, orbCell, bubble };
-}
-
-// ── appendMessage ─────────────────────────────────────────────────────────────
-function appendMessage(role, text) {
-  const list = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.appendChild(bubble);
+  wrap.appendChild(time);
+  row.appendChild(wrap);
+  list.appendChild(row);
 
   if (role === 'companion') {
-    // Strip orb from previous companion message
-    _detachOrbFromPrevious();
-
-    const { group, orbCell, bubble } = _buildCompanionGroup(text);
-    _activeOrbGroup = group;
-
-    list.appendChild(group);
-    scrollToBottom();
-
-    // Apply current presence state to the new orb
-    const state = _currentOrbState || 'idle';
-    _applyStateToOrb(orbCell, state);
-
-    // Return a proxy row so _attachMessageControls can find .bubble
-    return group;
-
-  } else {
-    // User message — plain row, no orb
-    const row    = document.createElement('div');
-    row.className = `msg-row ${role}`;
-    const bubble = document.createElement('div');
-    bubble.className      = 'bubble';
-    bubble.dataset.rawText = text;
-    bubble.innerHTML      = renderMarkdown(text);
-    const time = document.createElement('div');
-    time.className   = 'msg-time';
-    time.textContent = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-    const wrap = document.createElement('div');
-    wrap.appendChild(bubble);
-    wrap.appendChild(time);
-    row.appendChild(wrap);
-    list.appendChild(row);
-    scrollToBottom();
-    return row;
+    _moveOrbToRow(row);
+    _applyStateToOrb(_orbEl, _currentOrbState, _currentOrbOverrides);
   }
+
+  scrollToBottom();
+  return row;
 }
 
 function appendSystemNote(text) {
@@ -356,17 +288,7 @@ function appendSystemNote(text) {
   scrollToBottom();
 }
 
-// ── Companion orb state management ────────────────────────────────────────────
-// Tracks current state so newly appended messages start in the right state.
-let _currentOrbState    = 'idle';
-let _currentOrbOverrides = {};
-
-// Get the active orb element (inside the current active message group)
-function _getActiveOrb() {
-  return _activeOrbGroup?.querySelector('.msg-orb-cell');
-}
-
-// Apply a state + CSS variable overrides to a specific orb element
+// ── Orb state ─────────────────────────────────────────────────────────────────
 function _applyStateToOrb(orbEl, state, overrides = {}) {
   if (!orbEl) return;
   const BASE_STATES = ['idle','thinking','streaming','heartbeat','chaos'];
@@ -374,24 +296,21 @@ function _applyStateToOrb(orbEl, state, overrides = {}) {
   if (BASE_STATES.includes(state)) {
     orbEl.classList.add(state);
   } else {
-    orbEl.classList.add('thinking');  // unknown states use thinking animation
+    orbEl.classList.add('thinking');
   }
   Object.entries(overrides).forEach(([prop, val]) => {
     orbEl.style.setProperty(prop.startsWith('--') ? prop : '--' + prop, val);
   });
 }
 
-// Public API — called by chat.js, api.js, heartbeat.js etc.
 function setPresenceState(state, overrides = {}) {
   _currentOrbState     = state;
   _currentOrbOverrides = overrides;
-  _applyStateToOrb(_getActiveOrb(), state, overrides);
+  _applyStateToOrb(_ensureOrb(), state, overrides);
 }
 
-// Backward compat alias
 function setCompanionStatus(state) { setPresenceState(state); }
 
-// Sync avatar image into the active orb icon
 function syncStatusAvatar() {
   const src  = document.querySelector('#companion-avatar img')?.src;
   const icon = document.getElementById('orb-icon');
@@ -403,13 +322,10 @@ function syncStatusAvatar() {
   }
 }
 
-// Apply a full presence preset + optional mood overlay to the active orb.
-// Blending order: base state defaults → preset overrides → mood overrides.
 function applyPresencePreset(preset, mood = null) {
   if (!preset) return;
   const overrides = {};
 
-  // Layer 1: preset properties
   if (preset.glowColor)   overrides['--glow-color']   = preset.glowColor;
   if (preset.glowMax)     overrides['--glow-max']      = preset.glowMax + 'px';
   if (preset.glowSpeed)   overrides['--glow-speed']    = preset.glowSpeed + 's';
@@ -417,12 +333,8 @@ function applyPresencePreset(preset, mood = null) {
   if (preset.dotColor)    overrides['--dot-color']     = preset.dotColor;
   if (preset.dotSpeed)    overrides['--dot-speed']     = preset.dotSpeed + 's';
   if (preset.breathSpeed) overrides['--breath-speed']  = preset.breathSpeed + 's';
-  if (preset.orbSize) {
-    overrides['--orb-sz']  = preset.orbSize + 'px';
-    overrides['--orb-size'] = preset.orbSize + 'px';  // compat
-  }
+  if (preset.orbSize)     overrides['--orb-size']      = preset.orbSize + 'px';
 
-  // Layer 2: mood overrides (win over preset)
   if (mood) {
     if (mood.glowColor)   overrides['--glow-color']   = mood.glowColor;
     if (mood.glowMax)     overrides['--glow-max']      = mood.glowMax + 'px';
@@ -431,73 +343,23 @@ function applyPresencePreset(preset, mood = null) {
     if (mood.dotColor)    overrides['--dot-color']     = mood.dotColor;
     if (mood.dotSpeed)    overrides['--dot-speed']     = mood.dotSpeed + 's';
     if (mood.breathSpeed) overrides['--breath-speed']  = mood.breathSpeed + 's';
-    if (mood.orbSize) {
-      overrides['--orb-sz']  = mood.orbSize + 'px';
-      overrides['--orb-size'] = mood.orbSize + 'px';
-    }
+    if (mood.orbSize)     overrides['--orb-size']      = mood.orbSize + 'px';
   }
 
   setPresenceState(preset.state || 'idle', overrides);
 }
 
-// ── Thinking pill ─────────────────────────────────────────────────────────────
-// Shown while the companion is generating — replaces the bubble until text arrives.
-// Attaches to the active orb group if one exists, otherwise creates a standalone row.
-let _thinkingPillEl = null;
-
-function showThinkingPill() {
-  _detachOrbFromPrevious();
-  const sz = _getOrbSize();
-
-  const group = document.createElement('div');
-  group.className = 'msg-group';
-  group.id = 'thinking-pill-group';
-
-  const row = document.createElement('div');
-  row.className = 'msg-orb-row';
-  row.style.setProperty('--orb-sz', sz + 'px');
-
-  const orbCell = _buildOrbElement();
-
-  const pill = document.createElement('div');
-  pill.className = 'msg-thinking-pill';
-  pill.innerHTML = `thinking <span class="think-dots"><span></span><span></span><span></span></span>`;
-
-  row.appendChild(orbCell);
-  row.appendChild(pill);
-  group.appendChild(row);
-
-  _activeOrbGroup = group;
-  _thinkingPillEl = group;
-
-  document.getElementById('messages')?.appendChild(group);
-  scrollToBottom();
-  _applyStateToOrb(orbCell, 'thinking');
-}
-
-function removeThinkingPill() {
-  if (_thinkingPillEl) {
-    _thinkingPillEl.remove();
-    _thinkingPillEl = null;
-    if (_activeOrbGroup?.id === 'thinking-pill-group') {
-      _activeOrbGroup = null;
-    }
-  }
-}
-
-// ── Typing / streaming state ──────────────────────────────────────────────────
+// ── Typing / streaming ────────────────────────────────────────────────────────
 let _typingCounter = 0;
 
 function showTyping() {
   setPresenceState('thinking');
-  showThinkingPill();
   scrollToBottom();
   return 'orb-' + (++_typingCounter);
 }
 
 function removeTyping(id) {
-  removeThinkingPill();
-  setPresenceState('idle');
+  // State will be updated by the stream finaliser or appendMessage
 }
 
 function scrollToBottom() {

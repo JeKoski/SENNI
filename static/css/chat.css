@@ -1018,36 +1018,59 @@ body.controls-always-visible .msg-controls {
 .msg-thinking-pill .think-dots span:nth-child(2) { animation-delay: .18s; }
 .msg-thinking-pill .think-dots span:nth-child(3) { animation-delay: .36s; }
 
-/* ── Orb element ─────────────────────────────────────────────────────────────
-   All visual properties driven by CSS variables set by JS.
-   Variables are set on the .companion-orb element directly.                  */
+/* ── Companion orb ────────────────────────────────────────────────────────────
+   Single orb element, moves to the most recent companion message.
+   Positioned absolute inside .msg-row.companion (which gets position:relative
+   set by JS when the orb moves in).
+
+   Tuning — adjust these two variables to shift the orb position:
+     --orb-overlap-x  how far the orb overlaps the bubble horizontally
+     --orb-overlap-y  how far the orb overlaps the bubble vertically
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --orb-overlap-x: 8px;
+  --orb-overlap-y: 8px;
+}
+
+#companion-orb {
+  --orb-size:       36px;
+  --glow-color:     rgba(129,140,248,0.4);
+  --glow-min:       6px;
+  --glow-max:       16px;
+  --glow-speed:     2s;
+  --ring-color:     rgba(129,140,248,0.3);
+  --ring-speed:     1.8s;
+  --dot-color:      #818cf8;
+  --dot-speed:      1.2s;
+  --dot-opacity:    1;
+  --breath-speed:   3s;
+  --orb-bg:         rgba(129,140,248,0.12);
+  --orb-border:     rgba(129,140,248,0.35);
+}
+
 .companion-orb {
-  /* defaults — overridden per state by setPresenceState() */
-  --orb-sz:       36px;
-  --glow-color:   rgba(129,140,248,0.4);
-  --glow-min:     6px;
-  --glow-max:     16px;
-  --glow-speed:   2s;
-  --ring-color:   rgba(129,140,248,0.3);
-  --ring-speed:   1.8s;
-  --dot-color:    #818cf8;
-  --dot-speed:    1.2s;
-  --dot-opacity:  1;
-  --breath-speed: 3s;
-  --orb-bg:       rgba(129,140,248,0.12);
-  --orb-border:   rgba(129,140,248,0.35);
+  position: absolute;
+  left: 0px;
+  bottom: -20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: opacity .4s ease;
 }
 
 .orb-dots {
-  display:  flex;
-  gap:      4px;
+  display: flex;
+  gap: 5px;
   justify-content: center;
-  width:    var(--orb-sz, 36px);
-  height:   8px;
+  width: var(--orb-size, 36px);
+  height: 10px;
   align-items: center;
 }
 .orb-dots span {
-  width:  4px; height: 4px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--dot-color, #818cf8);
   opacity: 0;
@@ -1055,36 +1078,36 @@ body.controls-always-visible .msg-controls {
 }
 
 .orb-body {
-  width:         var(--orb-sz, 36px);
-  height:        var(--orb-sz, 36px);
+  position: relative;
+  width: var(--orb-size, 36px);
+  height: var(--orb-size, 36px);
   border-radius: 50%;
-  background:    var(--orb-bg, rgba(129,140,248,0.12));
-  border:        1.5px solid var(--orb-border, rgba(129,140,248,0.35));
-  display:       flex;
-  align-items:   center;
+  background: var(--orb-bg, rgba(129,140,248,0.12));
+  border: 2px solid var(--orb-border, rgba(129,140,248,0.35));
+  display: flex;
+  align-items: center;
   justify-content: center;
-  overflow:      hidden;
-  position:      relative;
-  transition:    background .5s ease, border-color .5s ease,
-                 box-shadow .5s ease, width .3s ease, height .3s ease;
-  flex-shrink:   0;
+  overflow: hidden;
+  transition: background .5s ease, border-color .5s ease, box-shadow .5s ease,
+              width .3s ease, height .3s ease;
+  flex-shrink: 0;
 }
 .orb-ring {
-  position:      absolute;
-  width: 100%;   height: 100%;
-  border-radius: 50%;
-  border:        1.5px solid var(--ring-color, rgba(129,140,248,0.3));
-  pointer-events: none;
-  opacity:       0;
-}
-.orb-icon {
-  font-size: calc(var(--orb-sz, 36px) * 0.42);
-  color:     var(--dot-color, #818cf8);
-  transition: color .4s ease, font-size .3s ease;
-  display:   flex; align-items: center; justify-content: center;
+  position: absolute;
   width: 100%; height: 100%;
   border-radius: 50%;
-  overflow:  hidden;
+  border: 1.5px solid var(--ring-color, rgba(129,140,248,0.3));
+  pointer-events: none;
+  opacity: 0;
+}
+.orb-icon {
+  font-size: calc(var(--orb-size, 36px) * 0.42);
+  color: var(--dot-color, #818cf8);
+  transition: color .4s ease, font-size .3s ease;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
 }
 .orb-icon img {
   width: 100%; height: 100%;
@@ -1116,11 +1139,12 @@ body.controls-always-visible .msg-controls {
 
 /* ── State: idle ── */
 .companion-orb.idle { opacity: 1; }
-.companion-orb.idle .orb-dots span { opacity: 0.12; animation: none; }
-.companion-orb.idle .orb-body      { animation: none; }
-.companion-orb.idle .orb-ring      { animation: none; opacity: 0; }
+.companion-orb.idle .orb-dots span  { opacity: 0.12; animation: none; }
+.companion-orb.idle .orb-body       { animation: none; }
+.companion-orb.idle .orb-ring       { animation: none; opacity: 0; }
 
 /* ── State: thinking ── */
+.companion-orb.thinking { opacity: 1; }
 .companion-orb.thinking .orb-dots span {
   opacity: 1;
   animation: dotBounce var(--dot-speed, 1.2s) ease-in-out infinite;
@@ -1137,6 +1161,7 @@ body.controls-always-visible .msg-controls {
 
 /* ── State: streaming ── */
 .companion-orb.streaming {
+  opacity: 1;
   --glow-color:  rgba(109,212,168,0.35);
   --glow-min:    4px; --glow-max: 12px;
   --ring-color:  rgba(109,212,168,0.25);
@@ -1159,6 +1184,7 @@ body.controls-always-visible .msg-controls {
 
 /* ── State: heartbeat ── */
 .companion-orb.heartbeat {
+  opacity: 1;
   --glow-color:  rgba(167,139,250,0.45);
   --glow-min:    6px; --glow-max: 20px;
   --glow-speed:  1.4s;
@@ -1185,6 +1211,7 @@ body.controls-always-visible .msg-controls {
 
 /* ── State: chaos ── */
 .companion-orb.chaos {
+  opacity: 1;
   --glow-color:   rgba(251,191,36,0.5);
   --glow-min:     8px; --glow-max: 24px;
   --glow-speed:   0.8s;
@@ -1208,6 +1235,12 @@ body.controls-always-visible .msg-controls {
 }
 .companion-orb.chaos .orb-ring {
   animation: ringPulse var(--ring-speed, 0.9s) ease-out infinite;
+}
+
+/* Give companion message rows enough bottom padding so the orb doesn't
+   overlap the next message. Adjust to taste. */
+.msg-row.companion {
+  margin-bottom: calc(var(--orb-size, 36px) - var(--orb-overlap-y) + 8px);
 }
 
 /* ── Companion gear button ─────────────────────────────────────────────────── */

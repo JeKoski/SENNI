@@ -490,50 +490,25 @@ async function callModel(system, messages, abortSignal = null) {
 
   // ── Stream bubble helpers ─────────────────────────────────────────────────
 function _createStreamBubble() {
-  // Remove thinking pill if present
-  document.getElementById('thinking-pill-group')?.remove();
-
+  document.querySelector('.typing-row')?.remove();
   const list = document.getElementById('messages');
   if (!list) return null;
-
-  // Use the new orb group structure instead of a plain row
-  const sz = (typeof _getOrbSize === 'function') ? _getOrbSize() : 36;
-
-  const group = document.createElement('div');
-  group.className = 'msg-group';
-  group.id = 'stream-bubble-row';  // keep this id so chat.js can find it
-
-  const row = document.createElement('div');
-  row.className = 'msg-orb-row';
-  row.style.setProperty('--orb-sz', sz + 'px');
-
-  // Build orb cell
-  const orbCell = (typeof _buildOrbElement === 'function')
-    ? _buildOrbElement()
-    : document.createElement('div');
-  if (typeof _applyStateToOrb === 'function') _applyStateToOrb(orbCell, 'streaming');
-
+  const row    = document.createElement('div');
+  row.className = 'msg-row companion stream-row';
+  row.id        = 'stream-bubble-row';
+  const wrap   = document.createElement('div');
   const bubble = document.createElement('div');
   bubble.className       = 'bubble stream-bubble';
   bubble.dataset.rawText = '';
-
   const time = document.createElement('div');
-  time.className   = 'msg-time-orb';
-  time.style.setProperty('--orb-sz', sz + 'px');
+  time.className   = 'msg-time';
   time.textContent = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-
-  row.appendChild(orbCell);
-  row.appendChild(bubble);
-  group.appendChild(row);
-  group.appendChild(time);
-
-  // Register as the active orb group so setPresenceState works during streaming
-  if (typeof _activeOrbGroup !== 'undefined') _activeOrbGroup = group;
-
-  list.appendChild(group);
+  wrap.appendChild(bubble);
+  wrap.appendChild(time);
+  row.appendChild(wrap);
+  list.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
-
-  return { row: group, bubble, wrap: row };
+  return { row, bubble, wrap };
 }
 
   function _updateStreamBubble({ bubble }, text) {
@@ -545,22 +520,18 @@ function _createStreamBubble() {
   }
 
   function _finaliseStreamBubble({ row, bubble }, text) {
-    if (!bubble) return;
-    bubble.dataset.rawText = text;
-    bubble.classList.remove("stream-bubble");
-    const rendered = typeof renderMarkdown === "function" ? renderMarkdown(text) : text;
-    bubble.innerHTML = rendered;
-    // Remove stream-row marker so controls can be attached
-    row.classList.remove("stream-row");
-    if (typeof _activeOrbGroup !== 'undefined') _activeOrbGroup = row;
-    if (typeof _applyStateToOrb === 'function') {
-      const orbCell = row.querySelector('.msg-orb-cell');
-      if (orbCell) _applyStateToOrb(orbCell, 'idle');
-    }
-    // Attach message controls
-    if (typeof _attachMessageControls === "function") {
-      _attachMessageControls(row, "companion");
-    }
+  if (!bubble) return;
+  bubble.dataset.rawText = text;
+  bubble.classList.remove('stream-bubble');
+  const rendered = typeof renderMarkdown === 'function' ? renderMarkdown(text) : text;
+  bubble.innerHTML = rendered;
+  row.classList.remove('stream-row');
+  if (typeof _attachMessageControls === 'function') {
+    _attachMessageControls(row, 'companion');
+  }
+  // Move the orb to this finalised message row
+  if (typeof _moveOrbToRow === 'function') _moveOrbToRow(row);
+  if (typeof setPresenceState === 'function') setPresenceState('idle');
   }
 
   function _removeStreamBubble({ row } = {}) {
