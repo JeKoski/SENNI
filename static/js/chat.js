@@ -134,9 +134,22 @@ function setupToolCallHandler() {
 
 // ── Server boot ───────────────────────────────────────────────────────────────
 async function ensureServerRunning() {
-  if (config.model_running) {
-    console.log('[boot] model already running');
-    startSession();
+  // model_running  = process alive AND ready (model fully loaded)
+  // model_launching = process alive but still loading — don't boot again
+  if (config.model_running || config.model_launching) {
+    if (config.model_running) {
+      console.log('[boot] model already running');
+      startSession();
+      return;
+    }
+    // Still loading — just attach to the existing SSE log stream and wait
+    console.log('[boot] model is launching, attaching to boot log');
+    showBootOverlay('Model is loading…');
+    watchBootLog(async () => {
+      hideBootOverlay();
+      await loadStatus();
+      startSession();
+    });
     return;
   }
 
@@ -157,9 +170,19 @@ async function ensureServerRunning() {
   }
 
   if (bootData.already_running) {
-    watchBootLog(() => {});
+    // Server said it's already up or launching — attach to log stream either way
+    watchBootLog(async () => {});
     await loadStatus();
-    startSession();
+    if (config.model_running) {
+      startSession();
+    } else {
+      // Was launching when we asked — wait for ready via SSE
+      watchBootLog(async () => {
+        hideBootOverlay();
+        await loadStatus();
+        startSession();
+      });
+    }
     return;
   }
 
