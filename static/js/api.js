@@ -5,168 +5,13 @@
 //   • Inline text calls written by Gemma: memory({"action":"write",...})
 //
 // onToolCall(name, args, status, result) — UI callback, set by chat.js
+//
+// Depends on: tool-parser.js (TOOL_DEFINITIONS, TOOL_NAMES, parseInlineToolCalls,
+//             parseXmlToolCalls, stripToolCalls)
 
 let onToolCall    = null;
 let onThinking    = null;  // set by chat.js: (thinkText) => void
 let onUsageUpdate = null;  // set by chat.js: (promptTokens, totalTokens) => void
-
-// ── Tool definitions ──────────────────────────────────────────────────────────
-const TOOL_DEFINITIONS = [
-  {
-    type: "function",
-    function: {
-      name: "memory",
-      description:
-        "Read, write, or list the companion's markdown memory files. " +
-        "soul/ = identity & user profile (persistent). " +
-        "mind/ = current session notes. memory/ = long-term archive. " +
-        "Always write complete markdown files.",
-      parameters: {
-        type: "object",
-        properties: {
-          action:      { type: "string", enum: ["read","write","list","archive","move"],
-                         description: "read=get file, write=save file, list=show files, archive=move from mind/ to memory/ with timestamp, move=transfer file between folders (chaos mode only)" },
-          folder:      { type: "string", enum: ["soul","mind","memory"],
-                         description: "Source folder" },
-          filename:    { type: "string", description: "File name e.g. 'session_notes.md'" },
-          content:     { type: "string", description: "Full file content for write action" },
-          dest_folder: { type: "string", enum: ["soul","mind","memory"],
-                         description: "Destination folder for move action" }
-        },
-        required: ["action","folder"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "web_search",
-      description: "Search the internet for current information.",
-      parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "web_scrape",
-      description: "Fetch the full text of a URL.",
-      parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_time",
-      description: "Get the current date and time.",
-      parameters: { type: "object", properties: {} }
-    }
-  }
-];
-
-const TOOL_NAMES = TOOL_DEFINITIONS.map(t => t.function.name);
-
-// ── JSON sanitizer ────────────────────────────────────────────────────────────
-function sanitizeJson(s) {
-  return s.replace(/\\([^"\\\/bfnrtu])/g, "$1");
-}
-
-// ── Inline tool call parser ───────────────────────────────────────────────────
-function parseInlineToolCalls(text) {
-  const calls = [];
-
-  for (const name of TOOL_NAMES) {
-    const opener = name + "(";
-    let searchFrom = 0;
-
-    while (true) {
-      const callStart = text.indexOf(opener, searchFrom);
-      if (callStart === -1) break;
-
-      let i = callStart + opener.length;
-      while (i < text.length && (text[i] === " " || text[i] === "\n" || text[i] === "\t")) i++;
-      if (text[i] !== "{") { searchFrom = callStart + 1; continue; }
-
-      const argsStart = i;
-      i++;
-
-      let depth = 1, inStr = false, esc = false;
-      while (i < text.length && depth > 0) {
-        const ch = text[i];
-        if (esc)             { esc = false; }
-        else if (ch === "\\") { esc = true; }
-        else if (inStr)      { if (ch === '"') inStr = false; }
-        else if (ch === '"') { inStr = true; }
-        else if (ch === "{") { depth++; }
-        else if (ch === "}") { depth--; }
-        i++;
-      }
-
-      if (depth !== 0) { searchFrom = callStart + 1; continue; }
-
-      let j = i;
-      while (j < text.length && (text[j] === " " || text[j] === "\n")) j++;
-      if (text[j] !== ")") { searchFrom = callStart + 1; continue; }
-
-      const rawArgs = text.slice(argsStart, i);
-      const raw     = text.slice(callStart, j + 1);
-
-      let args = {};
-      let parsed = false;
-
-      const attempts = [rawArgs, sanitizeJson(rawArgs)];
-      for (const a of attempts) {
-        if (parsed) break;
-        try { args = JSON.parse(a); parsed = true; break; } catch {}
-        try {
-          const relaxed = a.replace(/([{,]\s*)([a-zA-Z_]\w*)(\s*:)/g, '$1"$2"$3');
-          args = JSON.parse(relaxed); parsed = true;
-        } catch {}
-      }
-
-      if (!parsed) { searchFrom = callStart + 1; continue; }
-
-      calls.push({ name, args, raw });
-      searchFrom = j + 1;
-    }
-  }
-
-  return calls;
-}
-
-// ── XML tool call parser ──────────────────────────────────────────────────────
-function parseXmlToolCalls(text) {
-  const calls = [];
-  const blockRe = /<tool_use>([\s\S]*?)<\/tool_call>/g;
-  let block;
-  while ((block = blockRe.exec(text)) !== null) {
-    const inner = block[1];
-    const nameMatch = inner.match(/<function=([^>]+)>/);
-    if (!nameMatch) continue;
-    const name = nameMatch[1].trim();
-    if (!TOOL_NAMES.includes(name)) continue;
-    const args = {};
-    const paramRe = /<parameter=([^>]+)>([\s\S]*?)<\/parameter>/g;
-    let param;
-    while ((param = paramRe.exec(inner)) !== null) {
-      args[param[1].trim()] = param[2].trim();
-    }
-    calls.push({ name, args });
-  }
-  return calls;
-}
-
-// ── Strip inline tool calls from visible reply ────────────────────────────────
-function stripToolCalls(text, calls) {
-  let out = text;
-  for (const { raw } of calls) {
-    out = out.replace(raw, "");
-  }
-  out = out
-    .replace(/I(?:'m| am)(?: going to| now)? calling(?::)?\s*/gi, "")
-    .replace(/Calling(?::)?\s*/gi, "")
-    .replace(/Using tool(?::)?\s*/gi, "");
-  return out.replace(/\n{3,}/g, "\n\n").trim();
-}
 
 // ── callModel ─────────────────────────────────────────────────────────────────
 async function callModel(system, messages, abortSignal = null) {
@@ -517,7 +362,6 @@ function _finaliseStreamBubble({ row, bubble }, text) {
   if (typeof _attachMessageControls === "function") {
     _attachMessageControls(row, "companion");
   }
-
 }
 
 function _removeStreamBubble({ row } = {}) {
@@ -598,5 +442,5 @@ async function callTool(name, args) {
   if (!res.ok) throw new Error(`Bridge ${res.status}`);
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || "Tool error");
-  return data.result?.content?.[0]?.text ?? JSON.stringify(data.result);
+  return data.result?.content?.[0]?.text ?? String(data.result ?? "");
 }

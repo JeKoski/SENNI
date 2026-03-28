@@ -14,13 +14,16 @@ Serves:
 """
 
 import asyncio
+import atexit
 import json
 import logging
 import os
 import platform
 import shlex
+import shutil
 import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -50,6 +53,8 @@ from scripts.tool_loader import get_tool, load_tools
 
 log = logging.getLogger(__name__)
 
+IS_WIN = platform.system() == "Windows"
+
 # ── App setup ──────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Companion", docs_url=None, redoc_url=None)
@@ -71,14 +76,23 @@ _llama_process: subprocess.Popen | None = None
 _boot_log:      list[str]  = []   # all log lines since last (re)start
 _boot_ready:    bool       = False
 
+# Prevent simultaneous boot calls from spawning duplicate processes
+_boot_lock = threading.Lock()
 
-# ── Startup ────────────────────────────────────────────────────────────────────
+# Thread pool for running synchronous tool handlers without blocking the event loop
+_tool_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tool")
+
+
+# ── Startup / shutdown ─────────────────────────────────────────────────────────
 
 @app.on_event("startup")
-async def startup():
+async def on_startup():
     global _tool_manifest
     _tool_manifest = load_tools()
     log.info("Server ready. %d tools loaded.", len(_tool_manifest))
+
+    # Register cleanup so llama-server is killed if Python exits unexpectedly
+    atexit.register(_kill_llama_server)
 
     # Auto-backup on every bridge start
     try:
@@ -86,6 +100,38 @@ async def startup():
         run_backup(PROJECT_ROOT)
     except Exception as e:
         log.warning("Auto-backup failed (non-fatal): %s", e)
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Clean up llama-server and thread pool when uvicorn shuts down."""
+    log.info("Shutting down — stopping llama-server…")
+    _kill_llama_server()
+    _tool_executor.shutdown(wait=False)
+
+
+def _kill_llama_server():
+    """
+    Terminate llama-server synchronously. Safe to call from atexit or shutdown.
+    Tries SIGTERM first, then SIGKILL after 3 s.
+    """
+    global _llama_process
+    proc = _llama_process
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        log.info("Terminating llama-server (pid %s)…", proc.pid)
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            log.warning("llama-server did not exit — killing (pid %s)", proc.pid)
+            proc.kill()
+            proc.wait(timeout=2)
+    except Exception as e:
+        log.warning("Error killing llama-server: %s", e)
+    finally:
+        _llama_process = None
 
 
 # ── UI routes ──────────────────────────────────────────────────────────────────
@@ -113,50 +159,33 @@ async def chat():
 
 @app.get("/api/scan")
 async def api_scan():
-    """
-    Return detected GPU and current platform.
-    Platform is used by the wizard to show OS-appropriate GPU options
-    (e.g. Apple Metal chip on macOS).
-    """
+    """Return detected GPU and current platform."""
     gpu = detect_gpu()
     return {
         "gpu_detected": gpu,
-        "platform":     platform.system(),  # "Linux", "Windows", "Darwin"
+        "platform":     platform.system(),
     }
 
 
 @app.get("/api/scan/models")
 async def api_scan_models():
-    """
-    Optional: scan common directories for .gguf files.
-    Only called when the user clicks 'Scan for models'.
-    """
     files = find_gguf_files()
     return {"gguf_files": files}
 
 
 @app.get("/api/mmproj-candidates")
 async def api_mmproj_candidates(model_path: str = ""):
-    """
-    Given a model path, return any mmproj-like .gguf files
-    found in the same directory — presented to the user to pick from,
-    never auto-selected.
-    """
     candidates = find_mmproj_candidates(model_path)
     return {"candidates": candidates}
 
 
 @app.post("/api/browse")
 async def api_browse(request: Request):
-    """
-    Open the OS native file picker on the server machine and return
-    the selected path. Falls back gracefully if no GUI is available.
-    """
+    """Open the OS native file picker on the server machine."""
     body      = await request.json()
-    file_type = body.get("type", "model")   # "model" | "mmproj"
+    file_type = body.get("type", "model")
     title     = "Select mmproj file" if file_type == "mmproj" else "Select model file (.gguf)"
 
-    # Try tkinter file dialog (works on Linux/Windows/Mac with a desktop)
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -179,11 +208,9 @@ async def api_browse(request: Request):
 
 def _merged_presence_presets(global_cfg: dict, companion_cfg: dict) -> dict:
     """Merge global presence presets with per-companion additions/overrides."""
-    from scripts.config import DEFAULTS
     base    = dict(DEFAULTS.get("presence_presets", {}))
     global_ = global_cfg.get("presence_presets", {})
     local   = companion_cfg.get("presence_presets", {})
-    # Deep merge: companion presets win, global overrides DEFAULTS, DEFAULTS are base
     merged  = {**base}
     for name, states in global_.items():
         merged[name] = {**(merged.get(name, {})), **states}
@@ -197,21 +224,15 @@ async def api_status():
     """Return current config, loaded tool names, and model status."""
     config = load_config()
 
-    # Check if llama-server process is alive — no HTTP call needed
     process_alive = (
         _llama_process is not None and
-        _llama_process.poll() is None  # None means still running
+        _llama_process.poll() is None
     )
-    # Also require that it reported ready at least once (model actually loaded)
     model_running = process_alive and _boot_ready
 
-    # Load avatar from companion config so the sidebar can show it on startup
     companion_cfg = load_companion_config(config.get("companion_folder", "default"))
 
-    # Read context window size from server_args so the UI can show a progress bar
-    ctx_size = config.get("server_args", {}).get("ctx", {}).get("value", 16384)
-
-    # Merge companion generation overrides on top of global generation settings
+    ctx_size      = config.get("server_args", {}).get("ctx", {}).get("value", 16384)
     global_gen    = config.get("generation", {})
     companion_gen = companion_cfg.get("generation", {})
     effective_gen = {**global_gen, **companion_gen}
@@ -237,17 +258,7 @@ async def api_status():
 
 @app.post("/api/setup")
 async def api_setup(request: Request):
-    """
-    Receive wizard form data, save config, create companion folder structure.
-    Expected JSON body:
-    {
-        "model_path":    str,
-        "gpu_type":      str,   # intel | nvidia | amd | metal | cpu
-        "ngl":           int,
-        "port_bridge":   int,
-        "port_model":    int,
-    }
-    """
+    """Receive wizard form data, save config, create companion folder structure."""
     body = await request.json()
 
     config = build_initial_config(
@@ -259,12 +270,9 @@ async def api_setup(request: Request):
         port_model  = int(body.get("port_model", 8081)),
     )
 
-    # Ensure companion folder structure exists
     get_companion_paths(config["companion_folder"])
-
     save_config(config)
     log.info("Config saved. Companion folder: %s", config["companion_folder"])
-
     return {"ok": True, "companion_folder": config["companion_folder"]}
 
 
@@ -274,10 +282,7 @@ async def api_setup(request: Request):
 async def api_boot(request: Request):
     """
     Start llama-server if not already running.
-    Pass {"force": true} in the JSON body to kill and restart (used by the
-    Restart button in the UI). Without force, a running healthy process is
-    left alone and we just return ok=True so the client can attach to the
-    existing SSE log stream.
+    Pass {"force": true} to kill and restart (used by the Restart button).
     """
     global _llama_process, _boot_log, _boot_ready
 
@@ -285,7 +290,6 @@ async def api_boot(request: Request):
     if not config.get("model_path"):
         return {"ok": False, "error": "No model path configured."}
 
-    # Parse optional body
     force = False
     try:
         body  = await request.json()
@@ -293,118 +297,126 @@ async def api_boot(request: Request):
     except Exception:
         pass
 
-    # If already running and not forced, just say ok — don't restart
-    already_running = (
-        _llama_process is not None and
-        _llama_process.poll() is None and
-        _boot_ready
-    )
-    if already_running and not force:
-        log.info("llama-server already running (pid %s), skipping boot", _llama_process.pid)
-        return {"ok": True, "already_running": True}
+    with _boot_lock:
+        already_running = (
+            _llama_process is not None and
+            _llama_process.poll() is None and
+            _boot_ready
+        )
+        if already_running and not force:
+            log.info("llama-server already running (pid %s), skipping boot", _llama_process.pid)
+            return {"ok": True, "already_running": True}
 
-    # Kill existing process if force or if it crashed/exited
-    if _llama_process and _llama_process.poll() is None:
-        log.info("Terminating llama-server (pid %s)…", _llama_process.pid)
-        try:
-            _llama_process.terminate()
-            for _ in range(50):
-                if _llama_process.poll() is not None:
-                    break
-                await asyncio.sleep(0.1)
-            if _llama_process.poll() is None:
-                _llama_process.kill()
-                _llama_process.wait()
-        except Exception as e:
-            log.warning("Error stopping llama-server: %s", e)
+        # Terminate any existing process (forced restart or crashed process)
+        if _llama_process and _llama_process.poll() is None:
+            log.info("Stopping llama-server (pid %s) before relaunch…", _llama_process.pid)
+            _kill_llama_server()
 
-    # Reset and launch
-    _boot_log   = []
-    _boot_ready = False
-    _build_and_launch(config)
+        _boot_log   = []
+        _boot_ready = False
+        _build_and_launch(config)
+
     log.info("llama-server launching…")
     return {"ok": True, "already_running": False}
 
 
 def _build_and_launch(config: dict):
-    """Build the llama-server command using config and launch in background thread."""
-    IS_WIN = platform.system() == "Windows"
+    """
+    Build the llama-server command for the current OS/GPU and launch it in a
+    background daemon thread. Must be called with _boot_lock held.
+    """
     IS_MAC = platform.system() == "Darwin"
     gpu    = config.get("gpu_type", "cpu")
 
     # ── Resolve llama-server binary ───────────────────────────────────────────
     model_dir  = Path(config["model_path"]).parent
     server_exe = "llama-server.exe" if IS_WIN else "llama-server"
+
     candidates = [
-        # Relative to model file (common llama.cpp build layout)
-        model_dir.parent.parent / "build" / "bin" / server_exe,
+        # Next to the model file (common llama.cpp build layout)
+        model_dir / server_exe,
         model_dir.parent / "bin" / server_exe,
-        # macOS: Homebrew and common build locations
+        model_dir.parent.parent / "build" / "bin" / server_exe,
+        # macOS Homebrew / common build locations
         Path("/usr/local/bin") / server_exe,
         Path("/opt/homebrew/bin") / server_exe,
         Path.home() / "llama.cpp" / "build" / "bin" / server_exe,
-        # Fallback: rely on PATH
-        Path(server_exe),
     ]
-    binary = next((str(c) for c in candidates if Path(c).exists()), server_exe)
+    # Use the first path that actually exists on disk
+    binary = next((str(c) for c in candidates if c.exists()), None)
 
-    # ── Build args from config (handles toggleable built-ins + custom) ────────
+    # Fall back to PATH lookup (shutil.which handles Windows .exe extension correctly)
+    if binary is None:
+        binary = shutil.which(server_exe) or server_exe
+
+    # ── Build argument list ───────────────────────────────────────────────────
     cmd_args = build_server_command(config, binary)
 
-    # ── Wrap with GPU environment ─────────────────────────────────────────────
+    # ── Build OS/GPU-specific launch parameters ───────────────────────────────
+    env = os.environ.copy()
+
     if IS_WIN:
         if gpu == "intel":
-            oneapi   = r"C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
-            cmd_str  = " ".join(f'"{a}"' for a in cmd_args)
-            full_cmd = f'"{oneapi}" intel64 && {cmd_str}'
+            # Intel SYCL needs oneAPI environment sourced via setvars.bat.
+            # This requires cmd.exe chaining, so shell=True is unavoidable here.
+            oneapi  = r"C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
+            cmd_str = " ".join(f'"{a}"' for a in cmd_args)
+            full_cmd   = f'"{oneapi}" intel64 && {cmd_str}'
+            shell_args = {
+                "shell": True,
+                # CREATE_NO_WINDOW: suppress the cmd.exe console popup on Windows
+                "creationflags": subprocess.CREATE_NO_WINDOW,
+            }
+            env["ONEAPI_DEVICE_SELECTOR"] = "level_zero:gpu"
         else:
-            # NVIDIA / AMD / CPU on Windows — run directly
-            full_cmd = " ".join(f'"{a}"' for a in cmd_args)
-        shell_args = {"shell": True}
+            # NVIDIA / AMD / CPU — pass as a list so the OS handles quoting
+            # correctly even for paths with spaces. No shell needed.
+            full_cmd   = cmd_args
+            shell_args = {
+                "shell": False,
+                "creationflags": subprocess.CREATE_NO_WINDOW,
+            }
+            if gpu == "nvidia":
+                env.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
     elif IS_MAC:
-        # macOS: Metal is the only GPU backend — no environment setup needed.
-        # llama.cpp uses Metal automatically when built with it; -ngl handles offload.
-        safe_cmd   = " ".join(shlex.quote(a) for a in cmd_args)
-        full_cmd   = safe_cmd
-        shell_args = {"shell": True, "executable": "/bin/zsh"}
+        # macOS: Metal is automatic — no env setup needed.
+        full_cmd   = cmd_args
+        shell_args = {"shell": False}
 
     else:
         # Linux
-        safe_cmd = " ".join(shlex.quote(a) for a in cmd_args)
         if gpu == "intel":
-            oneapi   = "/opt/intel/oneapi/setvars.sh"
-            full_cmd = f". {oneapi} --force ; exec {safe_cmd}"
+            oneapi_sh = "/opt/intel/oneapi/setvars.sh"
+            safe_cmd  = " ".join(shlex.quote(a) for a in cmd_args)
+            full_cmd  = f". {oneapi_sh} --force ; exec {safe_cmd}"
+            shell_args = {"shell": True, "executable": "/bin/bash"}
+            env["ONEAPI_DEVICE_SELECTOR"] = "level_zero:gpu"
         else:
-            full_cmd = safe_cmd
-        shell_args = {"shell": True, "executable": "/bin/bash"}
-
-    env = os.environ.copy()
-    if gpu == "intel" and not IS_MAC:
-        env["ONEAPI_DEVICE_SELECTOR"] = "level_zero:gpu"
-    elif gpu == "nvidia":
-        env.setdefault("CUDA_VISIBLE_DEVICES", "0")
-    # Metal: no extra env vars needed — llama.cpp handles it automatically
+            full_cmd   = cmd_args
+            shell_args = {"shell": False}
+            if gpu == "nvidia":
+                env.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
     threading.Thread(
         target=_run_subprocess,
         args=(full_cmd, shell_args, env),
         daemon=True,
+        name="llama-server-watcher",
     ).start()
 
 
-def _run_subprocess(full_cmd: str, shell_args: dict, env: dict):
+def _run_subprocess(full_cmd, shell_args: dict, env: dict):
     """
-    Launch the subprocess, tee every output line to:
+    Launch llama-server, tee every output line to:
       1. _boot_log  (read by the SSE stream → browser)
-      2. Python's stdout (visible in your terminal / systemd journal)
-    Keeps running after _boot_ready — so restarts and runtime logs
-    continue flowing to both destinations.
+      2. Python's stdout (visible in the terminal)
+    Stays alive after _boot_ready so runtime logs keep flowing.
     """
     global _llama_process, _boot_log, _boot_ready
 
     try:
-        _llama_process = subprocess.Popen(
+        proc = subprocess.Popen(
             full_cmd,
             **shell_args,
             stdout=subprocess.PIPE,
@@ -412,36 +424,43 @@ def _run_subprocess(full_cmd: str, shell_args: dict, env: dict):
             bufsize=1,
             universal_newlines=True,
             encoding="utf-8",
-            errors="replace",   # don't crash on non-UTF-8 output
+            errors="replace",
             env=env,
         )
+        _llama_process = proc
+        print(f"\n[llama-server] started (pid {proc.pid})", flush=True)
 
-        print(f"\n[llama-server] started (pid {_llama_process.pid})", flush=True)
-
-        for line in iter(_llama_process.stdout.readline, ""):
+        for line in iter(proc.stdout.readline, ""):
             line = line.rstrip()
             if not line:
                 continue
 
-            # ── Tee to terminal ───────────────────────────────────────────
             print(f"[llama-server] {line}", flush=True)
 
-            # ── Buffer for SSE stream ─────────────────────────────────────
             _boot_log.append(line)
-
-            # Keep log from growing unbounded during long sessions
+            # Cap log size to avoid unbounded growth
             if len(_boot_log) > 2000:
                 _boot_log = _boot_log[-1000:]
 
-            # ── Detect ready ──────────────────────────────────────────────
             lower = line.lower()
             if "server is listening" in lower or "http server listening" in lower:
                 _boot_ready = True
 
-        _llama_process.stdout.close()
-        rc = _llama_process.wait()
+        proc.stdout.close()
+        rc = proc.wait()
         print(f"[llama-server] exited (code {rc})", flush=True)
         _boot_log.append(f"[exited with code {rc}]")
+
+    except FileNotFoundError:
+        # Binary not found — give a clear message instead of a traceback
+        exe = full_cmd[0] if isinstance(full_cmd, list) else full_cmd.split()[0]
+        msg = (
+            f"[launcher error] llama-server not found: {exe!r}\n"
+            f"Make sure llama-server{'exe' if IS_WIN else ''} is on your PATH "
+            f"or next to your model file."
+        )
+        print(msg, flush=True)
+        _boot_log.append(msg)
 
     except Exception as e:
         msg = f"[launcher error] {e}"
@@ -455,29 +474,25 @@ def _run_subprocess(full_cmd: str, shell_args: dict, env: dict):
 async def api_boot_log():
     """
     SSE stream of llama-server log lines.
-    Streams everything in _boot_log, then keeps polling for new lines.
+    Streams everything in _boot_log, then polls for new lines.
     Sends {ready: true} once when _boot_ready becomes True.
-    Stays open indefinitely so the chat UI always sees live output.
     """
     async def generate() -> AsyncGenerator[str, None]:
         sent       = 0
         ready_sent = False
 
         while True:
-            # Drain any new log lines
             while sent < len(_boot_log):
                 yield f"data: {json.dumps({'line': _boot_log[sent]})}\n\n"
                 sent += 1
 
-            # Fire ready event exactly once
             if _boot_ready and not ready_sent:
                 yield f"data: {json.dumps({'ready': True})}\n\n"
                 ready_sent = True
 
-            # After ready, slow down polling to save CPU (1 s instead of 0.2 s)
             await asyncio.sleep(1.0 if ready_sent else 0.2)
 
-            # Stop streaming if the process has exited — client will reconnect on restart
+            # Stop streaming once a restarted process has exited
             if ready_sent and _llama_process and _llama_process.poll() is not None:
                 break
 
@@ -539,7 +554,10 @@ async def mcp_handler(request: Request):
         tool_name = params.get("name")
         args      = params.get("arguments", {})
         if isinstance(args, str):
-            args = json.loads(args)
+            try:
+                args = json.loads(args)
+            except Exception:
+                args = {}
 
         tool = get_tool(_tool_manifest, tool_name)
         if not tool:
@@ -549,9 +567,16 @@ async def mcp_handler(request: Request):
                 "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"},
             }
 
+        # Run the synchronous tool handler in a thread so we don't block the
+        # event loop (critical on Windows where file I/O is slower).
         try:
-            result = tool["handler"](args)
+            loop   = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                _tool_executor,
+                lambda: tool["handler"](args),
+            )
         except Exception as e:
+            log.error("Tool %r raised an exception: %s", tool_name, e, exc_info=True)
             result = f"Tool error: {e}"
 
         return {
@@ -570,7 +595,6 @@ TEMPLATES_DIR = PROJECT_ROOT / "templates"
 
 @app.get("/api/templates")
 async def api_list_templates():
-    """List available template files."""
     if not TEMPLATES_DIR.exists():
         return {"templates": []}
     files = {f.name: f.read_text(encoding="utf-8")
@@ -580,15 +604,12 @@ async def api_list_templates():
 
 @app.post("/api/templates/apply")
 async def api_apply_template(request: Request):
-    """
-    Copy a template file into a companion folder.
-    Body: {companion_folder, template_name, filename (optional), target_folder (optional, default "soul")}
-    """
+    """Copy a template file into a companion folder."""
     body          = await request.json()
     comp_folder   = body.get("companion_folder", "default")
     tname         = body.get("template_name", "")
     filename      = body.get("filename") or tname
-    target_folder = body.get("target_folder", "soul")  # "soul" or "mind"
+    target_folder = body.get("target_folder", "soul")
 
     src = TEMPLATES_DIR / tname
     if not src.exists():
@@ -605,11 +626,7 @@ async def api_apply_template(request: Request):
 
 @app.delete("/api/companions/{folder}")
 async def api_delete_companion(folder: str):
-    """
-    Permanently delete a companion folder and all its files.
-    Cannot delete the active companion (switch first).
-    """
-    import shutil
+    """Permanently delete a companion folder."""
     config = load_config()
     if config.get("companion_folder") == folder:
         return {"ok": False, "error": "Cannot delete the active companion. Switch to another first."}
@@ -628,35 +645,15 @@ async def api_delete_companion(folder: str):
 
 @app.post("/api/factory-reset")
 async def api_factory_reset():
-    """
-    Full factory reset — shuts down llama-server, deletes ALL companions and config.
-    The next page load goes to the wizard which will re-launch the server.
-    """
-    import shutil
-    global _llama_process, _boot_log, _boot_ready
+    """Full factory reset — shuts down llama-server, deletes ALL companions and config."""
+    global _boot_log, _boot_ready
 
-    # Shut down llama-server gracefully
-    if _llama_process and _llama_process.poll() is None:
-        log.info("Factory reset: terminating llama-server (pid %s)…", _llama_process.pid)
-        try:
-            _llama_process.terminate()
-            for _ in range(30):
-                if _llama_process.poll() is not None:
-                    break
-                await asyncio.sleep(0.1)
-            if _llama_process.poll() is None:
-                _llama_process.kill()
-                _llama_process.wait()
-        except Exception as e:
-            log.warning("Could not terminate llama-server: %s", e)
-
-    _llama_process = None
-    _boot_log      = []
-    _boot_ready    = False
+    _kill_llama_server()
+    _boot_log   = []
+    _boot_ready = False
 
     errors = []
 
-    # Delete all companion folders
     if COMPANIONS_DIR.exists():
         try:
             shutil.rmtree(str(COMPANIONS_DIR))
@@ -664,7 +661,6 @@ async def api_factory_reset():
         except Exception as e:
             errors.append(f"companions/: {e}")
 
-    # Delete config.json (triggers wizard on next load)
     if CONFIG_FILE.exists():
         try:
             CONFIG_FILE.unlink()
@@ -678,27 +674,15 @@ async def api_factory_reset():
     return {"ok": True}
 
 
-# ── Server shutdown ────────────────────────────────────────────────────────────
+# ── Server shutdown (model only) ───────────────────────────────────────────────
 
 @app.post("/api/shutdown-model")
 async def api_shutdown_model():
     """Shut down llama-server without resetting config. Used by the wizard."""
-    global _llama_process, _boot_log, _boot_ready
-    if _llama_process and _llama_process.poll() is None:
-        try:
-            _llama_process.terminate()
-            for _ in range(30):
-                if _llama_process.poll() is not None:
-                    break
-                await asyncio.sleep(0.1)
-            if _llama_process.poll() is None:
-                _llama_process.kill()
-                _llama_process.wait()
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
-    _llama_process = None
-    _boot_log      = []
-    _boot_ready    = False
+    global _boot_log, _boot_ready
+    _kill_llama_server()
+    _boot_log   = []
+    _boot_ready = False
     return {"ok": True}
 
 
@@ -715,7 +699,7 @@ async def api_get_settings():
         "companions":               companions,
         "active_companion":         active_cfg,
         "defaults":                 DEFAULTS,
-        "platform":                 platform.system(),   # "Linux", "Windows", "Darwin"
+        "platform":                 platform.system(),
         "presence_presets":         _merged_presence_presets(config, active_cfg),
         "active_presence_preset":   active_cfg.get("active_presence_preset", "Default"),
         "moods":                    active_cfg.get("moods", {}),
@@ -725,35 +709,28 @@ async def api_get_settings():
 
 @app.post("/api/settings/server")
 async def api_save_server_settings(request: Request):
-    """
-    Save server-level settings (model path, gpu, ports, server_args).
-    These require a server restart — we don't auto-restart here.
-    save_config() automatically writes per-OS path dicts.
-    """
+    """Save server-level settings. These require a bridge restart."""
     body   = await request.json()
     config = load_config()
 
-    # Merge in only the server-level keys
     for key in ("model_path", "mmproj_path", "gpu_type", "port_bridge",
                 "port_model", "server_args", "server_args_custom"):
         if key in body:
             config[key] = body[key]
 
-    save_config(config)  # update_platform_paths() is called inside save_config()
+    save_config(config)
     return {"ok": True, "restart_required": True}
+
 
 @app.delete("/api/settings/os-paths")
 async def api_delete_os_paths(request: Request):
-    """
-    Remove a saved per-OS model/mmproj/gpu entry from config.
-    Body: { "os": "Windows" }  (or "Linux" / "Darwin")
-    """
+    """Remove a saved per-OS model/mmproj/gpu entry from config."""
     body   = await request.json()
     os_key = body.get("os", "")
     if not os_key:
         return {"ok": False, "error": "No OS specified."}
 
-    config = load_config()
+    config  = load_config()
     changed = False
     for field in ("model_paths", "mmproj_paths", "gpu_types"):
         if os_key in config.get(field, {}):
@@ -761,10 +738,8 @@ async def api_delete_os_paths(request: Request):
             changed = True
 
     if changed:
-        # save_config calls update_platform_paths, which re-syncs the active OS.
-        # We write directly to avoid overwriting the just-deleted entry back in.
-        import json as _json
-        CONFIG_FILE.write_text(_json.dumps(config, indent=2), encoding="utf-8")
+        # Write directly to avoid update_platform_paths re-adding the deleted entry
+        CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
         log.info("Removed OS paths entry for: %s", os_key)
 
     return {"ok": True, "changed": changed}
@@ -772,9 +747,7 @@ async def api_delete_os_paths(request: Request):
 
 @app.post("/api/settings/generation")
 async def api_save_generation_settings(request: Request):
-    """
-    Save global generation defaults. No restart needed.
-    """
+    """Save global generation defaults. No restart needed."""
     body   = await request.json()
     config = load_config()
     config["generation"] = {
@@ -788,26 +761,21 @@ async def api_save_generation_settings(request: Request):
 
 @app.post("/api/settings/companion")
 async def api_save_companion_settings(request: Request):
-    """
-    Save per-companion config: name, avatar, generation overrides.
-    Optionally switch active companion or create a new one.
-    """
+    """Save per-companion config: name, avatar, generation overrides, etc."""
     body             = await request.json()
     config           = load_config()
     companion_folder = body.get("folder", config.get("companion_folder", "default"))
 
     companion_cfg = load_companion_config(companion_folder)
 
-    # Update editable fields
     for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode",
-                "heartbeat", "force_read_before_write", "presence_presets", "active_presence_preset",
-                "moods", "active_mood"):
+                "heartbeat", "force_read_before_write", "presence_presets",
+                "active_presence_preset", "moods", "active_mood"):
         if key in body:
             companion_cfg[key] = body[key]
 
     save_companion_config(companion_folder, companion_cfg)
 
-    # If switching active companion, update root config too
     if body.get("set_active", False):
         config["companion_folder"] = companion_folder
         config["companion_name"]   = companion_cfg.get("companion_name", companion_folder)
@@ -823,7 +791,6 @@ async def api_new_companion(request: Request):
     name   = body.get("name", "new companion").strip()
     folder = name.lower().replace(" ", "_")[:32]
 
-    # Avoid collisions
     base_folder = folder
     i = 2
     while (COMPANIONS_DIR / folder).exists():
@@ -840,14 +807,13 @@ async def api_new_companion(request: Request):
 
 @app.get("/api/settings/soul/{folder}")
 async def api_get_soul_files(folder: str):
-    """Return the contents of all soul/ files for a companion.
-    Excludes blank files and self_notes if soul_edit_mode != self_notes."""
+    """Return all soul/ file contents for a companion (skips blank files)."""
     soul_dir = COMPANIONS_DIR / folder / "soul"
     files = {}
     if soul_dir.exists():
         for f in sorted(soul_dir.glob("*.md")) + sorted(soul_dir.glob("*.txt")):
             content = f.read_text(encoding="utf-8").strip()
-            if content:  # skip blank/empty files
+            if content:
                 files[f.name] = f.read_text(encoding="utf-8")
     return {"files": files}
 
@@ -880,3 +846,5 @@ async def api_save_soul_file(folder: str, request: Request):
     soul_dir.mkdir(parents=True, exist_ok=True)
     (soul_dir / filename).write_text(content, encoding="utf-8")
     return {"ok": True}
+
+
