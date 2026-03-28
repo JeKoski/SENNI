@@ -196,6 +196,10 @@ function cpAvatarReset() {
   cpDirty = true;
 }
 
+function cpAvatarFile(input) {
+  if (input.files[0]) cpAvatarLoad(input.files[0]);
+}
+
 // ── Soul files ────────────────────────────────────────────────────────────────
 async function cpLoadSoulFiles() {
   try {
@@ -343,11 +347,7 @@ async function cpSave(andClose = false) {
     if (typeof applyPresencePreset === 'function') {
       const livePreset = _cpPresenceData[_cpActivePreset];
       if (livePreset) {
-        const orbEl      = document.getElementById('companion-orb');
-        const states     = ['thinking', 'streaming', 'heartbeat', 'chaos', 'idle'];
-        const activeState = states.find(s => orbEl?.classList.contains(s)) || 'idle';
-        const stateData   = livePreset[activeState] || livePreset.thinking || {};
-        applyPresencePreset({ state: activeState, ...stateData });
+        applyPresencePreset(livePreset);
       }
     }
 
@@ -436,6 +436,11 @@ function cpPresenceInit() {
 
   _cpEditingState     = 'thinking';
   _cpPresenceInitDone = true;
+
+  // Sync layout toggle to current mode
+  const currentMode = localStorage.getItem('orb_layout') || 'inline';
+  document.querySelectorAll('.cp-layout-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === currentMode));
 
   cpPresenceRenderPresets();
   cpPresenceSelectPreset(_cpActivePreset);
@@ -656,4 +661,11 @@ function _cpGetPresencePayload() {
     presence_presets:       _cpPresenceData,
     active_presence_preset: _cpActivePreset,
   };
+}
+
+// ── Orb layout toggle ─────────────────────────────────────────────────────────
+function cpSetOrbLayout(mode) {
+  orb.setMode(mode);
+  document.querySelectorAll('.cp-layout-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode));
 }

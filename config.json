@@ -1,8 +1,8 @@
 {
-  "companion_name": "Qwenny",
-  "companion_folder": "qwenny",
-  "model_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
-  "mmproj_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+  "companion_name": "Senni",
+  "companion_folder": "senni",
+  "model_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+  "mmproj_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
   "gpu_type": "intel",
   "port_bridge": 8000,
   "port_model": 8081,

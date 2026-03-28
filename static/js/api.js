@@ -457,6 +457,15 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
 }
 
 // ── Stream bubble helpers ─────────────────────────────────────────────────────
+// Flag: true when a stream bubble was fully rendered — chat.js checks this
+// instead of looking for the (already-removed) stream-bubble-row id.
+let _streamBubbleRendered = false;
+function streamWasRendered() {
+  const v = _streamBubbleRendered;
+  _streamBubbleRendered = false;  // reset after reading
+  return v;
+}
+
 function _createStreamBubble() {
   document.querySelector(".typing-row")?.remove();
 
@@ -479,10 +488,8 @@ function _createStreamBubble() {
   wrap.appendChild(bubble);
   wrap.appendChild(time);
   row.appendChild(wrap);
-  list.appendChild(row);
 
-  // Move the orb into this row
-  if (typeof _moveOrbToRow === "function") _moveOrbToRow(row);
+  list.appendChild(row);
 
   if (typeof scrollToBottom === "function") scrollToBottom();
   return { row, bubble, wrap };
@@ -504,12 +511,13 @@ function _finaliseStreamBubble({ row, bubble }, text) {
   bubble.innerHTML = rendered;
   row.classList.remove("stream-row");
   row.removeAttribute("id");
-  // Move the orb to the finalised row and set to idle
-  if (typeof _moveOrbToRow === "function") _moveOrbToRow(row);
+  _streamBubbleRendered = true;  // tell chat.js the bubble is already in the DOM
+  // Orb stays in its fixed home — just set state to idle
   if (typeof setPresenceState === "function") setPresenceState("idle");
   if (typeof _attachMessageControls === "function") {
     _attachMessageControls(row, "companion");
   }
+
 }
 
 function _removeStreamBubble({ row } = {}) {

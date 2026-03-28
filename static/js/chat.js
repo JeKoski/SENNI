@@ -62,8 +62,8 @@ async function loadStatus() {
     if (data.presence_presets && data.active_presence_preset) {
       const preset = data.presence_presets[data.active_presence_preset];
       if (preset && typeof applyPresencePreset === 'function') {
-        // Apply thinking state as the default (shown while idle too, just dimmed)
-        applyPresencePreset({ state: 'idle', ...(preset.idle || {}) });
+        // Pass the full preset so orb.js can apply the right slice per state transition
+        applyPresencePreset(preset);
       }
     }
     // Store presence presets in config for runtime use
@@ -531,8 +531,7 @@ async function sendMessage() {
     removeTyping(typingId);
     if (reply) {
       // If streaming already rendered the bubble, skip appendMessage (avoid duplicate)
-      const streamRow = document.getElementById('stream-bubble-row');
-      if (!streamRow) {
+      if (!streamWasRendered()) {
         const compRow = appendMessage('companion', reply);
         _attachMessageControls(compRow, 'companion');
       }

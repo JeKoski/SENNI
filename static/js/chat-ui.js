@@ -1,6 +1,6 @@
 // chat-ui.js — DOM helpers, message rendering, UI components
 // Loaded before chat.js. All functions are pure UI — no conversation logic.
-// Depends on: _esc() from attachments.js
+// Depends on: _esc() from attachments.js, orb from orb.js
 
 // ── Markdown rendering ────────────────────────────────────────────────────────
 let _markdownEnabled = false;
@@ -207,12 +207,6 @@ function appendMessage(role, text) {
   wrap.appendChild(time);
   row.appendChild(wrap);
   list.appendChild(row);
-
-  // Move the orb to this row if companion message
-  if (role === 'companion') {
-    _moveOrbToRow(row);
-  }
-
   scrollToBottom();
   return row;
 }
@@ -226,85 +220,17 @@ function appendSystemNote(text) {
   scrollToBottom();
 }
 
-// ── Companion orb ─────────────────────────────────────────────────────────────
-// One orb element that moves to the latest companion .msg-row.
-// Everything else (serialization, history, api.js) is completely unchanged.
-
-let _currentOrbState    = 'idle';
-let _currentOrbOverrides = {};
-
-// Move the orb element into a row
-function _moveOrbToRow(row) {
-  const orb = document.getElementById('companion-orb');
-  if (!orb || !row) return;
-  row.style.position = 'relative';
-  row.appendChild(orb);
-  // Re-apply current state so it doesn't reset visually
-  _applyStateToOrb(orb, _currentOrbState, _currentOrbOverrides);
-}
-
-function _applyStateToOrb(orbEl, state, overrides = {}) {
-  if (!orbEl) return;
-  const BASE_STATES = ['idle','thinking','streaming','heartbeat','chaos'];
-  orbEl.classList.remove(...BASE_STATES);
-  if (BASE_STATES.includes(state)) {
-    orbEl.classList.add(state);
-  } else {
-    orbEl.classList.add('thinking');
-  }
-  Object.entries(overrides).forEach(([prop, val]) => {
-    orbEl.style.setProperty(prop.startsWith('--') ? prop : '--' + prop, val);
-  });
-}
-
-function setPresenceState(state, overrides = {}) {
-  _currentOrbState     = state;
-  _currentOrbOverrides = overrides;
-  _applyStateToOrb(document.getElementById('companion-orb'), state, overrides);
-}
-
-function setCompanionStatus(state) { setPresenceState(state); }
-
-function syncStatusAvatar() {
-  const src  = document.querySelector('#companion-avatar img')?.src;
-  const icon = document.getElementById('orb-icon');
-  if (!icon) return;
-  if (src) {
-    icon.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-  } else {
-    icon.textContent = '✦';
-  }
-}
-
-function applyPresencePreset(preset, mood = null) {
-  if (!preset) return;
-  const overrides = {};
-  if (preset.glowColor)   overrides['--glow-color']   = preset.glowColor;
-  if (preset.glowMax)     overrides['--glow-max']      = preset.glowMax + 'px';
-  if (preset.glowSpeed)   overrides['--glow-speed']    = preset.glowSpeed + 's';
-  if (preset.ringSpeed)   overrides['--ring-speed']    = preset.ringSpeed + 's';
-  if (preset.dotColor)    overrides['--dot-color']     = preset.dotColor;
-  if (preset.dotSpeed)    overrides['--dot-speed']     = preset.dotSpeed + 's';
-  if (preset.breathSpeed) overrides['--breath-speed']  = preset.breathSpeed + 's';
-  if (preset.orbSize)     overrides['--orb-size']      = preset.orbSize + 'px';
-  if (mood) {
-    if (mood.glowColor)   overrides['--glow-color']   = mood.glowColor;
-    if (mood.glowMax)     overrides['--glow-max']      = mood.glowMax + 'px';
-    if (mood.glowSpeed)   overrides['--glow-speed']    = mood.glowSpeed + 's';
-    if (mood.ringSpeed)   overrides['--ring-speed']    = mood.ringSpeed + 's';
-    if (mood.dotColor)    overrides['--dot-color']     = mood.dotColor;
-    if (mood.dotSpeed)    overrides['--dot-speed']     = mood.dotSpeed + 's';
-    if (mood.breathSpeed) overrides['--breath-speed']  = mood.breathSpeed + 's';
-    if (mood.orbSize)     overrides['--orb-size']      = mood.orbSize + 'px';
-  }
-  setPresenceState(preset.state || 'idle', overrides);
-}
+// ── Presence / orb — delegated to orb.js ─────────────────────────────────────
+function setPresenceState(state, overrides = {}) { orb.setState(state); }
+function setCompanionStatus(state)               { orb.setState(state); }
+function syncStatusAvatar()                      { orb.syncAvatar(); }
+function applyPresencePreset(preset, mood = null){ orb.applyPreset(preset, mood); }
 
 // ── Typing ────────────────────────────────────────────────────────────────────
 let _typingCounter = 0;
 
 function showTyping() {
-  setPresenceState('thinking');
+  orb.setState('thinking');
   scrollToBottom();
   return 'orb-' + (++_typingCounter);
 }

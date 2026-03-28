@@ -90,11 +90,32 @@
 
   <!-- ── Main chat ────────────────────────────────────────────────────────── -->
   <main class="chat-area">
-    <div class="messages" id="messages">
-      <div class="empty-state" id="empty-state">
-        <div class="empty-glyph">✦</div>
-        <div class="empty-title">Connecting…</div>
-        <div class="empty-sub">Starting your companion</div>
+    <!-- messages-wrap: position:relative so #orb-home overlays bottom-left -->
+    <div class="messages-wrap">
+      <div class="messages" id="messages">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-glyph">✦</div>
+          <div class="empty-title">Connecting…</div>
+          <div class="empty-sub">Starting your companion</div>
+        </div>
+      </div>
+      <!-- Orb home — absolute overlay, pointer-events:none container -->
+      <div id="orb-home">
+        <div id="companion-orb" class="companion-orb idle">
+          <div class="orb-dots" id="orb-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="orb-body" id="orb-body">
+            <div class="orb-ring"></div>
+            <div class="orb-icon" id="orb-icon">✦</div>
+          </div>
+        </div>
+        <!-- Scroll-to-bottom button — appears when user scrolled up -->
+        <button id="scroll-to-bottom" onclick="scrollToBottom()" title="Scroll to latest">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3v10M3 9l5 5 5-5"/>
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -137,16 +158,6 @@
       <button onclick="triggerFilePick('audio')">🎵 Audio</button>
       <button onclick="triggerFilePick('text')">📄 Text file</button>
     </div>
-      <!-- Companion orb — persistent presence indicator, CSS-variable driven -->
-    <div id="companion-orb" class="companion-orb idle">
-    <div class="orb-dots" id="orb-dots">
-      <span></span><span></span><span></span>
-    </div>
-    <div class="orb-body" id="orb-body">
-      <div class="orb-ring"></div>
-      <div class="orb-icon" id="orb-icon">✦</div>
-    </div>
-    </div>
   </main>
 
 </div>
@@ -183,14 +194,9 @@
       </div>
       <input type="file" id="cp-avatar-file" accept="image/*" style="display:none" onchange="cpAvatarFile(this)"/>
       <div id="cp-crop-wrap" style="display:none">
-        <canvas id="cp-crop-canvas" width="240" height="240"
-          onmousedown="cpCropStart(event)" onmousemove="cpCropMove(event)"
-          onmouseup="cpCropEnd()" onmouseleave="cpCropEnd()"
-          style="cursor:move;border-radius:12px;display:block;margin:0 auto 10px"></canvas>
+        <img id="cp-crop-img" style="max-width:240px;border-radius:12px;display:block;margin:0 auto 10px"/>
         <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
-          <button class="sp-btn-ghost" onclick="cpCropZoom(-0.1)">－ Zoom</button>
-          <button class="sp-btn-ghost" onclick="cpCropZoom(0.1)">＋ Zoom</button>
-          <button class="sp-btn-primary" onclick="cpCropConfirm()">Use this</button>
+          <button class="sp-btn-primary" onclick="cpAvatarCrop()">Use this</button>
         </div>
       </div>
       <div class="cp-section" style="margin-top:16px">Name</div>
@@ -276,6 +282,13 @@
     </div>
     <!-- Presence -->
     <div class="cp-tab-body" id="cp-tab-presence">
+
+      <!-- Layout toggle -->
+      <div class="cp-section">Layout</div>
+      <div class="cp-layout-toggle" style="margin-bottom:16px">
+        <button class="cp-layout-btn" data-mode="strip" onclick="cpSetOrbLayout('strip')">Orb only</button>
+        <button class="cp-layout-btn active" data-mode="inline" onclick="cpSetOrbLayout('inline')">Orb + message</button>
+      </div>
 
       <!-- Live orb preview -->
       <div class="cp-presence-preview" id="cp-presence-preview">
@@ -441,120 +454,7 @@
       <button class="sp-btn-ghost" style="width:100%;justify-content:center;gap:8px" onclick="closeSettings();openCompanionWindow()">
         ⚙ Open companion settings
       </button>
-      <div style="height:1px;background:rgba(140,145,220,0.1);margin:16px 0"></div>
-      <div id="sp-companion-editor" style="display:none">
-        <div class="sp-section-label">Active companion</div>
-        <div class="sp-avatar-zone" id="sp-avatar-zone"
-          ondragover="event.preventDefault()" ondrop="spAvatarDrop(event)">
-          <div class="sp-avatar-preview" id="sp-avatar-preview">✦</div>
-          <div class="sp-avatar-hint">Drop image or <span class="sp-link" onclick="spAvatarBrowse()">browse</span></div>
-        </div>
-        <input type="file" id="sp-avatar-file" accept="image/*" style="display:none" onchange="spAvatarFile(this)"/>
-        <div id="sp-crop-wrap" style="display:none">
-          <canvas id="sp-crop-canvas" width="240" height="240"
-            onmousedown="cropStart(event)" onmousemove="cropMove(event)"
-            onmouseup="cropEnd()" onmouseleave="cropEnd()"
-            ontouchstart="cropTouchStart(event)" ontouchmove="cropTouchMove(event)" ontouchend="cropEnd()"
-            style="cursor:move;border-radius:12px;display:block;margin:0 auto 10px"></canvas>
-          <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
-            <button class="sp-btn-ghost" onclick="spCropZoom(-0.1)">－ Zoom</button>
-            <button class="sp-btn-ghost" onclick="spCropZoom(0.1)">＋ Zoom</button>
-            <button class="sp-btn-primary" onclick="spCropConfirm()">Use this</button>
-          </div>
-        </div>
-        <div class="sp-field-label">Name</div>
-        <input type="text" class="sp-input" id="sp-companion-name" placeholder="Companion name" style="margin-bottom:14px"/>
-        <div class="sp-section-label">Generation overrides <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim)">(leave blank to use global)</span></div>
-        <div class="sp-row-2col">
-          <div><div class="sp-field-label">Temperature</div><input type="number" class="sp-input" id="sp-c-temp" placeholder="0.8" min="0" max="2" step="0.05" oninput="spMarkCompanionDirty()"/></div>
-          <div><div class="sp-field-label">Top-P</div><input type="number" class="sp-input" id="sp-c-topp" placeholder="0.95" min="0" max="1" step="0.01" oninput="spMarkCompanionDirty()"/></div>
-          <div><div class="sp-field-label">Repeat penalty</div><input type="number" class="sp-input" id="sp-c-rpen" placeholder="1.1" min="1" max="2" step="0.05"/></div>
-          <div><div class="sp-field-label">Max response tokens</div><input type="number" class="sp-input" id="sp-c-maxt" placeholder="1024" min="64"/></div>
-        </div>
-        <div class="sp-field-label" style="margin-top:16px">Identity editing
-          <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">what the companion can change about itself</span>
-        </div>
-        <div class="sp-radio-group" id="sp-soul-edit-mode">
-          <label class="sp-radio"><input type="radio" name="soul-edit" value="locked" checked/>
-            <span>Locked</span> <span class="sp-note">companion cannot edit its own identity</span></label>
-          <label class="sp-radio"><input type="radio" name="soul-edit" value="self_notes"/>
-            <span>Self notes</span> <span class="sp-note">can write to soul/self_notes.md — additive only</span></label>
-          <label class="sp-radio"><input type="radio" name="soul-edit" value="agentic"/>
-            <span>Fully agentic</span> <span class="sp-note">can rewrite companion_identity.md — auto-backed up</span></label>
-          <label class="sp-radio"><input type="radio" name="soul-edit" value="chaos"/>
-            <span>Chaos mode 🔥</span> <span class="sp-note">unrestricted — read/write/move files across all folders, all soul/ writes auto-backed up</span></label>
-        </div>
-        <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
-          <div class="sp-tog on" id="tog-force-read" onclick="this.classList.toggle('on')"></div>
-          <span class="sp-field-label" style="margin:0">Require read before write
-            <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:4px">disable to reduce context burn on move/archive</span>
-          </span>
-        </div>
 
-        <div class="sp-section-label" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
-          Soul files
-          <button class="sp-add-btn" onclick="spNewSoulFile()">+ New file</button>
-        </div>
-        <div id="sp-soul-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
-        <textarea class="sp-textarea" id="sp-soul-content" placeholder="Select a file above to edit…" rows="7"></textarea>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:4px">
-          <button class="sp-btn-ghost" id="sp-soul-save-btn" onclick="spSaveSoulFile()" style="display:none">Save file</button>
-        </div>
-        <div class="sp-section-label" style="margin-top:18px">Heartbeat
-          <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">autonomous companion turns</span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="sp-tog" id="hb-silent" onclick="this.classList.toggle('on')"></div>
-            <span class="sp-field-label" style="margin:0">Silent tool turns <span class="sp-note">(update notes, research — not shown)</span></span>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="sp-tog" id="hb-message" onclick="this.classList.toggle('on')"></div>
-            <span class="sp-field-label" style="margin:0">Can send messages <span class="sp-note">(companion reaches out)</span></span>
-          </div>
-        </div>
-        <div class="sp-field-label">Triggers</div>
-        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="sp-tog" id="hb-idle" onclick="this.classList.toggle('on')"></div>
-            <span style="font-size:13px;color:var(--text-muted)">After</span>
-            <input type="number" class="sp-input" id="hb-idle-min" value="15" min="1" max="120" style="width:60px;font-size:13px;padding:4px 8px"/>
-            <span style="font-size:13px;color:var(--text-muted)">minutes idle</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="sp-tog" id="hb-conv-end" onclick="this.classList.toggle('on')"></div>
-            <span class="sp-field-label" style="margin:0">When context is reset</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="sp-tog" id="hb-session" onclick="this.classList.toggle('on')"></div>
-            <span class="sp-field-label" style="margin:0">On session start</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="sp-tog" id="hb-ctx" onclick="this.classList.toggle('on')"></div>
-            <span style="font-size:13px;color:var(--text-muted)">When context reaches</span>
-            <input type="number" class="sp-input" id="hb-ctx-pct" value="75" min="10" max="95" style="width:60px;font-size:13px;padding:4px 8px"/>
-            <span style="font-size:13px;color:var(--text-muted)">%</span>
-          </div>
-        </div>
-        <div class="sp-field-label" style="margin-top:8px">Instructions <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:4px">per-trigger, or leave blank to use default</span></div>
-        <div style="margin-bottom:6px">
-          <div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:3px">Default (all triggers)</div>
-          <textarea class="sp-textarea" id="hb-instr-default" rows="2" placeholder="Reflect on the conversation. Update session notes. Research anything interesting."></textarea>
-        </div>
-        <div id="hb-instr-triggers" style="display:flex;flex-direction:column;gap:6px">
-          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">After idle</div>
-          <textarea class="sp-textarea" id="hb-instr-idle" rows="2" placeholder="(uses default if blank)"></textarea></div>
-          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">Context reset</div>
-          <textarea class="sp-textarea" id="hb-instr-conversation-end" rows="2" placeholder="(uses default if blank)"></textarea></div>
-          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">Session start</div>
-          <textarea class="sp-textarea" id="hb-instr-session-start" rows="2" placeholder="(uses default if blank)"></textarea></div>
-          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">Context filling</div>
-          <textarea class="sp-textarea" id="hb-instr-context-threshold" rows="2" placeholder="(uses default if blank)"></textarea></div>
-          <div><div class="sp-field-label" style="font-size:11px;opacity:.7;margin-bottom:2px">Manual trigger</div>
-          <textarea class="sp-textarea" id="hb-instr-manual" rows="2" placeholder="(uses default if blank)"></textarea></div>
-        </div>
-
-      </div>
     </div>
 
     <!-- Sticky action footer - shown/hidden per active tab -->
@@ -613,6 +513,7 @@
 
 <script src="/static/js/api.js"></script>
 <script src="/static/js/attachments.js"></script>
+<script src="/static/js/orb.js"></script>
 <script src="/static/js/chat-ui.js"></script>
 <script src="/static/js/chat-tabs.js"></script>
 <script src="/static/js/chat-controls.js"></script>
@@ -621,5 +522,6 @@
 <script src="/static/js/companion.js"></script>
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/settings_os_paths.js"></script>
+<script>document.addEventListener('DOMContentLoaded', () => orb.init());</script>
 </body>
 </html>
