@@ -19,6 +19,10 @@
     "Windows": "intel",
     "Linux": "intel"
   },
+  "server_binary": "C:/AI/llama-cpp/llama-b8398-sycl/llama-server.exe",
+  "server_binaries": {
+    "Windows": "C:/AI/llama-cpp/llama-b8398-sycl/llama-server.exe"
+  },
   "server_args": {
     "ngl": {
       "flag": "-ngl",

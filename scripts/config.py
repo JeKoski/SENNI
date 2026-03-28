@@ -41,30 +41,36 @@ DEFAULTS = {
 
     # Per-OS paths — populated progressively as the user sets up on each OS
     # Keys match platform.system(): "Linux", "Windows", "Darwin"
-    "model_paths":  {},
-    "mmproj_paths": {},
-    "gpu_types":    {},
+    "model_paths":      {},
+    "mmproj_paths":     {},
+    "gpu_types":        {},
+
+    # llama-server binary — empty = auto-discover
+    # Per-OS so users can point different OSes at different builds
+    # (e.g. a SYCL build on Windows, PATH lookup on Linux)
+    "server_binary":    "",
+    "server_binaries":  {},
 
     # Built-in server args
     "server_args": {
         # Core — always on
-        "ngl":              {"enabled": True,  "value": 99,           "flag": "-ngl"},
-        "ctx":              {"enabled": True,  "value": 16384,        "flag": "-c"},
-        "np":               {"enabled": True,  "value": 1,            "flag": "-np"},
-        "ctk":              {"enabled": True,  "value": "q8_0",       "flag": "-ctk"},
-        "ctv":              {"enabled": True,  "value": "q8_0",       "flag": "-ctv"},
-        "jinja":            {"enabled": True,  "value": None,         "flag": "--jinja"},
-        "reasoning_format": {"enabled": True,  "value": "deepseek",   "flag": "--reasoning-format"},
+        "ngl":              {"enabled": True,  "value": 99,            "flag": "-ngl"},
+        "ctx":              {"enabled": True,  "value": 16384,         "flag": "-c"},
+        "np":               {"enabled": True,  "value": 1,             "flag": "-np"},
+        "ctk":              {"enabled": True,  "value": "q8_0",        "flag": "-ctk"},
+        "ctv":              {"enabled": True,  "value": "q8_0",        "flag": "-ctv"},
+        "jinja":            {"enabled": True,  "value": None,          "flag": "--jinja"},
+        "reasoning_format": {"enabled": True,  "value": "deepseek",    "flag": "--reasoning-format"},
         # KV cache / performance — on by default
-        "cache_reuse":      {"enabled": True,  "value": 256,          "flag": "--cache-reuse"},
-        "batch":            {"enabled": True,  "value": 256,          "flag": "-b"},
-        "ubatch":           {"enabled": True,  "value": 256,          "flag": "-ub"},
+        "cache_reuse":      {"enabled": True,  "value": 256,           "flag": "--cache-reuse"},
+        "batch":            {"enabled": True,  "value": 256,           "flag": "-b"},
+        "ubatch":           {"enabled": True,  "value": 256,           "flag": "-ub"},
         # Off by default — hardware/situation dependent
-        "flash_attn":       {"enabled": False, "value": None,         "flag": "--flash-attn"},
-        "prompt_cache":     {"enabled": False, "value": "senni.cache","flag": "--prompt-cache"},
-        "mlock":            {"enabled": False, "value": None,         "flag": "--mlock"},
-        "no_mmap":          {"enabled": False, "value": None,         "flag": "--no-mmap"},
-        "threads":          {"enabled": False, "value": 0,            "flag": "-t"},
+        "flash_attn":       {"enabled": False, "value": None,          "flag": "--flash-attn"},
+        "prompt_cache":     {"enabled": False, "value": "senni.cache", "flag": "--prompt-cache"},
+        "mlock":            {"enabled": False, "value": None,          "flag": "--mlock"},
+        "no_mmap":          {"enabled": False, "value": None,          "flag": "--no-mmap"},
+        "threads":          {"enabled": False, "value": 0,             "flag": "-t"},
     },
     "server_args_custom": [],
 
@@ -72,36 +78,32 @@ DEFAULTS = {
     "presence_presets": {
         "Default": {
             "thinking":  {"glowColor":"rgba(129,140,248,0.4)",  "glowMax":16, "glowSpeed":2.0, "ringSpeed":1.8, "dotColor":"#818cf8", "dotSpeed":1.2, "breathSpeed":3.0, "orbSize":52},
-            "streaming": {"glowColor":"rgba(109,212,168,0.35)", "glowMax":12, "glowSpeed":2.5, "ringSpeed":2.4, "dotColor":"#6dd4a8", "dotSpeed":1.4, "breathSpeed":3.0, "orbSize":52},
-            "heartbeat": {"glowColor":"rgba(167,139,250,0.45)", "glowMax":20, "glowSpeed":1.4, "ringSpeed":1.4, "dotColor":"#a78bfa", "dotSpeed":0.9, "breathSpeed":2.0, "orbSize":52},
-            "chaos":     {"glowColor":"rgba(251,191,36,0.5)",   "glowMax":24, "glowSpeed":0.8, "ringSpeed":0.9, "dotColor":"#fbbf24", "dotSpeed":0.6, "breathSpeed":0.6, "orbSize":52},
-            "idle":      {"glowColor":"rgba(129,140,248,0.15)", "glowMax":6,  "glowSpeed":4.0, "ringSpeed":4.0, "dotColor":"#818cf8", "dotSpeed":2.0, "breathSpeed":5.0, "orbSize":52},
+            "streaming": {"glowColor":"rgba(109,212,168,0.35)", "glowMax":12, "glowSpeed":2.5, "ringSpeed":2.4, "dotColor":"#6dd4a8", "dotSpeed":1.4, "breathSpeed":4.0, "orbSize":52},
+            "idle":      {"glowColor":"rgba(129,140,248,0.15)", "glowMax":6,  "glowSpeed":4.0, "ringSpeed":4.0, "dotColor":"#818cf8", "dotSpeed":3.0, "breathSpeed":5.0, "orbSize":52},
         },
         "Warm": {
-            "thinking":  {"glowColor":"rgba(251,146,60,0.4)",   "glowMax":16, "glowSpeed":2.0, "ringSpeed":1.8, "dotColor":"#fb923c", "dotSpeed":1.2, "breathSpeed":3.0, "orbSize":52},
-            "streaming": {"glowColor":"rgba(251,191,36,0.35)",  "glowMax":12, "glowSpeed":2.5, "ringSpeed":2.4, "dotColor":"#fbbf24", "dotSpeed":1.4, "breathSpeed":3.0, "orbSize":52},
-            "heartbeat": {"glowColor":"rgba(248,113,113,0.45)", "glowMax":20, "glowSpeed":1.4, "ringSpeed":1.4, "dotColor":"#f87171", "dotSpeed":0.9, "breathSpeed":2.0, "orbSize":52},
-            "chaos":     {"glowColor":"rgba(239,68,68,0.5)",    "glowMax":24, "glowSpeed":0.8, "ringSpeed":0.9, "dotColor":"#ef4444", "dotSpeed":0.6, "breathSpeed":0.6, "orbSize":52},
-            "idle":      {"glowColor":"rgba(251,146,60,0.15)",  "glowMax":6,  "glowSpeed":4.0, "ringSpeed":4.0, "dotColor":"#fb923c", "dotSpeed":2.0, "breathSpeed":5.0, "orbSize":52},
+            "thinking":  {"glowColor":"rgba(251,191,36,0.4)",   "glowMax":18, "glowSpeed":1.8, "ringSpeed":1.6, "dotColor":"#fbbf24", "dotSpeed":1.0, "breathSpeed":2.5, "orbSize":52},
+            "streaming": {"glowColor":"rgba(251,146,60,0.35)",  "glowMax":14, "glowSpeed":2.2, "ringSpeed":2.0, "dotColor":"#fb923c", "dotSpeed":1.2, "breathSpeed":3.5, "orbSize":52},
+            "idle":      {"glowColor":"rgba(251,191,36,0.12)",  "glowMax":6,  "glowSpeed":4.0, "ringSpeed":4.0, "dotColor":"#fb923c", "dotSpeed":2.0, "breathSpeed":5.0, "orbSize":52},
         },
     },
 
     # Generation defaults (per-request, no restart needed)
     "generation": {
-        "temperature":       0.8,
-        "top_p":             0.95,
-        "top_k":             40,
-        "min_p":             0.0,
-        "repeat_penalty":    1.1,
-        "presence_penalty":  0.0,
-        "frequency_penalty": 0.0,
-        "dry_multiplier":    0.0,
-        "dry_base":          1.75,
+        "temperature":        0.8,
+        "top_p":              0.95,
+        "top_k":              40,
+        "min_p":              0.0,
+        "repeat_penalty":     1.1,
+        "presence_penalty":   0.0,
+        "frequency_penalty":  0.0,
+        "dry_multiplier":     0.0,
+        "dry_base":           1.75,
         "dry_allowed_length": 2,
-        "max_tokens":        1024,
-        "max_tool_rounds":   8,
-        "vision_mode":       "always",
-        "markdown_enabled":  False,
+        "max_tokens":         1024,
+        "max_tool_rounds":    8,
+        "vision_mode":        "always",
+        "markdown_enabled":   False,
     },
 }
 
@@ -177,14 +179,13 @@ def detect_gpu() -> str:
                 capture_output=True, text=True, timeout=5
             )
             output = result.stdout.lower()
-            # Apple Silicon or any Mac with a GPU supports Metal
             if "apple" in output or "m1" in output or "m2" in output or "m3" in output or "m4" in output:
                 return "metal"
             if "intel" in output or "amd" in output or "radeon" in output or "nvidia" in output:
-                return "metal"  # All modern Macs use Metal regardless of GPU vendor
+                return "metal"
         except Exception:
             pass
-        return "metal"  # Safe default for any Mac — llama.cpp Metal works universally
+        return "metal"
 
     return "cpu"
 
@@ -194,37 +195,42 @@ def detect_gpu() -> str:
 def resolve_platform_paths(config: dict) -> dict:
     """
     Check if per-OS path dicts exist and use the current OS's entry.
-    Falls back to the flat model_path value if no per-OS entry is set.
-    The flat model_path / gpu_type values are always kept in sync with
-    the active OS so the rest of the codebase never needs to change.
+    Falls back to the flat value if no per-OS entry is set.
+    The flat values are always kept in sync with the active OS so the
+    rest of the codebase never needs to think about this.
     """
     system = platform.system()  # "Linux", "Windows", "Darwin"
 
+    # model_path, mmproj_path
     for key in ("model_path", "mmproj_path"):
-        multi = config.get(f"{key}s", {})  # e.g. "model_paths"
+        multi = config.get(f"{key}s", {})
         if multi and isinstance(multi, dict):
-            # Current OS has an entry → use it
             if system in multi and multi[system]:
                 config[key] = multi[system]
-            # No entry for this OS yet → leave flat value as-is
-            # (it will be written into the dict when the user saves from this OS)
 
+    # gpu_type
     gpu_types = config.get("gpu_types", {})
     if gpu_types and isinstance(gpu_types, dict):
         if system in gpu_types and gpu_types[system]:
             config["gpu_type"] = gpu_types[system]
+
+    # server_binary
+    server_binaries = config.get("server_binaries", {})
+    if server_binaries and isinstance(server_binaries, dict):
+        if system in server_binaries and server_binaries[system]:
+            config["server_binary"] = server_binaries[system]
 
     return config
 
 
 def update_platform_paths(config: dict) -> dict:
     """
-    Write the current flat model_path / mmproj_path / gpu_type values
-    back into the per-OS dicts so future OS-switches can find them.
-    Called by save_config() automatically.
+    Write the current flat values back into the per-OS dicts so future
+    OS-switches can find them. Called by save_config() automatically.
     """
     system = platform.system()
 
+    # model_path, mmproj_path
     for key in ("model_path", "mmproj_path"):
         multi_key = f"{key}s"
         if multi_key not in config or not isinstance(config[multi_key], dict):
@@ -233,11 +239,20 @@ def update_platform_paths(config: dict) -> dict:
         if val:
             config[multi_key][system] = val
 
+    # gpu_type
     if "gpu_types" not in config or not isinstance(config["gpu_types"], dict):
         config["gpu_types"] = {}
     gpu = config.get("gpu_type", "cpu")
     if gpu:
         config["gpu_types"][system] = gpu
+
+    # server_binary — only write if non-empty (empty means "auto-discover")
+    if "server_binaries" not in config or not isinstance(config["server_binaries"], dict):
+        config["server_binaries"] = {}
+    binary = config.get("server_binary", "")
+    if binary:
+        config["server_binaries"][system] = binary
+    # Don't write an empty string — that would shadow auto-discovery on this OS
 
     return config
 
@@ -248,7 +263,6 @@ def find_gguf_files() -> list[dict]:
     """
     Scan common directories for .gguf files.
     Returns a list of dicts: {path, name, size_gb}
-    Only returns files that actually exist.
     """
     found = []
     seen  = set()
@@ -277,8 +291,7 @@ def find_gguf_files() -> list[dict]:
 def find_mmproj_candidates(model_path: str) -> list[dict]:
     """
     Given a model file path, return a list of possible mmproj files
-    in the same directory — for the user to pick from, not auto-select.
-    Returns [{path, name}] or [] if none found.
+    in the same directory.
     """
     if not model_path:
         return []
@@ -376,6 +389,9 @@ def build_initial_config(
         "model_paths":  {system: model_path}  if model_path  else {},
         "mmproj_paths": {system: mmproj_path} if mmproj_path else {},
         "gpu_types":    {system: resolved_gpu},
+        # server_binary intentionally empty — auto-discover on first boot
+        "server_binary":   "",
+        "server_binaries": {},
     }
     return cfg
 
@@ -414,8 +430,8 @@ def load_companion_config(companion_folder: str) -> dict:
             },
         },
         # ── Moods ──
-        "moods":        {},    # { mood_name: { dotColor, glowColor, glowSpeed, ... } }
-        "active_mood":  None,  # name of currently active mood, or None
+        "moods":        {},
+        "active_mood":  None,
     }
     if not path.exists():
         return base

@@ -2,21 +2,21 @@
 
 // ── Built-in server args definition ──────────────────────────────────────────
 const BUILTIN_ARGS = [
-  { key:'ngl',              flag:'-ngl',                desc:'GPU layers to offload',                         type:'number', default:99,            defaultOn:true  },
-  { key:'ctx',              flag:'-c',                  desc:'Context window size',                           type:'number', default:16384,          defaultOn:true  },
-  { key:'np',               flag:'-np',                 desc:'Parallel slots',                               type:'number', default:1,              defaultOn:true  },
-  { key:'ctk',              flag:'-ctk',                desc:'KV cache key quantisation',                    type:'text',   default:'q8_0',         defaultOn:true  },
-  { key:'ctv',              flag:'-ctv',                desc:'KV cache value quantisation',                  type:'text',   default:'q8_0',         defaultOn:true  },
-  { key:'jinja',            flag:'--jinja',             desc:'Jinja2 chat templates (required for most models)', type:'flag', default:null,         defaultOn:true  },
-  { key:'reasoning_format', flag:'--reasoning-format',  desc:'Thinking format (deepseek for Qwen3)',          type:'text',   default:'deepseek',    defaultOn:true  },
-  { key:'cache_reuse',      flag:'--cache-reuse',       desc:'Reuse KV cache across turns (reduces re-processing)', type:'number', default:256,    defaultOn:true  },
-  { key:'batch',            flag:'-b',                  desc:'Batch size (prompt processing)',                type:'number', default:256,            defaultOn:true  },
-  { key:'ubatch',           flag:'-ub',                 desc:'Micro-batch size',                             type:'number', default:256,            defaultOn:true  },
-  { key:'flash_attn',       flag:'--flash-attn',        desc:'Flash attention — big speed win, needs compatible GPU', type:'flag', default:null,   defaultOn:false },
-  { key:'prompt_cache',     flag:'--prompt-cache',      desc:'Persist KV cache to disk (faster cold starts)', type:'text',  default:'senni.cache',  defaultOn:false },
-  { key:'mlock',            flag:'--mlock',             desc:'Lock model in RAM — prevents swapping',        type:'flag',   default:null,           defaultOn:false },
-  { key:'no_mmap',          flag:'--no-mmap',           desc:'Disable memory mapping',                      type:'flag',   default:null,           defaultOn:false },
-  { key:'threads',          flag:'-t',                  desc:'Thread count (0 = auto)',                      type:'number', default:0,              defaultOn:false },
+  { key:'ngl',              flag:'-ngl',                desc:'GPU layers to offload',                              type:'number', default:99,            defaultOn:true  },
+  { key:'ctx',              flag:'-c',                  desc:'Context window size',                                type:'number', default:16384,          defaultOn:true  },
+  { key:'np',               flag:'-np',                 desc:'Parallel slots',                                    type:'number', default:1,              defaultOn:true  },
+  { key:'ctk',              flag:'-ctk',                desc:'KV cache key quantisation',                         type:'text',   default:'q8_0',         defaultOn:true  },
+  { key:'ctv',              flag:'-ctv',                desc:'KV cache value quantisation',                       type:'text',   default:'q8_0',         defaultOn:true  },
+  { key:'jinja',            flag:'--jinja',             desc:'Jinja2 chat templates (required for most models)',   type:'flag',   default:null,           defaultOn:true  },
+  { key:'reasoning_format', flag:'--reasoning-format',  desc:'Thinking format (deepseek for Qwen3)',               type:'text',   default:'deepseek',     defaultOn:true  },
+  { key:'cache_reuse',      flag:'--cache-reuse',       desc:'Reuse KV cache across turns (reduces re-processing)',type:'number', default:256,            defaultOn:true  },
+  { key:'batch',            flag:'-b',                  desc:'Batch size (prompt processing)',                     type:'number', default:256,            defaultOn:true  },
+  { key:'ubatch',           flag:'-ub',                 desc:'Micro-batch size',                                  type:'number', default:256,            defaultOn:true  },
+  { key:'flash_attn',       flag:'--flash-attn',        desc:'Flash attention — big speed win, needs compatible GPU', type:'flag', default:null,          defaultOn:false },
+  { key:'prompt_cache',     flag:'--prompt-cache',      desc:'Persist KV cache to disk (faster cold starts)',      type:'text',   default:'senni.cache',  defaultOn:false },
+  { key:'mlock',            flag:'--mlock',             desc:'Lock model in RAM — prevents swapping',             type:'flag',   default:null,           defaultOn:false },
+  { key:'no_mmap',          flag:'--no-mmap',           desc:'Disable memory mapping',                            type:'flag',   default:null,           defaultOn:false },
+  { key:'threads',          flag:'-t',                  desc:'Thread count (0 = auto)',                           type:'number', default:0,              defaultOn:false },
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -55,11 +55,10 @@ function _spUpdateFooterButtons() {
     const footer = document.getElementById('sp-footer-' + tab);
     if (!footer) return;
     footer.querySelectorAll('.sp-btn-ghost, .sp-btn-primary').forEach(btn => {
-      // Only colour the Apply / Save buttons, not Restart/Reset
       if (btn.textContent.includes('Apply') || btn.textContent.includes('Save')) {
-        btn.style.background   = dirty ? 'rgba(251,191,36,0.15)'  : '';
-        btn.style.borderColor  = dirty ? 'rgba(251,191,36,0.5)'   : '';
-        btn.style.color        = dirty ? 'rgba(251,191,36,0.9)'   : '';
+        btn.style.background  = dirty ? 'rgba(251,191,36,0.15)' : '';
+        btn.style.borderColor = dirty ? 'rgba(251,191,36,0.5)'  : '';
+        btn.style.color       = dirty ? 'rgba(251,191,36,0.9)'  : '';
       }
     });
   });
@@ -126,7 +125,6 @@ function spShowSavedToast(msg = 'Saved ✓') {
 
 // ── Load — always fetches fresh from server ───────────────────────────────────
 async function spLoad() {
-  // Show a subtle loading state on the panel title
   const title = document.querySelector('.sp-title');
   const origTitle = title?.textContent || 'Settings';
   if (title) title.textContent = 'Loading…';
@@ -139,7 +137,6 @@ async function spLoad() {
     spPopulateGeneration();
     spPopulateCompanion();
     spPopulateAbout();
-    // Reset all dirty flags after fresh load
     spServerDirty = spGenerationDirty = spCompanionDirty = false;
     _spUpdateFooterButtons();
   } catch(e) {
@@ -150,27 +147,44 @@ async function spLoad() {
 }
 
 // ── Server tab ────────────────────────────────────────────────────────────────
+let _spScanResults = [];
+
 function spPopulateServer() {
   const cfg = spSettings.config || {};
 
-  fetch('/api/scan/models').then(r => r.json()).then(d => { _spScanResults = d.gguf_files || []; }).catch(() => {});
+  // Pre-fetch scan results for the fallback path match
+  fetch('/api/scan/models').then(r => r.json()).then(d => {
+    _spScanResults = d.gguf_files || [];
+  }).catch(() => {});
 
+  // Model path
   const mp = cfg.model_path || '';
   const md = document.getElementById('sp-model-display');
   md.textContent = mp ? mp.split(/[\\/]/).pop() : '—';
-  md.title = mp;
-  md.className = 'sp-file-display' + (mp ? ' set' : '');
+  md.title       = mp;
+  md.className   = 'sp-file-display' + (mp ? ' set' : '');
 
+  // mmproj path
   const mm  = cfg.mmproj_path || '';
   const mmd = document.getElementById('sp-mmproj-display');
   mmd.textContent = mm ? mm.split(/[\\/]/).pop() : 'No mmproj';
-  mmd.title = mm;
-  mmd.className = 'sp-file-display' + (mm ? ' set' : '');
+  mmd.title       = mm;
+  mmd.className   = 'sp-file-display' + (mm ? ' set' : '');
+
+  // llama-server binary path
+  const bin = cfg.server_binary || '';
+  const bnd = document.getElementById('sp-binary-display');
+  if (bnd) {
+    bnd.textContent = bin ? bin.split(/[\\/]/).pop() : 'Auto-detect';
+    bnd.title       = bin;
+    bnd.className   = 'sp-file-display' + (bin ? ' set' : '');
+  }
 
   document.getElementById('sp-gpu').value         = cfg.gpu_type    || 'cpu';
   document.getElementById('sp-port-bridge').value = cfg.port_bridge || 8000;
   document.getElementById('sp-port-model').value  = cfg.port_model  || 8081;
 
+  // Built-in args
   const savedArgs = cfg.server_args || {};
   const wrap = document.getElementById('sp-builtin-args');
   wrap.innerHTML = '';
@@ -197,6 +211,7 @@ function spPopulateServer() {
     wrap.appendChild(row);
   });
 
+  // Custom args
   const customWrap = document.getElementById('sp-custom-args');
   customWrap.innerHTML = '';
   (cfg.server_args_custom || []).forEach(c => spAddCustomArg(c.flag, c.value, c.enabled !== false));
@@ -232,46 +247,137 @@ function spAddCustomArg(flag='', value='', enabled=true) {
   if (!flag) row.querySelector('.sp-custom-flag').focus();
 }
 
-function spBrowse(type) {
-  document.getElementById('pick-' + type)?.click();
+// ── File browsing — uses native OS picker via /api/browse ────────────────────
+// Falls back to a manual text input if the server-side dialog isn't available.
+
+async function spBrowse(type) {
+  // type: 'model' | 'mmproj' | 'binary'
+  const dispId = type === 'binary' ? 'sp-binary-display'
+               : type === 'mmproj' ? 'sp-mmproj-display'
+               :                     'sp-model-display';
+  const disp = document.getElementById(dispId);
+
+  // Show a brief loading state on the display element
+  const originalText  = disp?.textContent;
+  const originalClass = disp?.className;
+  if (disp) { disp.textContent = '…'; }
+
+  try {
+    const res  = await fetch('/api/browse', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ type }),
+    });
+    const data = await res.json();
+
+    if (data.ok && data.path) {
+      _spApplyBrowsedPath(type, data.path);
+    } else if (data.reason !== 'cancelled') {
+      // Server-side dialog not available — show manual text input
+      if (disp) { disp.textContent = originalText; disp.className = originalClass; }
+      _spShowPathFallback(type, dispId);
+    } else {
+      // User cancelled — restore display
+      if (disp) { disp.textContent = originalText; disp.className = originalClass; }
+    }
+  } catch (e) {
+    if (disp) { disp.textContent = originalText; disp.className = originalClass; }
+    _spShowPathFallback(type, dispId);
+  }
 }
 
-function spNativePick(input, type) {
-  const file = input.files?.[0];
-  if (!file) return;
-  input.value = '';
-  const nameOnly = file.name;
-  const dispId   = 'sp-' + (type === 'model' ? 'model' : 'mmproj') + '-display';
-  const disp     = document.getElementById(dispId);
-  document.getElementById('sp-' + type + '-path-inp')?.remove();
-  const scanResults = _spScanResults || [];
-  const match = scanResults.find(f => f.name === nameOnly);
-  if (match) {
-    if (disp) { disp.textContent = nameOnly; disp.title = match.path; disp.className = 'sp-file-display set'; }
-    spMarkServerDirty();
-    return;
+function _spApplyBrowsedPath(type, path) {
+  const dispId = type === 'binary' ? 'sp-binary-display'
+               : type === 'mmproj' ? 'sp-mmproj-display'
+               :                     'sp-model-display';
+  const disp = document.getElementById(dispId);
+  if (disp) {
+    disp.textContent = path.split(/[\\/]/).pop();
+    disp.title       = path;
+    disp.className   = 'sp-file-display set';
   }
-  if (disp) { disp.textContent = nameOnly; disp.className = 'sp-file-display'; }
+  // Remove any stale fallback input for this type
+  document.getElementById('sp-' + type + '-path-inp')?.remove();
+  spMarkServerDirty();
+}
+
+function _spShowPathFallback(type, dispId) {
+  // Remove any existing fallback input for this type first
+  document.getElementById('sp-' + type + '-path-inp')?.remove();
+
+  const disp = document.getElementById(dispId);
+  if (!disp) return;
+
+  const placeholders = {
+    model:  '/path/to/model.gguf',
+    mmproj: '/path/to/mmproj.gguf',
+    binary: 'C:\\path\\to\\llama-server.exe',
+  };
+
   const inp = document.createElement('input');
   inp.type        = 'text';
   inp.id          = 'sp-' + type + '-path-inp';
-  inp.placeholder = `/path/to/${nameOnly}`;
-  inp.style.cssText = 'width:100%;margin-top:6px;background:rgba(0,0,0,0.2);border:1px solid rgba(129,140,248,0.3);border-radius:9px;color:var(--text);font-family:"DM Mono",monospace;font-size:12px;padding:9px 12px;outline:none;display:block';
+  inp.placeholder = placeholders[type] || '/path/to/file';
+  inp.value       = disp.title || '';
+  inp.style.cssText = [
+    'width:100%', 'margin-top:6px',
+    'background:rgba(0,0,0,0.2)',
+    'border:1px solid rgba(129,140,248,0.3)',
+    'border-radius:9px', 'color:var(--text)',
+    'font-family:"DM Mono",monospace', 'font-size:12px',
+    'padding:9px 12px', 'outline:none', 'display:block',
+  ].join(';');
+
   inp.addEventListener('input', () => {
     const val = inp.value.trim();
-    if (disp) { disp.textContent = val ? val.split(/[\/]/).pop() : nameOnly; disp.title = val; disp.className = 'sp-file-display' + (val ? ' set' : ''); }
+    if (disp) {
+      disp.textContent = val ? val.split(/[\\/]/).pop() : (type === 'binary' ? 'Auto-detect' : type === 'mmproj' ? 'No mmproj' : '—');
+      disp.title       = val;
+      disp.className   = 'sp-file-display' + (val ? ' set' : '');
+    }
     spMarkServerDirty();
   });
+
   const row = disp?.closest('.sp-file-row');
   if (row) row.insertAdjacentElement('afterend', inp);
   inp.focus();
 }
 
-let _spScanResults = [];
+// Legacy: only called by the hidden <input type="file"> elements which remain
+// as a last-resort fallback. Uses scan results to resolve full path if possible.
+function spNativePick(input, type) {
+  const file = input.files?.[0];
+  if (!file) return;
+  input.value = '';
+
+  const dispId = type === 'binary' ? 'sp-binary-display'
+               : type === 'mmproj' ? 'sp-mmproj-display'
+               :                     'sp-model-display';
+  const disp = document.getElementById(dispId);
+  document.getElementById('sp-' + type + '-path-inp')?.remove();
+
+  const match = (_spScanResults || []).find(f => f.name === file.name);
+  if (match) {
+    _spApplyBrowsedPath(type, match.path);
+    return;
+  }
+
+  // Name only, no full path — show it dimmed and open the fallback input
+  if (disp) { disp.textContent = file.name; disp.className = 'sp-file-display'; }
+  _spShowPathFallback(type, dispId);
+}
 
 function spClearMmproj() {
   const d = document.getElementById('sp-mmproj-display');
   d.textContent = 'No mmproj'; d.title = ''; d.className = 'sp-file-display';
+  document.getElementById('sp-mmproj-path-inp')?.remove();
+  spMarkServerDirty();
+}
+
+function spClearBinary() {
+  const d = document.getElementById('sp-binary-display');
+  if (d) { d.textContent = 'Auto-detect'; d.title = ''; d.className = 'sp-file-display'; }
+  document.getElementById('sp-binary-path-inp')?.remove();
   spMarkServerDirty();
 }
 
@@ -286,6 +392,7 @@ async function spSaveServer(andClose = false) {
       value:   arg.type === 'flag' ? null : (inp ? (arg.type==='number' ? Number(inp.value)||null : inp.value||null) : null),
     };
   });
+
   const customArgs = [];
   document.querySelectorAll('#sp-custom-args .sp-custom-row').forEach(row => {
     const tog   = row.querySelector('.sp-tog');
@@ -293,18 +400,22 @@ async function spSaveServer(andClose = false) {
     const value = row.querySelector('.sp-custom-val')?.value?.trim();
     if (flag) customArgs.push({ flag, value: value||null, enabled: tog?.classList.contains('on') ?? true });
   });
+
   await fetch('/api/settings/server', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model_path:         document.getElementById('sp-model-display').title || '',
+      model_path:         document.getElementById('sp-model-display').title  || '',
       mmproj_path:        document.getElementById('sp-mmproj-display').title || '',
+      server_binary:      document.getElementById('sp-binary-display')?.title || '',
       gpu_type:           document.getElementById('sp-gpu').value,
       port_bridge:        parseInt(document.getElementById('sp-port-bridge').value) || 8000,
       port_model:         parseInt(document.getElementById('sp-port-model').value)  || 8081,
       server_args:        serverArgs,
       server_args_custom: customArgs,
-    })
+    }),
   });
+
   _spClearDirty('server');
   document.getElementById('sp-restart-note').style.display = 'none';
   spShowSavedToast('Server settings saved ✓ — restart required');
@@ -341,8 +452,6 @@ function spToggleControlsVisible(tog) {
   tog.classList.toggle('on');
   const val = tog.classList.contains('on');
   if (typeof setControlsAlwaysVisible === 'function') setControlsAlwaysVisible(val);
-  // Controls-visible is localStorage only, no server save needed — but mark dirty
-  // so the yellow button appears as confirmation feedback
   _spSetDirty('generation');
 }
 
@@ -356,20 +465,20 @@ function spResetGeneration() {
 
 async function spSaveGeneration(andClose = false) {
   const gen = {
-    temperature:    parseFloat(document.getElementById('sp-temperature')?.value)    ?? 0.8,
-    top_p:          parseFloat(document.getElementById('sp-top-p')?.value)          ?? 0.95,
-    top_k:          parseInt(document.getElementById('sp-top-k')?.value)            ?? 40,
-    repeat_penalty: parseFloat(document.getElementById('sp-repeat-penalty')?.value) ?? 1.1,
-    max_tokens:     parseInt(document.getElementById('sp-max-tokens')?.value)       ?? 1024,
-    max_tool_rounds:parseInt(document.getElementById('sp-max-tool-rounds')?.value)  ?? 8,
-    vision_mode:    document.querySelector('#sp-vision-mode input[name="vision-mode"]:checked')?.value || 'always',
+    temperature:     parseFloat(document.getElementById('sp-temperature')?.value)    ?? 0.8,
+    top_p:           parseFloat(document.getElementById('sp-top-p')?.value)          ?? 0.95,
+    top_k:           parseInt(document.getElementById('sp-top-k')?.value)            ?? 40,
+    repeat_penalty:  parseFloat(document.getElementById('sp-repeat-penalty')?.value) ?? 1.1,
+    max_tokens:      parseInt(document.getElementById('sp-max-tokens')?.value)       ?? 1024,
+    max_tool_rounds: parseInt(document.getElementById('sp-max-tool-rounds')?.value)  ?? 8,
+    vision_mode:     document.querySelector('#sp-vision-mode input[name="vision-mode"]:checked')?.value || 'always',
     markdown_enabled: document.getElementById('tog-markdown')?.classList.contains('on') ?? true,
   };
   await fetch('/api/settings/generation', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(gen),
   });
-  // Update local cache
   if (spSettings.config) spSettings.config.generation = gen;
   _spClearDirty('generation');
   spShowSavedToast('Generation settings saved ✓');
@@ -416,196 +525,125 @@ function spPopulateCompanion() {
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${isActive
-          ? `<span style="font-size:11px;color:var(--green)">active</span>`
-          : `<button class="sp-btn-sm" onclick="spSetActiveCompanion('${c.folder}');event.stopPropagation()">Switch</button>
-             <button class="sp-btn-sm" style="background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.25);color:var(--red)" onclick="spConfirmDeleteCompanion('${c.folder}','${c.name.replace(/'/g,"\\'")}');event.stopPropagation()">Delete</button>`
+          ? '<span style="font-size:10px;color:var(--indigo);opacity:0.7">active</span>'
+          : `<button class="sp-btn-sm" onclick="spSwitchCompanion('${c.folder}')">Switch</button>
+             <button class="sp-btn-sm sp-btn-ghost" style="color:var(--red);border-color:rgba(248,113,113,0.25)"
+               onclick="spDeleteCompanion('${c.folder}','${c.name}')">✕</button>`
         }
       </div>`;
-    item.onclick = () => spEditCompanion(c.folder);
     listEl.appendChild(item);
   });
-  spEditCompanion(spActiveFolder);
-}
 
-async function spEditCompanion(folder) {
-  spActiveFolder = folder;
-  const cfg = spSettings || {};
-  const companions = cfg.companions || [];
-  const c = companions.find(x => x.folder === folder) || {};
-  const companionCfg = cfg.active_companion || {};
-
-  document.getElementById('sp-companion-name').value = c.name || '';
+  const active = spSettings.active_companion || {};
+  document.getElementById('sp-companion-name-input').value = active.companion_name || '';
 
   const preview = document.getElementById('sp-avatar-preview');
-  if (c.avatar_data) {
-    preview.innerHTML = `<img src="${c.avatar_data}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-  } else {
-    preview.innerHTML = '✦';
+  if (preview) {
+    const data = spSettings.companions?.find(c => c.folder === spActiveFolder)?.avatar_data || '';
+    preview.innerHTML = data
+      ? `<img src="${data}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
+      : '✦';
   }
-  document.getElementById('sp-crop-wrap').style.display = 'none';
 
-  const gen = companionCfg.generation || {};
-  document.getElementById('sp-c-temp').value = gen.temperature    !== undefined ? gen.temperature    : '';
-  document.getElementById('sp-c-topp').value = gen.top_p          !== undefined ? gen.top_p          : '';
-  document.getElementById('sp-c-rpen').value = gen.repeat_penalty !== undefined ? gen.repeat_penalty : '';
-  document.getElementById('sp-c-maxt').value = gen.max_tokens     !== undefined ? gen.max_tokens     : '';
+  const frc = document.getElementById('tog-force-read');
+  if (frc) frc.classList.toggle('on', active.force_read_before_write !== false);
 
-  const hb = companionCfg.heartbeat || {};
-  const hbTog = (id, val) => { const el = document.getElementById(id); if (el) el.classList.toggle('on', !!val); };
-  hbTog('hb-silent',   hb.silent_enabled);
-  hbTog('hb-message',  hb.message_enabled);
-  hbTog('hb-idle',     hb.idle_trigger);
-  hbTog('hb-conv-end', hb.conversation_end_trigger);
-  hbTog('hb-session',  hb.session_start_trigger);
-  hbTog('hb-ctx',      hb.context_threshold_trigger);
-  const idleMin = document.getElementById('hb-idle-min'); if (idleMin) idleMin.value = hb.idle_minutes         ?? 15;
-  const ctxPct  = document.getElementById('hb-ctx-pct');  if (ctxPct)  ctxPct.value  = hb.context_threshold_pct ?? 75;
+  const soulModeEl = document.getElementById('sp-soul-mode');
+  if (soulModeEl) soulModeEl.value = active.soul_edit_mode || 'locked';
 
-  const instr    = hb.instructions || {};
-  const instrVal = (key) => typeof instr === 'string' ? (key === 'default' ? instr : '') : (instr[key] || '');
-  ['default','idle','conversation-end','session-start','context-threshold','manual'].forEach(key => {
-    const el = document.getElementById(`hb-instr-${key}`);
-    if (el) el.value = instrVal(key.replace('-', '_'));
-  });
+  // Heartbeat toggles
+  const hb = active.heartbeat || {};
+  const setTog = (id, val) => document.getElementById(id)?.classList.toggle('on', !!val);
+  setTog('hb-tog-silent',   hb.silent_enabled);
+  setTog('hb-tog-message',  hb.message_enabled);
+  setTog('hb-tog-idle',     hb.idle_trigger);
+  setTog('hb-tog-conv-end', hb.conversation_end_trigger);
+  setTog('hb-tog-sess-start',hb.session_start_trigger);
+  setTog('hb-tog-ctx',      hb.context_threshold_trigger);
+  const idleMin = document.getElementById('hb-idle-minutes');
+  if (idleMin) idleMin.value = hb.idle_minutes ?? 15;
+  const ctxPct = document.getElementById('hb-ctx-pct');
+  if (ctxPct) ctxPct.value = hb.context_threshold_pct ?? 75;
 
-  const editorEl = document.getElementById('sp-companion-editor');
-  if (editorEl) editorEl.style.display = '';
-  await spLoadSoulFiles(folder);
+  const instr = hb.instructions || {};
+  const setInstr = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  setInstr('hb-instr-default',           instr.default           || '');
+  setInstr('hb-instr-idle',              instr.idle              || '');
+  setInstr('hb-instr-conversation-end',  instr.conversation_end  || '');
+  setInstr('hb-instr-session-start',     instr.session_start     || '');
+  setInstr('hb-instr-context-threshold', instr.context_threshold || '');
+  setInstr('hb-instr-manual',            instr.manual            || '');
+
+  // Soul files
+  spLoadSoulFiles();
 }
-
-async function spLoadSoulFiles(folder) {
-  try {
-    const res   = await fetch(`/api/settings/soul/${folder}`);
-    const data  = await res.json();
-    const files = data.files || {};
-    const tabsEl = document.getElementById('sp-soul-tabs');
-    tabsEl.innerHTML = '';
-    spCurrentSoulFile = null;
-    document.getElementById('sp-soul-content').value = '';
-    document.getElementById('sp-soul-save-btn').style.display = 'none';
-    Object.keys(files).forEach(fname => {
-      const tab = document.createElement('button');
-      tab.className = 'sp-soul-tab';
-      tab.textContent = fname;
-      tab.onclick = () => {
-        document.querySelectorAll('.sp-soul-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        spCurrentSoulFile = fname;
-        document.getElementById('sp-soul-content').value = files[fname];
-        document.getElementById('sp-soul-save-btn').style.display = 'inline-flex';
-      };
-      tabsEl.appendChild(tab);
-    });
-  } catch(e) {}
-}
-
-async function spSaveSoulFile() {
-  if (!spCurrentSoulFile) return;
-  const content = document.getElementById('sp-soul-content').value;
-  await fetch(`/api/settings/soul/${spActiveFolder}`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ filename: spCurrentSoulFile, content }),
-  });
-}
-
-function spNewSoulFile() {
-  const name = prompt('File name (e.g. identity.md):');
-  if (!name) return;
-  const fname = name.endsWith('.md') || name.endsWith('.txt') ? name : name + '.md';
-  const tabsEl = document.getElementById('sp-soul-tabs');
-  const tab = document.createElement('button');
-  tab.className = 'sp-soul-tab active';
-  tab.textContent = fname;
-  tab.onclick = () => {
-    document.querySelectorAll('.sp-soul-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    spCurrentSoulFile = fname;
-    document.getElementById('sp-soul-save-btn').style.display = 'inline-flex';
-  };
-  tabsEl.appendChild(tab);
-  spCurrentSoulFile = fname;
-  document.getElementById('sp-soul-content').value = '';
-  document.getElementById('sp-soul-save-btn').style.display = 'inline-flex';
-  document.querySelectorAll('.sp-soul-tab').forEach(t => t.classList.remove('active'));
-  tab.classList.add('active');
-}
-
-function spMarkCompanionDirty() { _spSetDirty('companion'); }
 
 async function spSaveCompanion(andClose = false) {
-  const editor = document.getElementById('sp-companion-editor');
-  if (!editor || editor.style.display === 'none') {
-    if (andClose) closeSettings();
-    return;
-  }
-  const gen = {};
-  const t = parseFloat(document.getElementById('sp-c-temp').value);
-  const p = parseFloat(document.getElementById('sp-c-topp').value);
-  const r = parseFloat(document.getElementById('sp-c-rpen').value);
-  const m = parseInt(document.getElementById('sp-c-maxt').value);
-  if (!isNaN(t) && document.getElementById('sp-c-temp').value !== '') gen.temperature    = t;
-  if (!isNaN(p) && document.getElementById('sp-c-topp').value !== '') gen.top_p          = p;
-  if (!isNaN(r) && document.getElementById('sp-c-rpen').value !== '') gen.repeat_penalty = r;
-  if (!isNaN(m) && document.getElementById('sp-c-maxt').value !== '') gen.max_tokens     = m;
+  const nameEl = document.getElementById('sp-companion-name-input');
+  const name   = nameEl?.value?.trim() || '';
 
-  const hb = {
-    silent_enabled:            document.getElementById('hb-silent')?.classList.contains('on')   || false,
-    message_enabled:           document.getElementById('hb-message')?.classList.contains('on')  || false,
-    idle_trigger:              document.getElementById('hb-idle')?.classList.contains('on')     || false,
-    conversation_end_trigger:  document.getElementById('hb-conv-end')?.classList.contains('on') || false,
-    session_start_trigger:     document.getElementById('hb-session')?.classList.contains('on')  || false,
-    context_threshold_trigger: document.getElementById('hb-ctx')?.classList.contains('on')      || false,
-    idle_minutes:    parseInt(document.getElementById('hb-idle-min')?.value) || 15,
-    context_threshold_pct: parseInt(document.getElementById('hb-ctx-pct')?.value) || 75,
+  const companions = spSettings.companions || [];
+  const avatarData = companions.find(c => c.folder === spActiveFolder)?.avatar_data || '';
+
+  const frc      = document.getElementById('tog-force-read');
+  const soulMode = document.getElementById('sp-soul-mode')?.value || 'locked';
+
+  const hbPayload = {
+    silent_enabled:            document.getElementById('hb-tog-silent')?.classList.contains('on')    || false,
+    message_enabled:           document.getElementById('hb-tog-message')?.classList.contains('on')   || false,
+    idle_trigger:              document.getElementById('hb-tog-idle')?.classList.contains('on')      || false,
+    idle_minutes:              parseInt(document.getElementById('hb-idle-minutes')?.value) || 15,
+    conversation_end_trigger:  document.getElementById('hb-tog-conv-end')?.classList.contains('on')  || false,
+    session_start_trigger:     document.getElementById('hb-tog-sess-start')?.classList.contains('on')|| false,
+    context_threshold_trigger: document.getElementById('hb-tog-ctx')?.classList.contains('on')       || false,
+    context_threshold_pct:     parseInt(document.getElementById('hb-ctx-pct')?.value) || 75,
     instructions: _spGetHeartbeatInstructions(),
   };
 
   await fetch('/api/settings/companion', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      folder:          spActiveFolder,
-      companion_name:  document.getElementById('sp-companion-name').value.trim(),
-      avatar_data:     document.getElementById('sp-avatar-preview').querySelector('img')?.src || '',
-      generation:      gen,
-      soul_edit_mode:  document.querySelector('#sp-soul-edit-mode input[name="soul-edit"]:checked')?.value || 'locked',
-      force_read_before_write: document.getElementById('tog-force-read')?.classList.contains('on') ?? true,
-      heartbeat: hb,
+      folder:                spActiveFolder,
+      companion_name:        name,
+      avatar_data:           avatarData,
+      soul_edit_mode:        soulMode,
+      force_read_before_write: frc ? frc.classList.contains('on') : true,
+      heartbeat:             hbPayload,
     }),
   });
 
-  // Update local cache so reopening shows correct values
-  if (spSettings?.active_companion) {
-    spSettings.active_companion.generation              = gen;
-    spSettings.active_companion.heartbeat               = hb;
-    spSettings.active_companion.force_read_before_write = document.getElementById('tog-force-read')?.classList.contains('on') ?? true;
+  if (spSettings.config) spSettings.config.companion_name = name;
+  if (typeof companionName !== 'undefined') {
+    companionName = name;
+    document.getElementById('companion-name').textContent = name;
+    document.title = name;
   }
 
-  if (typeof heartbeatReload === 'function') heartbeatReload();
-  spPopulateCompanion();
-  if (typeof syncStatusAvatar === 'function') syncStatusAvatar();
   _spClearDirty('companion');
-  spShowSavedToast('Companion saved ✓');
+  spShowSavedToast('Companion settings saved ✓');
   if (andClose) closeSettings();
 }
 
+// ── Companion switching / creation / deletion ─────────────────────────────────
 let _switchingCompanion = false;
-async function spSetActiveCompanion(folder) {
+
+async function spSwitchCompanion(folder) {
   if (_switchingCompanion) return;
   _switchingCompanion = true;
+
   const overlay = document.createElement('div');
   overlay.id = 'companion-switch-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px';
-  overlay.innerHTML = `
-    <div style="width:32px;height:32px;border-radius:50%;border:2px solid rgba(129,140,248,0.2);border-top-color:#818cf8;animation:spin .8s linear infinite"></div>
-    <div style="font-family:'DM Sans',sans-serif;font-size:14px;color:rgba(165,180,252,0.7)">Switching companion…</div>`;
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:"DM Sans",sans-serif;color:#eef0fb;font-size:15px';
+  overlay.textContent = 'Switching companion…';
   document.body.appendChild(overlay);
+
   try {
     await fetch('/api/settings/companion', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ folder, set_active: true }),
     });
-    spActiveFolder = folder;
-    closeSettings?.();
     window.location.reload();
   } catch (e) {
     document.getElementById('companion-switch-overlay')?.remove();
@@ -618,11 +656,23 @@ async function spNewCompanion() {
   const name = prompt('New companion name:');
   if (!name) return;
   const res  = await fetch('/api/settings/companion/new', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
   const data = await res.json();
   if (data.ok) await spLoad();
+}
+
+async function spDeleteCompanion(folder, name) {
+  if (!confirm(`Delete companion "${name}"? This cannot be undone.`)) return;
+  const res  = await fetch(`/api/companions/${folder}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.ok) {
+    await spLoad();
+  } else {
+    alert('Could not delete: ' + (data.error || 'unknown error'));
+  }
 }
 
 // ── About tab ─────────────────────────────────────────────────────────────────
@@ -634,10 +684,11 @@ function spPopulateAbout() {
   document.getElementById('about-companion').textContent = `${cfg.companion_name||'—'} (${cfg.companion_folder||'default'})`;
   document.getElementById('about-paths').innerHTML =
     `model: ${cfg.model_path||'—'}\n` +
-    (cfg.mmproj_path ? `mmproj: ${cfg.mmproj_path}\n` : '');
+    (cfg.mmproj_path   ? `mmproj: ${cfg.mmproj_path}\n`         : '') +
+    (cfg.server_binary ? `binary: ${cfg.server_binary}\n`       : '');
 }
 
-// ── Avatar (settings companion tab) ──────────────────────────────────────────
+// ── Avatar (companion settings tab) ──────────────────────────────────────────
 let spCropDragging2 = false;
 
 function spAvatarBrowse() { document.getElementById('sp-avatar-input')?.click(); }
@@ -655,18 +706,21 @@ function spAvatarDrop(e) {
   e.preventDefault();
   document.getElementById('sp-avatar-zone')?.classList.remove('drag-over');
   const file = e.dataTransfer.files?.[0];
-  if (file?.type.startsWith('image/')) {
-    const reader = new FileReader();
-    reader.onload = ev => spAvatarStartCrop(ev.target.result);
-    reader.readAsDataURL(file);
-  }
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => spAvatarStartCrop(ev.target.result);
+  reader.readAsDataURL(file);
 }
 
 function spAvatarStartCrop(src) {
+  const wrap = document.getElementById('sp-crop-wrap');
+  if (!wrap) return;
+  wrap.style.display = 'flex';
   spCropImg = new Image();
   spCropImg.onload = () => {
-    spCropX = 0; spCropY = 0; spCropScale = 1;
-    document.getElementById('sp-crop-wrap').style.display = 'block';
+    spCropX     = 0;
+    spCropY     = 0;
+    spCropScale = 1;
     spDrawCrop();
   };
   spCropImg.src = src;
@@ -676,42 +730,57 @@ function spDrawCrop() {
   const canvas = document.getElementById('sp-crop-canvas');
   if (!canvas || !spCropImg) return;
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 240, 240);
-  ctx.save();
-  ctx.translate(spCropX + 120, spCropY + 120);
-  ctx.scale(spCropScale, spCropScale);
-  ctx.drawImage(spCropImg, -spCropImg.width/2, -spCropImg.height/2, spCropImg.width, spCropImg.height);
-  ctx.restore();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(spCropImg, spCropX, spCropY, spCropImg.width * spCropScale, spCropImg.height * spCropScale);
   ctx.beginPath();
-  ctx.arc(120, 120, 119, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(129,140,248,0.5)';
-  ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.arc(canvas.width/2, canvas.height/2, canvas.width/2, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(129,140,248,0.8)';
+  ctx.lineWidth   = 2;
+  ctx.stroke();
 }
 
-function cropStart(e)  { spCropDragging = true; spCropDragStart = {x:e.clientX,y:e.clientY}; spCropPosStart = {x:spCropX,y:spCropY}; }
-function cropMove(e)   { if (!spCropDragging) return; spCropX = spCropPosStart.x+(e.clientX-spCropDragStart.x); spCropY = spCropPosStart.y+(e.clientY-spCropDragStart.y); spDrawCrop(); }
-function cropEnd()     { spCropDragging = false; }
-function cropTouchStart(e) { cropStart(e.touches[0]); }
-function cropTouchMove(e)  { e.preventDefault(); cropMove(e.touches[0]); }
-function spCropZoom(delta) { spCropScale = Math.max(0.1, spCropScale + delta); spDrawCrop(); }
+function spCropMouseDown(e) {
+  spCropDragging  = true;
+  spCropDragStart = { x: e.clientX, y: e.clientY };
+  spCropPosStart  = { x: spCropX, y: spCropY };
+}
 
-function spCropConfirm() {
-  const canvas = document.getElementById('sp-crop-canvas');
+function spCropMouseMove(e) {
+  if (!spCropDragging) return;
+  spCropX = spCropPosStart.x + (e.clientX - spCropDragStart.x);
+  spCropY = spCropPosStart.y + (e.clientY - spCropDragStart.y);
+  spDrawCrop();
+}
+
+function spCropMouseUp() { spCropDragging = false; }
+
+function spCropWheel(e) {
+  e.preventDefault();
+  spCropScale = Math.max(0.1, Math.min(5, spCropScale - e.deltaY * 0.001));
+  spDrawCrop();
+}
+
+function spCropApply() {
+  if (!spCropImg) return;
   const out = document.createElement('canvas');
   out.width = out.height = 240;
   const ctx = out.getContext('2d');
-  ctx.beginPath(); ctx.arc(120,120,120,0,Math.PI*2); ctx.clip();
-  ctx.drawImage(spCropImg, spCropX, spCropY, spCropImg.width*spCropScale, spCropImg.height*spCropScale);
+  ctx.beginPath(); ctx.arc(120, 120, 120, 0, Math.PI*2); ctx.clip();
+  ctx.drawImage(spCropImg, spCropX, spCropY, spCropImg.width * spCropScale, spCropImg.height * spCropScale);
   const dataUrl = out.toDataURL('image/png');
+
   const preview = document.getElementById('sp-avatar-preview');
   preview.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+
   const sidebarAvatar = document.getElementById('companion-avatar');
   if (sidebarAvatar) {
     sidebarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
   }
+
   const companions = spSettings?.companions || [];
   const c = companions.find(x => x.folder === spActiveFolder);
   if (c) c.avatar_data = dataUrl;
+
   spPopulateCompanion();
   document.getElementById('sp-crop-wrap').style.display = 'none';
   _spSetDirty('companion');
@@ -731,96 +800,105 @@ async function restartServer() {
   btn.textContent = '…';
   btn.disabled = true;
   try {
-    const res  = await fetch('/api/boot', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({force:true}) });
-    const data = await res.json();
-    if (!data.ok) {
-      appendSystemNote(`Could not restart: ${data.error || 'unknown error'}`);
-      btn.textContent = '↺'; btn.disabled = false;
-      return;
-    }
-    closeSettings();
-    showBootOverlay('Restarting model server…');
-    disableInput();
-    watchBootLog(async () => {
-      hideBootOverlay();
-      appendSystemNote('Model server ready ✓');
-      await loadStatus();
-      enableInput();
+    const res  = await fetch('/api/boot', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ force: true }),
     });
+    const data = await res.json();
+    if (data.ok) {
+      btn.textContent = '↺';
+      btn.disabled = false;
+    }
   } catch (e) {
-    appendSystemNote(`Restart failed: ${e.message}`);
-    btn.textContent = '↺'; btn.disabled = false;
+    btn.textContent = '↺';
+    btn.disabled = false;
   }
 }
 
-// ── Companion delete ──────────────────────────────────────────────────────────
-function spConfirmDeleteCompanion(folder, name) {
-  const id    = 'modal-del-' + Date.now();
-  const close = () => document.getElementById(id)?.remove();
-  const modal = document.createElement('div');
-  modal.id = id;
-  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:#21232e;border:1px solid rgba(248,113,113,0.3);border-radius:20px;padding:32px 36px;max-width:380px;width:90%;text-align:center">
-      <div style="font-family:'Lora',serif;font-size:18px;color:#eef0fb;margin-bottom:10px">Delete companion?</div>
-      <p style="font-size:13.5px;color:var(--text-muted);line-height:1.6;margin-bottom:20px">
-        This will permanently delete <strong style="color:var(--text)">${name}</strong> and all their memory files. This cannot be undone.
-      </p>
-      <div style="display:flex;gap:10px;justify-content:center">
-        <button id="${id}-cancel" style="background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-family:inherit;font-size:13px;padding:10px 20px;cursor:pointer">Cancel</button>
-        <button id="${id}-confirm" style="background:linear-gradient(135deg,#dc2626,#b91c1c);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:13px;font-weight:500;padding:10px 20px;cursor:pointer">Delete</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  document.getElementById(id + '-cancel').onclick  = close;
-  document.getElementById(id + '-confirm').onclick = () => { close(); spDeleteCompanion(folder); };
-  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+async function spRestartServer() {
+  if (!confirm('Restart llama-server with current settings?')) return;
+  spShowSavedToast('Restarting…');
+  await fetch('/api/boot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ force: true }),
+  });
 }
 
-async function spDeleteCompanion(folder) {
-  const res  = await fetch(`/api/companions/${folder}`, { method: 'DELETE' });
-  const data = await res.json();
-  if (!data.ok) { alert('Could not delete: ' + (data.error || 'unknown error')); return; }
-  await spLoad();
+async function spFactoryReset() {
+  if (!confirm('Factory reset? This will delete ALL companions, history, and settings. This cannot be undone.')) return;
+  await fetch('/api/factory-reset', { method: 'POST' });
+  window.location.reload();
 }
 
-// ── Factory reset ─────────────────────────────────────────────────────────────
-function spFactoryReset() {
-  const id    = 'modal-reset-' + Date.now();
-  const close = () => document.getElementById(id)?.remove();
-  const modal = document.createElement('div');
-  modal.id = id;
-  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:#21232e;border:1px solid rgba(248,113,113,0.35);border-radius:20px;padding:36px 40px;max-width:420px;width:90%;text-align:center">
-      <div style="font-family:'Lora',serif;font-size:20px;color:#eef0fb;margin-bottom:12px">Factory reset</div>
-      <p style="font-size:13.5px;color:var(--text-muted);line-height:1.6;margin-bottom:8px">This will permanently delete:</p>
-      <ul style="font-size:13px;color:var(--text-muted);text-align:left;margin:0 auto 20px;display:inline-block;line-height:1.9">
-        <li>All companions and their memory files</li>
-        <li>All conversation history</li>
-        <li>All configuration and settings</li>
-      </ul>
-      <p style="font-size:13px;color:var(--red);margin-bottom:22px;font-weight:500">This cannot be undone.</p>
-      <div style="display:flex;gap:10px;justify-content:center">
-        <button id="${id}-cancel" style="background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-family:inherit;font-size:14px;padding:11px 24px;cursor:pointer">Cancel</button>
-        <button id="${id}-confirm" style="background:linear-gradient(135deg,#dc2626,#b91c1c);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:500;padding:11px 24px;cursor:pointer">Reset everything</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  document.getElementById(id + '-cancel').onclick  = close;
-  document.getElementById(id + '-confirm').onclick = () => { close(); spExecuteFactoryReset(); };
-  modal.addEventListener('click', e => { if (e.target === modal) close(); });
-}
+// ── Soul file editor ──────────────────────────────────────────────────────────
+async function spLoadSoulFiles() {
+  const folder  = spActiveFolder;
+  const wrap    = document.getElementById('sp-soul-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:4px 0">Loading…</div>';
 
-async function spExecuteFactoryReset() {
   try {
-    Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => localStorage.removeItem(k));
-    const res  = await fetch('/api/factory-reset', { method: 'POST' });
+    const res  = await fetch(`/api/settings/soul/${folder}`);
     const data = await res.json();
-    if (!data.ok) { alert('Reset failed: ' + (data.errors || []).join(', ')); return; }
-    window.location.href = '/wizard';
-  } catch (e) { alert('Reset failed: ' + e.message); }
+    const files = data.files || {};
+
+    wrap.innerHTML = '';
+    if (!Object.keys(files).length) {
+      wrap.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:4px 0">No soul files yet.</div>';
+      return;
+    }
+
+    Object.entries(files).forEach(([fname, content]) => {
+      const btn = document.createElement('button');
+      btn.className = 'sp-soul-btn' + (spCurrentSoulFile === fname ? ' active' : '');
+      btn.textContent = fname;
+      btn.onclick = () => spEditSoulFile(fname, content);
+      wrap.appendChild(btn);
+    });
+  } catch (e) {
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--red);padding:4px 0">Could not load soul files.</div>';
+  }
 }
 
-// Alias used by settings panel buttons
-const spRestartServer = restartServer;
+function spEditSoulFile(fname, content) {
+  spCurrentSoulFile = fname;
+  document.querySelectorAll('.sp-soul-btn').forEach(b =>
+    b.classList.toggle('active', b.textContent === fname));
+  const editor  = document.getElementById('sp-soul-editor');
+  const nameEl  = document.getElementById('sp-soul-filename');
+  if (editor) editor.value   = content;
+  if (nameEl) nameEl.textContent = fname;
+  document.getElementById('sp-soul-editor-wrap')?.style && (document.getElementById('sp-soul-editor-wrap').style.display = 'flex');
+}
+
+async function spSaveSoulFile() {
+  const fname   = spCurrentSoulFile;
+  const content = document.getElementById('sp-soul-editor')?.value || '';
+  if (!fname) return;
+  await fetch(`/api/settings/soul/${spActiveFolder}`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ filename: fname, content }),
+  });
+  spShowSavedToast(`${fname} saved ✓`);
+}
+
+async function spDeleteSoulFile() {
+  const fname = spCurrentSoulFile;
+  if (!fname || !confirm(`Delete ${fname}? This cannot be undone.`)) return;
+  const res  = await fetch(`/api/settings/soul/${spActiveFolder}/delete`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ filename: fname }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    spCurrentSoulFile = null;
+    document.getElementById('sp-soul-editor-wrap').style.display = 'none';
+    spLoadSoulFiles();
+  } else {
+    alert(data.error || 'Could not delete.');
+  }
+}

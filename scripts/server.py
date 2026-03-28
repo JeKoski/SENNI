@@ -71,16 +71,18 @@ if STATIC_DIR.exists():
 
 # ── Global state ───────────────────────────────────────────────────────────────
 
-_tool_manifest: list[dict] = []   # populated at startup
+_tool_manifest: list[dict] = []
 _llama_process: subprocess.Popen | None = None
-_boot_log:      list[str]  = []   # all log lines since last (re)start
+_boot_log:      list[str]  = []
 _boot_ready:    bool       = False
 
 # Prevent simultaneous boot calls from spawning duplicate processes
 _boot_lock = threading.Lock()
 
-# Thread pool for running synchronous tool handlers without blocking the event loop
-_tool_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tool")
+# Thread pool for synchronous work (tool handlers, tkinter file dialogs).
+# tkinter on Windows must not run on the asyncio event loop thread — routing
+# all GUI and blocking I/O through this executor keeps the loop free.
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="senni-worker")
 
 
 # ── Startup / shutdown ─────────────────────────────────────────────────────────
@@ -91,10 +93,8 @@ async def on_startup():
     _tool_manifest = load_tools()
     log.info("Server ready. %d tools loaded.", len(_tool_manifest))
 
-    # Register cleanup so llama-server is killed if Python exits unexpectedly
     atexit.register(_kill_llama_server)
 
-    # Auto-backup on every bridge start
     try:
         from scripts.auto_backup import run_backup
         run_backup(PROJECT_ROOT)
@@ -104,10 +104,9 @@ async def on_startup():
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    """Clean up llama-server and thread pool when uvicorn shuts down."""
     log.info("Shutting down — stopping llama-server…")
     _kill_llama_server()
-    _tool_executor.shutdown(wait=False)
+    _executor.shutdown(wait=False)
 
 
 def _kill_llama_server():
@@ -138,7 +137,6 @@ def _kill_llama_server():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    """Send the user to the wizard on first run, chat otherwise."""
     config = load_config()
     if config.get("first_run", True):
         return FileResponse(str(STATIC_DIR / "wizard.html"))
@@ -155,16 +153,12 @@ async def chat():
     return FileResponse(str(STATIC_DIR / "chat.html"))
 
 
-# ── API: scan (wizard step 1 data) ────────────────────────────────────────────
+# ── API: scan ─────────────────────────────────────────────────────────────────
 
 @app.get("/api/scan")
 async def api_scan():
-    """Return detected GPU and current platform."""
     gpu = detect_gpu()
-    return {
-        "gpu_detected": gpu,
-        "platform":     platform.system(),
-    }
+    return {"gpu_detected": gpu, "platform": platform.system()}
 
 
 @app.get("/api/scan/models")
@@ -179,35 +173,68 @@ async def api_mmproj_candidates(model_path: str = ""):
     return {"candidates": candidates}
 
 
-@app.post("/api/browse")
-async def api_browse(request: Request):
-    """Open the OS native file picker on the server machine."""
-    body      = await request.json()
-    file_type = body.get("type", "model")
-    title     = "Select mmproj file" if file_type == "mmproj" else "Select model file (.gguf)"
+# ── API: browse (native OS file picker) ───────────────────────────────────────
 
+def _run_file_dialog(title: str, filetypes: list) -> str | None:
+    """
+    Open a native OS file-picker dialog using tkinter.
+    Must be called from a worker thread — NOT the asyncio event loop thread.
+    On Windows, tkinter requires its own thread separate from the event loop.
+    Returns the selected path string, or None if cancelled / unavailable.
+    """
     try:
         import tkinter as tk
         from tkinter import filedialog
+
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
-        path = filedialog.askopenfilename(
-            title=title,
-            filetypes=[("GGUF model files", "*.gguf"), ("All files", "*.*")],
-        )
+        root.lift()
+        root.update()
+        path = filedialog.askopenfilename(title=title, filetypes=filetypes)
         root.destroy()
-        if path:
-            return {"ok": True, "path": path}
-        return {"ok": False, "reason": "cancelled"}
+        return path or None
+    except Exception:
+        return None
+
+
+@app.post("/api/browse")
+async def api_browse(request: Request):
+    """
+    Open the OS native file picker on the server machine.
+    Supported types: "model" | "mmproj" | "binary"
+    Returns {ok: true, path} or {ok: false, reason}.
+    """
+    body      = await request.json()
+    file_type = body.get("type", "model")
+
+    if file_type == "binary":
+        title     = "Select llama-server binary"
+        filetypes = [("Executable", "*.exe")] if IS_WIN else [("All files", "*")]
+    elif file_type == "mmproj":
+        title     = "Select mmproj file"
+        filetypes = [("GGUF files", "*.gguf"), ("All files", "*.*")]
+    else:
+        title     = "Select model file (.gguf)"
+        filetypes = [("GGUF files", "*.gguf"), ("All files", "*.*")]
+
+    loop = asyncio.get_event_loop()
+    try:
+        path = await loop.run_in_executor(
+            _executor,
+            lambda: _run_file_dialog(title, filetypes),
+        )
     except Exception as e:
         return {"ok": False, "reason": str(e)}
+
+    if path:
+        return {"ok": True, "path": path}
+    return {"ok": False, "reason": "cancelled"}
 
 
 # ── API: status ────────────────────────────────────────────────────────────────
 
 def _merged_presence_presets(global_cfg: dict, companion_cfg: dict) -> dict:
-    """Merge global presence presets with per-companion additions/overrides."""
     base    = dict(DEFAULTS.get("presence_presets", {}))
     global_ = global_cfg.get("presence_presets", {})
     local   = companion_cfg.get("presence_presets", {})
@@ -221,7 +248,6 @@ def _merged_presence_presets(global_cfg: dict, companion_cfg: dict) -> dict:
 
 @app.get("/api/status")
 async def api_status():
-    """Return current config, loaded tool names, and model status."""
     config = load_config()
 
     process_alive = (
@@ -231,7 +257,6 @@ async def api_status():
     model_running = process_alive and _boot_ready
 
     companion_cfg = load_companion_config(config.get("companion_folder", "default"))
-
     ctx_size      = config.get("server_args", {}).get("ctx", {}).get("value", 16384)
     global_gen    = config.get("generation", {})
     companion_gen = companion_cfg.get("generation", {})
@@ -258,9 +283,7 @@ async def api_status():
 
 @app.post("/api/setup")
 async def api_setup(request: Request):
-    """Receive wizard form data, save config, create companion folder structure."""
     body = await request.json()
-
     config = build_initial_config(
         model_path  = body.get("model_path", ""),
         mmproj_path = body.get("mmproj_path", ""),
@@ -269,7 +292,6 @@ async def api_setup(request: Request):
         port_bridge = int(body.get("port_bridge", 8000)),
         port_model  = int(body.get("port_model", 8081)),
     )
-
     get_companion_paths(config["companion_folder"])
     save_config(config)
     log.info("Config saved. Companion folder: %s", config["companion_folder"])
@@ -282,7 +304,7 @@ async def api_setup(request: Request):
 async def api_boot(request: Request):
     """
     Start llama-server if not already running.
-    Pass {"force": true} to kill and restart (used by the Restart button).
+    Pass {"force": true} to kill and restart.
     """
     global _llama_process, _boot_log, _boot_ready
 
@@ -307,7 +329,6 @@ async def api_boot(request: Request):
             log.info("llama-server already running (pid %s), skipping boot", _llama_process.pid)
             return {"ok": True, "already_running": True}
 
-        # Terminate any existing process (forced restart or crashed process)
         if _llama_process and _llama_process.poll() is None:
             log.info("Stopping llama-server (pid %s) before relaunch…", _llama_process.pid)
             _kill_llama_server()
@@ -322,55 +343,58 @@ async def api_boot(request: Request):
 
 def _build_and_launch(config: dict):
     """
-    Build the llama-server command for the current OS/GPU and launch it in a
-    background daemon thread. Must be called with _boot_lock held.
+    Build the llama-server command for the current OS/GPU and launch it
+    in a background daemon thread. Must be called with _boot_lock held.
     """
     IS_MAC = platform.system() == "Darwin"
     gpu    = config.get("gpu_type", "cpu")
 
     # ── Resolve llama-server binary ───────────────────────────────────────────
-    model_dir  = Path(config["model_path"]).parent
+    # Priority:
+    #   1. Explicit path from config (set in Settings → Server)
+    #   2. Auto-discovery relative to model file
+    #   3. shutil.which() PATH lookup
     server_exe = "llama-server.exe" if IS_WIN else "llama-server"
 
-    candidates = [
-        # Next to the model file (common llama.cpp build layout)
-        model_dir / server_exe,
-        model_dir.parent / "bin" / server_exe,
-        model_dir.parent.parent / "build" / "bin" / server_exe,
-        # macOS Homebrew / common build locations
-        Path("/usr/local/bin") / server_exe,
-        Path("/opt/homebrew/bin") / server_exe,
-        Path.home() / "llama.cpp" / "build" / "bin" / server_exe,
-    ]
-    # Use the first path that actually exists on disk
-    binary = next((str(c) for c in candidates if c.exists()), None)
+    binary = config.get("server_binary", "").strip() or None
 
-    # Fall back to PATH lookup (shutil.which handles Windows .exe extension correctly)
-    if binary is None:
+    if not binary:
+        model_dir  = Path(config["model_path"]).parent
+        candidates = [
+            model_dir / server_exe,
+            model_dir.parent / "bin" / server_exe,
+            model_dir.parent.parent / "build" / "bin" / server_exe,
+            Path("/usr/local/bin") / server_exe,
+            Path("/opt/homebrew/bin") / server_exe,
+            Path.home() / "llama.cpp" / "build" / "bin" / server_exe,
+        ]
+        binary = next((str(c) for c in candidates if c.exists()), None)
+
+    if not binary:
         binary = shutil.which(server_exe) or server_exe
+
+    log.info("llama-server binary: %s", binary)
 
     # ── Build argument list ───────────────────────────────────────────────────
     cmd_args = build_server_command(config, binary)
 
-    # ── Build OS/GPU-specific launch parameters ───────────────────────────────
+    # ── OS/GPU-specific launch parameters ────────────────────────────────────
     env = os.environ.copy()
 
     if IS_WIN:
         if gpu == "intel":
             # Intel SYCL needs oneAPI environment sourced via setvars.bat.
-            # This requires cmd.exe chaining, so shell=True is unavoidable here.
+            # This requires cmd.exe chaining so shell=True is unavoidable here.
             oneapi  = r"C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
             cmd_str = " ".join(f'"{a}"' for a in cmd_args)
             full_cmd   = f'"{oneapi}" intel64 && {cmd_str}'
             shell_args = {
                 "shell": True,
-                # CREATE_NO_WINDOW: suppress the cmd.exe console popup on Windows
                 "creationflags": subprocess.CREATE_NO_WINDOW,
             }
             env["ONEAPI_DEVICE_SELECTOR"] = "level_zero:gpu"
         else:
-            # NVIDIA / AMD / CPU — pass as a list so the OS handles quoting
-            # correctly even for paths with spaces. No shell needed.
+            # NVIDIA / AMD / CPU — list + shell=False handles spaces in paths correctly
             full_cmd   = cmd_args
             shell_args = {
                 "shell": False,
@@ -380,7 +404,6 @@ def _build_and_launch(config: dict):
                 env.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
     elif IS_MAC:
-        # macOS: Metal is automatic — no env setup needed.
         full_cmd   = cmd_args
         shell_args = {"shell": False}
 
@@ -408,9 +431,7 @@ def _build_and_launch(config: dict):
 
 def _run_subprocess(full_cmd, shell_args: dict, env: dict):
     """
-    Launch llama-server, tee every output line to:
-      1. _boot_log  (read by the SSE stream → browser)
-      2. Python's stdout (visible in the terminal)
+    Launch llama-server, tee every output line to _boot_log and stdout.
     Stays alive after _boot_ready so runtime logs keep flowing.
     """
     global _llama_process, _boot_log, _boot_ready
@@ -434,14 +455,10 @@ def _run_subprocess(full_cmd, shell_args: dict, env: dict):
             line = line.rstrip()
             if not line:
                 continue
-
             print(f"[llama-server] {line}", flush=True)
-
             _boot_log.append(line)
-            # Cap log size to avoid unbounded growth
             if len(_boot_log) > 2000:
                 _boot_log = _boot_log[-1000:]
-
             lower = line.lower()
             if "server is listening" in lower or "http server listening" in lower:
                 _boot_ready = True
@@ -452,12 +469,10 @@ def _run_subprocess(full_cmd, shell_args: dict, env: dict):
         _boot_log.append(f"[exited with code {rc}]")
 
     except FileNotFoundError:
-        # Binary not found — give a clear message instead of a traceback
-        exe = full_cmd[0] if isinstance(full_cmd, list) else full_cmd.split()[0]
+        exe = full_cmd[0] if isinstance(full_cmd, list) else str(full_cmd).split()[0]
         msg = (
             f"[launcher error] llama-server not found: {exe!r}\n"
-            f"Make sure llama-server{'exe' if IS_WIN else ''} is on your PATH "
-            f"or next to your model file."
+            f"Set the binary path in Settings → Server, or add llama-server to your PATH."
         )
         print(msg, flush=True)
         _boot_log.append(msg)
@@ -472,11 +487,6 @@ def _run_subprocess(full_cmd, shell_args: dict, env: dict):
 
 @app.get("/api/boot/log")
 async def api_boot_log():
-    """
-    SSE stream of llama-server log lines.
-    Streams everything in _boot_log, then polls for new lines.
-    Sends {ready: true} once when _boot_ready becomes True.
-    """
     async def generate() -> AsyncGenerator[str, None]:
         sent       = 0
         ready_sent = False
@@ -492,17 +502,13 @@ async def api_boot_log():
 
             await asyncio.sleep(1.0 if ready_sent else 0.2)
 
-            # Stop streaming once a restarted process has exited
             if ready_sent and _llama_process and _llama_process.poll() is not None:
                 break
 
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control":     "no-cache",
-            "X-Accel-Buffering": "no",
-        },
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
@@ -510,14 +516,9 @@ async def api_boot_log():
 
 @app.api_route("/irina/message", methods=["GET", "POST", "OPTIONS"])
 async def mcp_handler(request: Request):
-    """
-    MCP (Model Context Protocol) bridge.
-    The model calls this endpoint to use tools.
-    """
     if request.method == "OPTIONS":
         return Response(status_code=200)
 
-    # SSE discovery handshake (GET)
     if request.method == "GET":
         return Response(
             content="event: endpoint\ndata: /irina/message\n\n",
@@ -528,7 +529,6 @@ async def mcp_handler(request: Request):
     method = data.get("method")
     req_id = data.get("id", 1)
 
-    # ── initialize ────────────────────────────────────────────────────────────
     if method == "initialize":
         return {
             "jsonrpc": "2.0",
@@ -540,15 +540,10 @@ async def mcp_handler(request: Request):
             },
         }
 
-    # ── tools/list ────────────────────────────────────────────────────────────
     if method == "tools/list":
-        clean = [
-            {k: v for k, v in t.items() if k != "handler"}
-            for t in _tool_manifest
-        ]
+        clean = [{k: v for k, v in t.items() if k != "handler"} for t in _tool_manifest]
         return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": clean}}
 
-    # ── tools/call ────────────────────────────────────────────────────────────
     if method == "tools/call":
         params    = data.get("params", {})
         tool_name = params.get("name")
@@ -567,12 +562,10 @@ async def mcp_handler(request: Request):
                 "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"},
             }
 
-        # Run the synchronous tool handler in a thread so we don't block the
-        # event loop (critical on Windows where file I/O is slower).
         try:
             loop   = asyncio.get_event_loop()
             result = await loop.run_in_executor(
-                _tool_executor,
+                _executor,
                 lambda: tool["handler"](args),
             )
         except Exception as e:
@@ -585,7 +578,6 @@ async def mcp_handler(request: Request):
             "result": {"content": [{"type": "text", "text": str(result)}]},
         }
 
-    # ── fallback ──────────────────────────────────────────────────────────────
     return {"jsonrpc": "2.0", "id": req_id, "result": {}}
 
 
@@ -597,14 +589,12 @@ TEMPLATES_DIR = PROJECT_ROOT / "templates"
 async def api_list_templates():
     if not TEMPLATES_DIR.exists():
         return {"templates": []}
-    files = {f.name: f.read_text(encoding="utf-8")
-             for f in TEMPLATES_DIR.glob("*.md")}
+    files = {f.name: f.read_text(encoding="utf-8") for f in TEMPLATES_DIR.glob("*.md")}
     return {"templates": files}
 
 
 @app.post("/api/templates/apply")
 async def api_apply_template(request: Request):
-    """Copy a template file into a companion folder."""
     body          = await request.json()
     comp_folder   = body.get("companion_folder", "default")
     tname         = body.get("template_name", "")
@@ -622,11 +612,10 @@ async def api_apply_template(request: Request):
     return {"ok": True, "path": str(dst)}
 
 
-# ── Companion delete ──────────────────────────────────────────────────────────
+# ── Companion management ──────────────────────────────────────────────────────
 
 @app.delete("/api/companions/{folder}")
 async def api_delete_companion(folder: str):
-    """Permanently delete a companion folder."""
     config = load_config()
     if config.get("companion_folder") == folder:
         return {"ok": False, "error": "Cannot delete the active companion. Switch to another first."}
@@ -645,7 +634,6 @@ async def api_delete_companion(folder: str):
 
 @app.post("/api/factory-reset")
 async def api_factory_reset():
-    """Full factory reset — shuts down llama-server, deletes ALL companions and config."""
     global _boot_log, _boot_ready
 
     _kill_llama_server()
@@ -653,7 +641,6 @@ async def api_factory_reset():
     _boot_ready = False
 
     errors = []
-
     if COMPANIONS_DIR.exists():
         try:
             shutil.rmtree(str(COMPANIONS_DIR))
@@ -678,7 +665,6 @@ async def api_factory_reset():
 
 @app.post("/api/shutdown-model")
 async def api_shutdown_model():
-    """Shut down llama-server without resetting config. Used by the wizard."""
     global _boot_log, _boot_ready
     _kill_llama_server()
     _boot_log   = []
@@ -690,7 +676,6 @@ async def api_shutdown_model():
 
 @app.get("/api/settings")
 async def api_get_settings():
-    """Return full config + all companion configs for the settings panel."""
     config     = load_config()
     companions = list_companions()
     active_cfg = load_companion_config(config.get("companion_folder", "default"))
@@ -709,12 +694,12 @@ async def api_get_settings():
 
 @app.post("/api/settings/server")
 async def api_save_server_settings(request: Request):
-    """Save server-level settings. These require a bridge restart."""
     body   = await request.json()
     config = load_config()
 
+    # server_binary included — update_platform_paths will persist it per-OS
     for key in ("model_path", "mmproj_path", "gpu_type", "port_bridge",
-                "port_model", "server_args", "server_args_custom"):
+                "port_model", "server_args", "server_args_custom", "server_binary"):
         if key in body:
             config[key] = body[key]
 
@@ -724,7 +709,6 @@ async def api_save_server_settings(request: Request):
 
 @app.delete("/api/settings/os-paths")
 async def api_delete_os_paths(request: Request):
-    """Remove a saved per-OS model/mmproj/gpu entry from config."""
     body   = await request.json()
     os_key = body.get("os", "")
     if not os_key:
@@ -732,13 +716,13 @@ async def api_delete_os_paths(request: Request):
 
     config  = load_config()
     changed = False
-    for field in ("model_paths", "mmproj_paths", "gpu_types"):
+    # Include server_binaries so removing an OS entry cleans everything up
+    for field in ("model_paths", "mmproj_paths", "gpu_types", "server_binaries"):
         if os_key in config.get(field, {}):
             del config[field][os_key]
             changed = True
 
     if changed:
-        # Write directly to avoid update_platform_paths re-adding the deleted entry
         CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
         log.info("Removed OS paths entry for: %s", os_key)
 
@@ -747,7 +731,6 @@ async def api_delete_os_paths(request: Request):
 
 @app.post("/api/settings/generation")
 async def api_save_generation_settings(request: Request):
-    """Save global generation defaults. No restart needed."""
     body   = await request.json()
     config = load_config()
     config["generation"] = {
@@ -761,7 +744,6 @@ async def api_save_generation_settings(request: Request):
 
 @app.post("/api/settings/companion")
 async def api_save_companion_settings(request: Request):
-    """Save per-companion config: name, avatar, generation overrides, etc."""
     body             = await request.json()
     config           = load_config()
     companion_folder = body.get("folder", config.get("companion_folder", "default"))
@@ -786,7 +768,6 @@ async def api_save_companion_settings(request: Request):
 
 @app.post("/api/settings/companion/new")
 async def api_new_companion(request: Request):
-    """Create a new companion folder with default config."""
     body   = await request.json()
     name   = body.get("name", "new companion").strip()
     folder = name.lower().replace(" ", "_")[:32]
@@ -807,7 +788,6 @@ async def api_new_companion(request: Request):
 
 @app.get("/api/settings/soul/{folder}")
 async def api_get_soul_files(folder: str):
-    """Return all soul/ file contents for a companion (skips blank files)."""
     soul_dir = COMPANIONS_DIR / folder / "soul"
     files = {}
     if soul_dir.exists():
@@ -820,7 +800,6 @@ async def api_get_soul_files(folder: str):
 
 @app.post("/api/settings/soul/{folder}/delete")
 async def api_delete_soul_file(folder: str, request: Request):
-    """Delete a specific file from a companion's soul/ folder."""
     body     = await request.json()
     filename = body.get("filename", "").strip()
     if not filename or "/" in filename or "\\" in filename:
@@ -836,7 +815,6 @@ async def api_delete_soul_file(folder: str, request: Request):
 
 @app.post("/api/settings/soul/{folder}")
 async def api_save_soul_file(folder: str, request: Request):
-    """Write a soul/ file for a companion."""
     body     = await request.json()
     filename = body.get("filename", "").strip()
     content  = body.get("content", "")
@@ -846,5 +824,3 @@ async def api_save_soul_file(folder: str, request: Request):
     soul_dir.mkdir(parents=True, exist_ok=True)
     (soul_dir / filename).write_text(content, encoding="utf-8")
     return {"ok": True}
-
-
