@@ -7,6 +7,9 @@ or just *Senni* for short
 
 S.E.N.N.I is a fully local framework for creating and interacting with your own AI assistants and companions.
 
+<img width="1336" height="922" alt="screencap-senni" src="https://github.com/user-attachments/assets/5bc12e79-28a6-4ef2-b068-5763445dd1dc" />
+
+
 ## Focus is on:
 - **Local & Private** — Everything happens on your own computer. No cloud.
 - **Fully GUI driven** — A clean interface where you can manage everything without touching code or the command line.
