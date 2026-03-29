@@ -31,37 +31,64 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 
 ## Key file map
 
+### Python
 | File | Purpose |
 |------|---------|
 | `scripts/server.py` | FastAPI bridge — API endpoints, tool routing, process management |
 | `scripts/config.py` | Config read/write, per-OS path resolution, DEFAULTS |
-| `static/chat.html` | Main chat UI HTML |
-| `static/css/chat.css` | All styles |
-| `static/js/chat.js` | Core chat logic, session management, system prompt |
-| `static/js/orb.js` | All orb logic (state, avatar, presets, layout mode) |
-| `static/js/chat-ui.js` | DOM helpers, message rendering, thin orb wrappers |
+
+### HTML
+| File | Purpose |
+|------|---------|
+| `static/chat.html` | Main chat UI HTML — also defines script/stylesheet load order |
+
+### CSS (load order matters — base first)
+| File | Purpose |
+|------|---------|
+| `static/css/base.css` | CSS variables, reset, layout, sidebar, input bar |
+| `static/css/messages.css` | Message bubbles, thinking blocks, tool indicators, attachments, tabs, context bar |
+| `static/css/orb.css` | Companion orb structure, states, animations, layout modes, presence preview |
+| `static/css/companion-panel.css` | Companion settings window and all its inner components |
+| `static/css/settings.css` | Global settings panel (separate, pre-existing) |
+
+### JavaScript (load order matters — deps listed)
+| File | Purpose |
+|------|---------|
 | `static/js/tool-parser.js` | Tool call parsing/stripping — no DOM, no side effects |
 | `static/js/api.js` | Model communication, tool execution, streaming |
+| `static/js/attachments.js` | File attachment handling |
+| `static/js/orb.js` | All orb logic (state, avatar, presets, layout mode) |
+| `static/js/message-renderer.js` | Markdown rendering, message/thinking/tool DOM builders |
+| `static/js/chat-ui.js` | DOM helpers, sidebar UI, input handling, orb delegation |
 | `static/js/chat-tabs.js` | Tab management, message serialization/replay |
 | `static/js/chat-controls.js` | Message controls, edit, regenerate |
-| `static/js/companion.js` | Companion settings window, presence tab |
-| `static/js/settings.js` | Global settings panel |
-| `static/js/settings_os_paths.js` | Per-OS path cards in Settings → Server tab |
+| `static/js/chat.js` | Core chat logic, session management, system prompt, boot |
 | `static/js/heartbeat.js` | Heartbeat system |
+| `static/js/companion.js` | Companion settings window coordinator (open/close, load, save, tabs, avatar, soul files, heartbeat, generation) |
+| `static/js/companion-presence.js` | Presence tab: presets, state editor, preview orb, layout toggle |
+| `static/js/settings.js` | Settings panel coordinator (open/close, tab switch, load, toast, dirty tracking) |
+| `static/js/settings-server.js` | Settings → Server tab (BUILTIN_ARGS, file browsing, save, restart) |
+| `static/js/settings-generation.js` | Settings → Generation tab |
+| `static/js/settings-companion.js` | Settings → Companion tab + About tab (avatar crop, soul files, heartbeat, companion CRUD) |
+| `static/js/settings_os_paths.js` | Per-OS path cards in Settings → Server tab |
 
 ---
 
 ## Modularity plan
 
-The codebase is being gradually refactored into small focused modules.
-New features should be built as separate files where possible.
+The codebase uses small focused modules. New features should be built as separate files where possible.
 
-**Refactors completed:**
+**Refactors completed this project:**
 - `static/js/orb.js` — extracted from chat-ui.js ✓
 - `static/js/tool-parser.js` — extracted from api.js ✓
+- `static/js/message-renderer.js` — extracted from chat-ui.js ✓
+- `static/js/companion-presence.js` — extracted from companion.js ✓
+- `static/css/chat.css` → split into base/messages/orb/companion-panel.css ✓
+- `static/js/settings.js` → split into coordinator + server/generation/companion tab files ✓
 
-**Next refactor candidates** (do as a dedicated session, not mixed with features):
-- `static/js/chat-ui.js` — `appendMessage` + bubble rendering → `message-renderer.js`
+**Planned future modules:**
+- `static/js/companion-mood.js` — Mood UI tab (new file when Mood UI is built)
+- `static/js/system-prompt.js` — extract `buildSystemPrompt()` from chat.js (low priority)
 
 When creating a new module, it should:
 - Do one thing only
@@ -71,18 +98,32 @@ When creating a new module, it should:
 
 **Current `chat.html` script load order:**
 ```
-tool-parser.js  ← no deps
-api.js          ← needs tool-parser.js
+tool-parser.js       ← no deps
+api.js               ← needs tool-parser.js
 attachments.js
 orb.js
-chat-ui.js
-chat-tabs.js
+message-renderer.js  ← no deps
+chat-ui.js           ← needs message-renderer.js, orb.js
+chat-tabs.js         ← needs message-renderer.js, chat-ui.js, chat-controls.js
 chat-controls.js
 chat.js
 heartbeat.js
-companion.js
-settings.js
-settings_os_paths.js
+companion.js         ← coordinator, loads before presence
+companion-presence.js ← needs companion.js (cpSettings), orb.js
+settings.js          ← coordinator, loads before tab files
+settings-server.js   ← needs settings.js
+settings-generation.js ← needs settings.js
+settings-companion.js  ← needs settings.js
+settings_os_paths.js   ← needs settings.js, settings-server.js
+```
+
+**Current `chat.html` stylesheet load order:**
+```
+base.css             ← defines all CSS variables — must be first
+messages.css         ← depends on base.css variables
+orb.css              ← depends on base.css variables
+companion-panel.css  ← depends on base.css variables, orb.css keyframes
+settings.css         ← pre-existing, independent
 ```
 
 ---
@@ -195,6 +236,15 @@ See `ORB_DESIGN.md` for full layout, state, and CSS variable documentation.
 - Layout toggle in Presence tab ✓
 - Mood system: backend done (`moods`, `active_mood` in config), UI not yet built
 
+### Module split
+- `companion.js` — coordinator: open/close, load, populate, tab switching, avatar, soul files, heartbeat, generation, save, toast
+- `companion-presence.js` — all Presence tab logic: presets, state editor, preview orb, layout toggle, `_cpGetPresencePayload()`
+- `companion-mood.js` — future: Mood tab UI (not yet built)
+
+When saving, `companion.js` calls `_cpGetPresencePayload()` from `companion-presence.js` and will call `_cpGetMoodPayload()` from `companion-mood.js` once built. The placeholder comment is already in `cpSave()`.
+
+`CP_STATE_DEFAULTS` lives in `companion-presence.js` and will be referenced by `companion-mood.js` — moods share the same visual properties.
+
 ---
 
 ## Companion settings window
@@ -230,10 +280,11 @@ Key companion config fields:
 
 - Streaming text visual (tokens appearing one by one) regressed — secondary priority
 - Strip mode is a placeholder — needs status bar UI (thinking text, etc.) in a future session
-- Mood UI in Presence tab — future session
+- Mood UI in Presence tab — future session (new `companion-mood.js` + new tab in `chat.html`)
 - `set_mood` tool for Qwenny — future session
-- `message-renderer.js` — extract from `chat-ui.js` (next refactor session)
+- `system-prompt.js` extraction from `chat.js` — low priority refactor
 - Chat history occasional rollback on reload (localStorage race condition, low priority)
+- User has noted additional bugs observed during refactor session — to be documented and triaged next session
 
 ---
 

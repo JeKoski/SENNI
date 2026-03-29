@@ -1,0 +1,427 @@
+/* orb.css — Companion orb: structure, states, animations, layout modes,
+   inline message grid, presence preview orb.
+   Depends on: base.css (variables)                                           */
+
+/* ── Orb CSS variables ────────────────────────────────────────────────────── */
+:root {
+  --orb-size:     36px;
+  --orb-gap:      12px;
+  --orb-indent:   calc(var(--orb-size) + var(--orb-gap) + 16px);
+  --orb-overlap-x: 8px;
+  --orb-overlap-y: 8px;
+}
+
+#companion-orb {
+  --orb-size:     36px;
+  --glow-color:   rgba(129,140,248,0.4);
+  --glow-min:     6px;
+  --glow-max:     16px;
+  --glow-speed:   2s;
+  --ring-color:   rgba(129,140,248,0.3);
+  --ring-speed:   1.8s;
+  --dot-color:    #818cf8;
+  --dot-speed:    1.2s;
+  --dot-opacity:  1;
+  --breath-speed: 3s;
+  --orb-bg:       rgba(129,140,248,0.12);
+  --orb-border:   rgba(129,140,248,0.35);
+}
+
+/* ── Orb home ─────────────────────────────────────────────────────────────── */
+#orb-home {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 8px 16px 12px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+#companion-orb,
+#scroll-to-bottom {
+  pointer-events: auto;
+}
+
+/* ── Layout modes ─────────────────────────────────────────────────────────── */
+body.orb-inline .msg-row.companion {
+  padding-left: var(--orb-indent);
+}
+
+/* Give companion rows enough bottom margin so the orb doesn't overlap the next message */
+.msg-row.companion {
+  margin-bottom: calc(var(--orb-size, 36px) - var(--orb-overlap-y) + 8px);
+}
+
+/* ── Scroll-to-bottom button ──────────────────────────────────────────────── */
+#scroll-to-bottom {
+  display: none;
+  position: fixed;
+  right: 32px;
+  bottom: 120px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
+  z-index: 20;
+  pointer-events: auto;
+}
+#scroll-to-bottom:hover { background: var(--surface); color: var(--text); }
+body.chat-scrolled-up #scroll-to-bottom { display: flex; }
+
+/* ── Orb structure ────────────────────────────────────────────────────────── */
+.companion-orb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: opacity .4s ease;
+}
+
+.orb-dots {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  width: var(--orb-size, 36px);
+  height: 10px;
+  align-items: center;
+}
+.orb-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--dot-color, #818cf8);
+  opacity: 0;
+  transition: opacity .3s ease, background .4s ease;
+}
+
+.orb-body {
+  position: relative;
+  width: var(--orb-size, 36px);
+  height: var(--orb-size, 36px);
+  border-radius: 50%;
+  background: var(--orb-bg, rgba(129,140,248,0.12));
+  border: 2px solid var(--orb-border, rgba(129,140,248,0.35));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  transition: background .5s ease, border-color .5s ease, box-shadow .5s ease,
+              width .3s ease, height .3s ease;
+  flex-shrink: 0;
+}
+.orb-ring {
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  border: 1.5px solid var(--ring-color, rgba(129,140,248,0.3));
+  pointer-events: none;
+  opacity: 0;
+}
+.orb-icon {
+  font-size: calc(var(--orb-size, 36px) * 0.42);
+  color: var(--dot-color, #818cf8);
+  transition: color .4s ease, font-size .3s ease;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.orb-icon img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* ── Orb keyframes ────────────────────────────────────────────────────────── */
+@keyframes orbGlow {
+  0%,100% { box-shadow: 0 0 var(--glow-min, 6px)  var(--glow-color, rgba(129,140,248,0.2)); }
+  50%     { box-shadow: 0 0 var(--glow-max, 16px) var(--glow-color, rgba(129,140,248,0.45)); }
+}
+@keyframes orbBreath {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.04); }
+}
+@keyframes ringPulse {
+  0%   { transform: scale(1);    opacity: .6; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+@keyframes dotBounce {
+  0%,100% { opacity: .25; transform: scale(.78); }
+  50%     { opacity: var(--dot-opacity, 1); transform: scale(1.15); }
+}
+@keyframes dotStream {
+  0%,100% { opacity: .2; }
+  50%     { opacity: .65; }
+}
+
+/* ── State: idle ──────────────────────────────────────────────────────────── */
+.companion-orb.idle { opacity: 1; }
+.companion-orb.idle .orb-dots span { opacity: 0.12; animation: none; }
+.companion-orb.idle .orb-body {
+  animation: orbGlow var(--glow-speed, 4s) ease-in-out infinite,
+             orbBreath var(--breath-speed, 5s) ease-in-out infinite;
+}
+.companion-orb.idle .orb-ring {
+  animation: ringPulse var(--ring-speed, 4s) ease-out infinite;
+}
+
+/* ── State: thinking ──────────────────────────────────────────────────────── */
+.companion-orb.thinking { opacity: 1; }
+.companion-orb.thinking .orb-dots span {
+  opacity: 1;
+  animation: dotBounce var(--dot-speed, 1.2s) ease-in-out infinite;
+}
+.companion-orb.thinking .orb-dots span:nth-child(2) { animation-delay: .18s; }
+.companion-orb.thinking .orb-dots span:nth-child(3) { animation-delay: .36s; }
+.companion-orb.thinking .orb-body {
+  animation: orbGlow var(--glow-speed, 2s) ease-in-out infinite,
+             orbBreath var(--breath-speed, 3s) ease-in-out infinite;
+}
+.companion-orb.thinking .orb-ring {
+  animation: ringPulse var(--ring-speed, 1.8s) ease-out infinite;
+}
+
+/* ── State: streaming ─────────────────────────────────────────────────────── */
+.companion-orb.streaming {
+  opacity: 1;
+  --glow-color:  rgba(109,212,168,0.35);
+  --glow-min:    4px; --glow-max: 12px;
+  --ring-color:  rgba(109,212,168,0.25);
+  --orb-bg:      rgba(109,212,168,0.08);
+  --orb-border:  rgba(109,212,168,0.4);
+  --dot-color:   #6dd4a8;
+}
+.companion-orb.streaming .orb-dots span {
+  opacity: 0.5;
+  animation: dotStream 1.4s ease-in-out infinite;
+}
+.companion-orb.streaming .orb-dots span:nth-child(2) { animation-delay: .2s; }
+.companion-orb.streaming .orb-dots span:nth-child(3) { animation-delay: .4s; }
+.companion-orb.streaming .orb-body {
+  animation: orbGlow var(--glow-speed, 2.5s) ease-in-out infinite;
+}
+.companion-orb.streaming .orb-ring {
+  animation: ringPulse 2.4s ease-out infinite;
+}
+
+/* ── State: heartbeat ─────────────────────────────────────────────────────── */
+.companion-orb.heartbeat {
+  opacity: 1;
+  --glow-color:  rgba(167,139,250,0.45);
+  --glow-min:    6px; --glow-max: 20px;
+  --glow-speed:  1.4s;
+  --ring-color:  rgba(167,139,250,0.35);
+  --ring-speed:  1.4s;
+  --orb-bg:      rgba(167,139,250,0.1);
+  --orb-border:  rgba(167,139,250,0.5);
+  --dot-color:   #a78bfa;
+  --dot-speed:   0.9s;
+}
+.companion-orb.heartbeat .orb-dots span {
+  opacity: 1;
+  animation: dotBounce var(--dot-speed, 0.9s) ease-in-out infinite;
+}
+.companion-orb.heartbeat .orb-dots span:nth-child(2) { animation-delay: .12s; }
+.companion-orb.heartbeat .orb-dots span:nth-child(3) { animation-delay: .24s; }
+.companion-orb.heartbeat .orb-body {
+  animation: orbGlow var(--glow-speed, 1.4s) ease-in-out infinite,
+             orbBreath var(--breath-speed, 2s) ease-in-out infinite;
+}
+.companion-orb.heartbeat .orb-ring {
+  animation: ringPulse var(--ring-speed, 1.4s) ease-out infinite;
+}
+
+/* ── State: chaos ─────────────────────────────────────────────────────────── */
+.companion-orb.chaos {
+  opacity: 1;
+  --glow-color:   rgba(251,191,36,0.5);
+  --glow-min:     8px; --glow-max: 24px;
+  --glow-speed:   0.8s;
+  --ring-color:   rgba(251,191,36,0.35);
+  --ring-speed:   0.9s;
+  --orb-bg:       rgba(251,191,36,0.08);
+  --orb-border:   rgba(251,191,36,0.5);
+  --dot-color:    #fbbf24;
+  --dot-speed:    0.6s;
+  --breath-speed: 0.6s;
+}
+.companion-orb.chaos .orb-dots span {
+  opacity: 1;
+  animation: dotBounce var(--dot-speed, 0.6s) ease-in-out infinite;
+}
+.companion-orb.chaos .orb-dots span:nth-child(2) { animation-delay: .08s; }
+.companion-orb.chaos .orb-dots span:nth-child(3) { animation-delay: .16s; }
+.companion-orb.chaos .orb-body {
+  animation: orbGlow var(--glow-speed, 0.8s) ease-in-out infinite,
+             orbBreath var(--breath-speed, 0.6s) ease-in-out infinite;
+}
+.companion-orb.chaos .orb-ring {
+  animation: ringPulse var(--ring-speed, 0.9s) ease-out infinite;
+}
+
+/* ── Inline message grid (msg-orb-row) ────────────────────────────────────── */
+.msg-group {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+}
+
+.msg-orb-row {
+  display: inline-grid;
+  grid-template-columns: var(--orb-sz, 36px) auto;
+  grid-template-rows: auto var(--orb-sz, 36px);
+  align-self: flex-start;
+}
+
+.msg-orb-row .bubble {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+  margin-left: calc(-1 * var(--orb-overlap-x));
+  margin-bottom: calc(-1 * var(--orb-overlap-y));
+}
+
+.msg-orb-cell {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  z-index: 2;
+}
+
+.msg-time-orb {
+  font-size: 10px;
+  color: rgba(221,225,240,0.22);
+  margin-top: 3px;
+  padding-left: calc(var(--orb-sz, 36px) - var(--orb-overlap-x));
+}
+
+/* ── Thinking pill (inline grid variant) ──────────────────────────────────── */
+.msg-thinking-pill {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  margin-left: calc(-1 * var(--orb-overlap-x));
+  margin-bottom: calc(-1 * var(--orb-overlap-y));
+  background: rgba(129,140,248,0.1);
+  border: 0.5px solid rgba(129,140,248,0.25);
+  border-radius: 4px 20px 20px 4px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  color: rgba(165,180,252,0.7);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.msg-thinking-pill .think-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.msg-thinking-pill .think-dots span {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #818cf8;
+  animation: dotBounce 1.2s ease-in-out infinite;
+}
+.msg-thinking-pill .think-dots span:nth-child(2) { animation-delay: .18s; }
+.msg-thinking-pill .think-dots span:nth-child(3) { animation-delay: .36s; }
+
+/* ── Presence preview orb (in companion settings) ─────────────────────────── */
+.cpp-orb-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.cpp-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  height: 10px;
+}
+.cpp-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cpp-dot-color, #818cf8);
+  transition: opacity .3s ease, background .4s ease;
+}
+.cpp-orb {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  transition: width .3s ease, height .3s ease, background .5s ease,
+              border-color .5s ease, box-shadow .5s ease;
+  overflow: visible;
+}
+.cpp-ring {
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  border: 1.5px solid var(--cpp-ring-color, rgba(129,140,248,0.3));
+  pointer-events: none;
+  opacity: 0;
+}
+.cpp-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  border-radius: 50%; overflow: hidden;
+  color: var(--cpp-dot-color, #818cf8);
+  font-size: 22px;
+  transition: font-size .3s ease, color .4s ease;
+}
+.cpp-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.cpp-state-label {
+  font-size: 11px;
+  color: rgba(221,225,240,0.3);
+  letter-spacing: .06em;
+  margin-top: 10px;
+  text-transform: lowercase;
+}
+
+/* Preview animation keyframes */
+@keyframes cppGlow {
+  0%,100% { box-shadow: 0 0 var(--cpp-glow-min,6px) var(--cpp-glow-color, rgba(129,140,248,0.2)); }
+  50%     { box-shadow: 0 0 var(--cpp-glow-max,16px) var(--cpp-glow-color, rgba(129,140,248,0.45)); }
+}
+@keyframes cppBreath { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+@keyframes cppRing   { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.55);opacity:0} }
+@keyframes cppDot    { 0%,100%{opacity:.25;transform:scale(.78)} 50%{opacity:1;transform:scale(1.15)} }
+@keyframes cppStream { 0%,100%{opacity:.2} 50%{opacity:.65} }
+
+/* ── Layout toggle buttons (Presence tab) ─────────────────────────────────── */
+.cp-layout-toggle {
+  display: flex;
+  gap: 6px;
+}
+.cp-layout-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(140,145,220,0.15);
+  background: rgba(255,255,255,0.03);
+  color: rgba(221,225,240,0.45);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.cp-layout-btn:hover { background: rgba(255,255,255,0.06); color: rgba(221,225,240,0.7); }
+.cp-layout-btn.active {
+  background: rgba(129,140,248,0.12);
+  border-color: rgba(129,140,248,0.3);
+  color: #a5b4fc;
+}

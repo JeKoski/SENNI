@@ -1,7 +1,8 @@
 // chat-tabs.js — Chat tab management, serialization, and replay
-// Depends on: chat-ui.js (appendMessage, appendSystemNote, scrollToBottom,
-//             removeEmptyState, enableInput, THINK_ICON, TOOL_ICON, _esc,
-//             _toolLabel, renderMarkdown, _attachMessageControls)
+// Depends on: message-renderer.js (THINK_ICON, TOOL_ICON, _toolLabel, renderMarkdown)
+//             chat-ui.js (appendMessage, appendSystemNote, scrollToBottom, removeEmptyState, enableInput)
+//             chat-controls.js (_attachMessageControls)
+//             attachments.js (_esc)
 
 // ── Tab helpers ───────────────────────────────────────────────────────────────
 function _tabsKey() {

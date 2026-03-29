@@ -1,0 +1,288 @@
+/* base.css — CSS variables, reset, layout skeleton, sidebar, input bar
+   Loaded first. Everything else depends on the variables defined here.    */
+
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #1c1e26;
+  --bg2:         #21232e;
+  --surface:     rgba(255,255,255,0.04);
+  --surface2:    rgba(255,255,255,0.07);
+  --border:      rgba(140,145,220,0.13);
+  --border-hi:   rgba(129,140,248,0.45);
+  --text:        #dde1f0;
+  --text-muted:  rgba(221,225,240,0.45);
+  --text-dim:    rgba(221,225,240,0.22);
+  --indigo:      #818cf8;
+  --indigo-hi:   #a5b4fc;
+  --indigo-glow: rgba(129,140,248,0.12);
+  --purple:      #a78bfa;
+  --green:       #6dd4a8;
+  --red:         #f87171;
+  --amber:       #fbbf24;
+  --sidebar-w:   240px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+}
+
+/* ── Ambient glow ─────────────────────────────────────────────────────────── */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 40% 50% at 5% 20%,  rgba(99,102,200,0.1)  0%, transparent 70%),
+    radial-gradient(ellipse 35% 45% at 95% 80%,  rgba(130,80,180,0.07) 0%, transparent 70%);
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.shell {
+  position: relative; z-index: 1;
+  display: flex;
+  height: 100vh;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: 160px;
+  max-width: 400px;
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px 16px;
+  overflow-y: auto;
+  position: relative;
+  resize: horizontal;
+  overflow-x: hidden;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0; right: 0;
+  width: 5px; height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background .15s;
+}
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.dragging {
+  background: rgba(129,140,248,0.35);
+}
+
+.companion-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(129,140,248,0.25);
+}
+.companion-name {
+  font-family: 'Lora', serif;
+  font-size: 16px;
+  color: #eef0fb;
+  line-height: 1.2;
+}
+.companion-status {
+  font-size: 11px;
+  color: var(--green);
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 2px;
+}
+.status-dot-svg {
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* ── Sidebar sections ─────────────────────────────────────────────────────── */
+.sidebar-section { margin-bottom: 22px; }
+.sidebar-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.memory-item {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--text-muted);
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(140,145,220,0.07);
+  gap: 8px;
+}
+.memory-item:last-child { border-bottom: none; }
+.mem-folder {
+  display: flex; align-items: center; gap: 6px;
+}
+.mem-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.mem-count {
+  font-size: 10px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 1px 7px;
+  color: var(--text-dim);
+}
+
+.tool-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(129,140,248,0.08);
+  border: 1px solid rgba(129,140,248,0.15);
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--indigo-hi);
+  padding: 3px 9px;
+  margin: 0 4px 5px 0;
+}
+
+/* ── Sidebar footer ───────────────────────────────────────────────────────── */
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sidebar-footer .icon-btn {
+  flex: 1 1 calc(33% - 6px);
+  min-width: 32px;
+}
+.icon-btn {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-muted);
+  font-size: 16px;
+  padding: 9px;
+  cursor: pointer;
+  text-align: center;
+  transition: all .2s;
+  font-family: inherit;
+}
+.icon-btn:hover {
+  background: var(--surface2);
+  border-color: var(--border-hi);
+  color: var(--text);
+}
+.icon-btn title { display: none; }
+
+/* ── Main chat area ───────────────────────────────────────────────────────── */
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+/* ── Message list wrapper ─────────────────────────────────────────────────── */
+.messages-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.messages {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 32px 40px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+/* ── Input bar ────────────────────────────────────────────────────────────── */
+.input-bar {
+  padding: 16px 40px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  background: linear-gradient(to top, rgba(28,30,38,0.95) 0%, transparent 100%);
+}
+
+.input-wrap {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 4px 4px 4px 16px;
+  transition: border-color .2s;
+}
+.input-wrap:focus-within { border-color: var(--border-hi); }
+
+#msg-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.5;
+  resize: none;
+  max-height: 160px;
+  padding: 10px 0;
+  min-height: 44px;
+}
+#msg-input::placeholder { color: var(--text-dim); }
+
+.attach-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 22px; font-weight: 300;
+  line-height: 1;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: color .2s, background .2s;
+}
+.attach-btn:hover { color: var(--indigo-hi); background: var(--indigo-glow); }
+
+.send-btn {
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity .2s, transform .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.send-btn:hover:not(:disabled) { opacity: .88; transform: translateY(-1px); }
+.send-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(140,145,220,0.18); border-radius: 3px; }

@@ -1,6 +1,6 @@
 {
-  "companion_name": "Senni",
-  "companion_folder": "senni",
+  "companion_name": "Qwenny",
+  "companion_folder": "qwenny",
   "model_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
   "mmproj_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
   "gpu_type": "intel",
@@ -114,7 +114,7 @@
     "dry_base": 1.75,
     "dry_allowed_length": 2,
     "max_tokens": 6000,
-    "max_tool_rounds": 18,
+    "max_tool_rounds": 20,
     "vision_mode": "always",
     "markdown_enabled": true
   }
