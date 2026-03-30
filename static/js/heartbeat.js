@@ -146,6 +146,9 @@ async function heartbeatFire(trigger) {
   _hbRunning = true;
   console.log('[heartbeat] firing, trigger:', trigger);
 
+  // Set orb to heartbeat state for the duration of this turn
+  if (typeof setPresenceState === 'function') setPresenceState('heartbeat');
+
   try {
     const prompt   = _buildHeartbeatPrompt(trigger);
     const history  = _buildHeartbeatHistory();
@@ -156,21 +159,35 @@ async function heartbeatFire(trigger) {
       const skip = text === '[skip]' || text.toLowerCase() === '[skip]';
 
       if (c.message_enabled && !skip) {
-        _appendHeartbeatMessage(text, trigger);
-        conversationHistory.push({ role: 'assistant', content: text });
-        const tab = _tabs?.find(t => t.id === _activeTabId);
-        if (tab) { tab.history = conversationHistory; }
+        // callModel → _streamFinalReply already rendered the bubble and pushed
+        // to conversationHistory if streaming ran. Check the flag before adding
+        // a second bubble or a second history entry.
+        if (typeof streamWasRendered === 'function' && streamWasRendered()) {
+          // Bubble already in DOM — just annotate it with the heartbeat meta
+          _annotateLastBubbleAsHeartbeat(trigger);
+        } else {
+          // Non-streaming fallback: render the bubble ourselves
+          _appendHeartbeatMessage(text, trigger);
+          conversationHistory.push({ role: 'assistant', content: text });
+        }
+        // Save the tab state once, after everything is settled
+        _saveCurrentTabState();
         if (typeof saveTabs === 'function') saveTabs();
+
       } else if (c.silent_enabled && !skip) {
-        // Silent: tools have run, just log a small note
+        // Silent mode: tools have already run, just log a timestamped note
         appendSystemNote('\u2736 ' + _triggerLabel(trigger) + ' \u2014 ' +
           new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }));
+        _saveCurrentTabState();
+        if (typeof saveTabs === 'function') saveTabs();
       }
     }
   } catch(e) {
     if (e.name !== 'AbortError') console.warn('[heartbeat] error:', e);
   }
 
+  // Restore orb to idle
+  if (typeof setPresenceState === 'function') setPresenceState('idle');
   _hbRunning = false;
 }
 
@@ -208,6 +225,41 @@ function _buildHeartbeatHistory() {
 }
 
 // ── Heartbeat message rendering ───────────────────────────────────────────────
+
+// Called when the stream already rendered the bubble — we just add the
+// heartbeat identity (class, meta line) to the existing last companion row.
+function _annotateLastBubbleAsHeartbeat(trigger) {
+  const list = document.getElementById('messages');
+  if (!list) return;
+  // Walk backwards to find the last companion msg-row
+  let targetRow = null;
+  for (let i = list.children.length - 1; i >= 0; i--) {
+    const el = list.children[i];
+    if (el.classList.contains('msg-row') && el.classList.contains('companion')) {
+      targetRow = el;
+      break;
+    }
+  }
+  if (!targetRow) return;
+
+  targetRow.classList.add('heartbeat-msg');
+  targetRow.querySelector('.bubble')?.classList.add('heartbeat-bubble');
+
+  // Replace or augment the timestamp with the heartbeat meta
+  const existingTime = targetRow.querySelector('.msg-time');
+  const metaText = '\u2736 ' + _triggerLabel(trigger) + ' \u00b7 ' +
+    new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  if (existingTime) {
+    existingTime.classList.add('heartbeat-meta');
+    existingTime.textContent = metaText;
+  } else {
+    const meta = document.createElement('div');
+    meta.className   = 'msg-time heartbeat-meta';
+    meta.textContent = metaText;
+    targetRow.querySelector('div')?.appendChild(meta);
+  }
+}
+
 function _appendHeartbeatMessage(text, trigger) {
   const list = document.getElementById('messages');
   const row  = document.createElement('div');

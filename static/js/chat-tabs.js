@@ -167,7 +167,12 @@ function _serializeMessages() {
       const role   = el.classList.contains('user') ? 'user' : 'companion';
       const bubble = el.querySelector('.bubble');
       const time   = el.querySelector('.msg-time');
-      if (bubble) msgs.push({ type: 'message', role, html: bubble.innerHTML, time: time?.textContent || '' });
+      if (bubble) {
+        const entry = { type: 'message', role, html: bubble.innerHTML, time: time?.textContent || '' };
+        // Preserve heartbeat identity so it restores with the right styling
+        if (el.classList.contains('heartbeat-msg')) entry.heartbeat = true;
+        msgs.push(entry);
+      }
 
     } else if (el.classList.contains('think-wrap')) {
       const body = el.querySelector('.think-content');
@@ -191,13 +196,13 @@ function _replayMessage(m) {
 
   if (m.type === 'message') {
     const row    = document.createElement('div');
-    row.className = `msg-row ${m.role}`;
+    row.className = `msg-row ${m.role}${m.heartbeat ? ' heartbeat-msg' : ''}`;
     const wrap   = document.createElement('div');
     const bubble = document.createElement('div');
-    bubble.className = 'bubble';
+    bubble.className = `bubble${m.heartbeat ? ' heartbeat-bubble' : ''}`;
     bubble.innerHTML = m.html;
     const time = document.createElement('div');
-    time.className   = 'msg-time';
+    time.className   = `msg-time${m.heartbeat ? ' heartbeat-meta' : ''}`;
     time.textContent = m.time;
     wrap.appendChild(bubble);
     wrap.appendChild(time);

@@ -257,14 +257,74 @@
   color: #a5b4fc;
 }
 
-/* Presence controls */
-.cp-presence-controls { display: flex; flex-direction: column; gap: 6px; }
+/* ── Presence controls ────────────────────────────────────────────────────── */
+.cp-presence-controls { display: flex; flex-direction: column; gap: 10px; }
 
-.cp-color-row {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+/* Color block — label + swatch grid + hex input + native picker */
+.cp-color-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cp-color-block-label {
+  font-size: 11px;
+  color: rgba(221,225,240,0.35);
+  letter-spacing: .04em;
+}
+
+/* Swatch grid: 8 columns × 5 rows */
+.cp-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.cp-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: transform .1s, border-color .15s;
+  position: relative;
+}
+.cp-swatch:hover {
+  transform: scale(1.15);
+  z-index: 1;
+}
+.cp-swatch.active {
+  border-color: rgba(255,255,255,0.75);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+  transform: scale(1.12);
+}
+/* "Custom" swatch — checkerboard background, opens native picker */
+.cp-swatch-custom {
+  background: conic-gradient(
+    rgba(255,255,255,0.15) 90deg,
+    rgba(255,255,255,0.05) 90deg 180deg,
+    rgba(255,255,255,0.15) 180deg 270deg,
+    rgba(255,255,255,0.05) 270deg
+  );
+  background-size: 8px 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: rgba(221,225,240,0.4);
+  border: 1.5px dashed rgba(140,145,220,0.25);
+}
+.cp-swatch-custom:hover { color: rgba(221,225,240,0.8); border-color: rgba(140,145,220,0.5); }
+/* Hidden native color input overlaid on the custom swatch */
+.cp-swatch-custom input[type="color"] {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer;
+  width: 100%; height: 100%;
+  border: none; padding: 0;
+}
+
+/* Hex input row */
+.cp-color-input-row {
+  display: flex; align-items: center; gap: 7px;
 }
 .cp-color-dot {
-  width: 20px; height: 20px; border-radius: 50%;
+  width: 18px; height: 18px; border-radius: 50%;
   flex-shrink: 0;
   border: 1px solid rgba(255,255,255,0.12);
   transition: background .2s;
@@ -274,16 +334,63 @@
   border: 1px solid rgba(140,145,220,0.14);
   border-radius: 8px; padding: 4px 9px;
   font-family: 'DM Mono', monospace; font-size: 12px;
-  color: #dde1f0; width: 100px;
+  color: #dde1f0; width: 90px;
+  transition: border-color .2s;
 }
 .cp-color-input:focus { outline: none; border-color: rgba(129,140,248,0.4); }
-.cp-color-picker {
-  width: 28px; height: 28px;
-  border: none; background: none; cursor: pointer;
-  border-radius: 6px; padding: 0;
-  flex-shrink: 0;
+
+/* Alpha slider row (for effectsColor only) */
+.cp-alpha-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.cp-alpha-lbl {
+  font-size: 11px;
+  color: rgba(221,225,240,0.3);
+  width: 38px; flex-shrink: 0;
+}
+.cp-alpha-track {
+  flex: 1; position: relative; height: 10px;
+  border-radius: 5px; overflow: hidden;
+}
+/* Checkerboard behind the gradient so transparency is visible */
+.cp-alpha-track::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-conic-gradient(
+    rgba(255,255,255,0.1) 0% 25%,
+    rgba(0,0,0,0.1) 0% 50%
+  ) 0 0 / 8px 8px;
+  border-radius: 5px;
+}
+.cp-alpha-gradient {
+  position: absolute; inset: 0;
+  border-radius: 5px;
+  /* updated via JS: background: linear-gradient(to right, transparent, <hex>) */
+}
+.cp-alpha-slider {
+  position: relative; width: 100%;
+  accent-color: #818cf8;
+  appearance: none; -webkit-appearance: none;
+  height: 10px; background: transparent; cursor: pointer;
+  margin: 0;
+}
+.cp-alpha-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0,0,0,0.3);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  cursor: pointer;
+}
+.cp-alpha-val {
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  color: rgba(165,180,252,0.6);
+  width: 30px; text-align: right;
 }
 
+/* Standard slider row */
 .cp-slider-row {
   display: flex; align-items: center; gap: 8px;
 }
@@ -301,4 +408,52 @@
   font-family: 'DM Mono', monospace;
   color: rgba(165,180,252,0.6);
   width: 34px; text-align: right;
+}
+
+/* ── Animation toggles ────────────────────────────────────────────────────── */
+.cp-anim-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+.cp-anim-toggle {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(140,145,220,0.15);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  font-size: 11.5px;
+  color: rgba(221,225,240,0.4);
+  font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+  user-select: none;
+}
+.cp-anim-toggle:hover {
+  background: rgba(255,255,255,0.06);
+  color: rgba(221,225,240,0.7);
+}
+.cp-anim-toggle.active {
+  background: rgba(129,140,248,0.1);
+  border-color: rgba(129,140,248,0.28);
+  color: #a5b4fc;
+}
+/* Dot indicator inside the toggle */
+.cp-anim-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(129,140,248,0.3);
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.cp-anim-toggle.active .cp-anim-dot {
+  background: #818cf8;
+}
+/* Dimmed label when animation is disabled */
+.cp-anim-toggle:not(.active) {
+  opacity: 0.55;
+}
+.cp-anim-toggle:not(.active):hover {
+  opacity: 0.85;
 }

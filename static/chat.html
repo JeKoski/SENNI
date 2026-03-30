@@ -326,18 +326,61 @@
       </div>
 
       <div class="cp-presence-controls">
-        <div class="cp-color-row">
-          <div class="cp-color-dot" id="cp-color-dot"></div>
-          <input class="cp-color-input" id="cp-color-input" type="text" maxlength="25" oninput="cpPresenceColorInput(this.value)" placeholder="#818cf8"/>
-          <input class="cp-color-picker" id="cp-color-picker" type="color" value="#818cf8" oninput="cpPresenceColorPick(this.value)"/>
-          <span class="cp-note" style="margin-left:4px">glow &amp; dots</span>
+
+        <!-- Dot color (dots + icon tint) -->
+        <div class="cp-color-block">
+          <div class="cp-color-block-label">Dots &amp; icon</div>
+          <div class="cp-swatch-grid" id="cp-swatch-grid-dot"></div>
+          <div class="cp-color-input-row">
+            <div class="cp-color-dot" id="cp-color-dot-dot"></div>
+            <input class="cp-color-input" id="cp-color-input-dot" type="text" maxlength="7"
+              oninput="cpPresenceColorInput('dot',this.value)" placeholder="#818cf8"/>
+          </div>
         </div>
-        <div class="cp-slider-row"><span class="cp-slider-lbl">Glow intensity</span><input class="cp-slider" type="range" id="ps-glow-max"    min="4"   max="36"  step="1"   oninput="cpPresenceSlider('ps-glow-max','glowMax',this.value,'px')"/>  <span class="cp-slider-val" id="ps-glow-max-val">16px</span></div>
-        <div class="cp-slider-row"><span class="cp-slider-lbl">Glow speed</span>    <input class="cp-slider" type="range" id="ps-glow-speed"  min="0.4" max="6"   step="0.1" oninput="cpPresenceSlider('ps-glow-speed','glowSpeed',this.value,'s')"/> <span class="cp-slider-val" id="ps-glow-speed-val">2.0s</span></div>
-        <div class="cp-slider-row"><span class="cp-slider-lbl">Ring speed</span>    <input class="cp-slider" type="range" id="ps-ring-speed"  min="0.4" max="5"   step="0.1" oninput="cpPresenceSlider('ps-ring-speed','ringSpeed',this.value,'s')"/> <span class="cp-slider-val" id="ps-ring-speed-val">1.8s</span></div>
-        <div class="cp-slider-row"><span class="cp-slider-lbl">Dot speed</span>     <input class="cp-slider" type="range" id="ps-dot-speed"   min="0.3" max="3"   step="0.1" oninput="cpPresenceSlider('ps-dot-speed','dotSpeed',this.value,'s')"/>  <span class="cp-slider-val" id="ps-dot-speed-val">1.2s</span></div>
+
+        <!-- Edge color (orb border) -->
+        <div class="cp-color-block">
+          <div class="cp-color-block-label">Orb edge</div>
+          <div class="cp-swatch-grid" id="cp-swatch-grid-edge"></div>
+          <div class="cp-color-input-row">
+            <div class="cp-color-dot" id="cp-color-dot-edge"></div>
+            <input class="cp-color-input" id="cp-color-input-edge" type="text" maxlength="7"
+              oninput="cpPresenceColorInput('edge',this.value)" placeholder="#818cf8"/>
+          </div>
+        </div>
+
+        <!-- Effects color (glow + ring) + alpha slider -->
+        <div class="cp-color-block">
+          <div class="cp-color-block-label">Glow &amp; ring</div>
+          <div class="cp-swatch-grid" id="cp-swatch-grid-effects"></div>
+          <div class="cp-color-input-row">
+            <div class="cp-color-dot" id="cp-color-dot-effects"></div>
+            <input class="cp-color-input" id="cp-color-input-effects" type="text" maxlength="7"
+              oninput="cpPresenceColorInput('effects',this.value)" placeholder="#818cf8"/>
+          </div>
+          <div class="cp-alpha-row">
+            <span class="cp-alpha-lbl">Opacity</span>
+            <div class="cp-alpha-track">
+              <div class="cp-alpha-gradient" id="cp-alpha-gradient"></div>
+              <input class="cp-alpha-slider" type="range" id="ps-effects-alpha"
+                min="0" max="100" step="1" oninput="cpPresenceSetAlpha(this.value)"/>
+            </div>
+            <span class="cp-alpha-val" id="ps-effects-alpha-val">40%</span>
+          </div>
+        </div>
+
+        <!-- Speed sliders -->
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Glow intensity</span><input class="cp-slider" type="range" id="ps-glow-max"     min="4"   max="36" step="1"   oninput="cpPresenceSlider('ps-glow-max','glowMax',this.value,'px')"/>    <span class="cp-slider-val" id="ps-glow-max-val">16px</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Glow speed</span>    <input class="cp-slider" type="range" id="ps-glow-speed"   min="0.4" max="6"  step="0.1" oninput="cpPresenceSlider('ps-glow-speed','glowSpeed',this.value,'s')"/>  <span class="cp-slider-val" id="ps-glow-speed-val">2.0s</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Ring speed</span>    <input class="cp-slider" type="range" id="ps-ring-speed"   min="0.4" max="5"  step="0.1" oninput="cpPresenceSlider('ps-ring-speed','ringSpeed',this.value,'s')"/>  <span class="cp-slider-val" id="ps-ring-speed-val">1.8s</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Dot speed</span>     <input class="cp-slider" type="range" id="ps-dot-speed"    min="0.3" max="3"  step="0.1" oninput="cpPresenceSlider('ps-dot-speed','dotSpeed',this.value,'s')"/>    <span class="cp-slider-val" id="ps-dot-speed-val">1.2s</span></div>
         <div class="cp-slider-row"><span class="cp-slider-lbl">Breath speed</span>  <input class="cp-slider" type="range" id="ps-breath-speed" min="0.4" max="7"  step="0.1" oninput="cpPresenceSlider('ps-breath-speed','breathSpeed',this.value,'s')"/><span class="cp-slider-val" id="ps-breath-speed-val">3.0s</span></div>
-        <div class="cp-slider-row"><span class="cp-slider-lbl">Orb size</span>      <input class="cp-slider" type="range" id="ps-orb-size"    min="32"  max="80"  step="2"   oninput="cpPresenceSlider('ps-orb-size','orbSize',this.value,'px')"/>  <span class="cp-slider-val" id="ps-orb-size-val">52px</span></div>
+        <div class="cp-slider-row"><span class="cp-slider-lbl">Orb size</span>      <input class="cp-slider" type="range" id="ps-orb-size"     min="32"  max="80" step="2"   oninput="cpPresenceSlider('ps-orb-size','orbSize',this.value,'px')"/>     <span class="cp-slider-val" id="ps-orb-size-val">52px</span></div>
+
+        <!-- Animation toggles (built dynamically from orb.ANIMATIONS registry) -->
+        <div class="cp-section" style="padding-top:10px;margin-bottom:6px">Animations</div>
+        <div class="cp-anim-toggles" id="cp-anim-toggles"></div>
+
       </div>
 
     </div>

@@ -1,6 +1,20 @@
 /* orb.css — Companion orb: structure, states, animations, layout modes,
    inline message grid, presence preview orb.
-   Depends on: base.css (variables)                                           */
+   Depends on: base.css (variables)
+
+   Color architecture (three independent properties per state):
+     --dot-color     : dots + icon tint              (set by orb.js)
+     --orb-border    : orb edge/border rgba           (set by orb.js)
+     --orb-bg        : orb background rgba            (set by orb.js, derived from effectsColor)
+     --glow-color    : glow box-shadow rgba           (set by orb.js, effectsColor + alpha)
+     --ring-color    : ring pulse rgba                (set by orb.js, effectsColor + alpha)
+
+   Animation toggles (set by orb.js, 1 = enabled / 0 = disabled):
+     --anim-glowEnabled
+     --anim-breathEnabled
+     --anim-ringEnabled
+     --anim-dotsEnabled
+*/
 
 /* ── Orb CSS variables ────────────────────────────────────────────────────── */
 :root {
@@ -12,19 +26,24 @@
 }
 
 #companion-orb {
-  --orb-size:     36px;
-  --glow-color:   rgba(129,140,248,0.4);
-  --glow-min:     6px;
-  --glow-max:     16px;
-  --glow-speed:   2s;
-  --ring-color:   rgba(129,140,248,0.3);
-  --ring-speed:   1.8s;
-  --dot-color:    #818cf8;
-  --dot-speed:    1.2s;
-  --dot-opacity:  1;
-  --breath-speed: 3s;
-  --orb-bg:       rgba(129,140,248,0.12);
-  --orb-border:   rgba(129,140,248,0.35);
+  --orb-size:          36px;
+  --dot-color:         #818cf8;
+  --orb-bg:            rgba(129,140,248,0.12);
+  --orb-border:        rgba(129,140,248,0.35);
+  --glow-color:        rgba(129,140,248,0.4);
+  --glow-min:          6px;
+  --glow-max:          16px;
+  --glow-speed:        2s;
+  --ring-color:        rgba(129,140,248,0.3);
+  --ring-speed:        1.8s;
+  --dot-speed:         1.2s;
+  --dot-opacity:       1;
+  --breath-speed:      3s;
+  /* Animation toggles — 1 = on, 0 = off */
+  --anim-glowEnabled:    1;
+  --anim-breathEnabled:  1;
+  --anim-ringEnabled:    1;
+  --anim-dotsEnabled:    1;
 }
 
 /* ── Orb home ─────────────────────────────────────────────────────────────── */
@@ -49,7 +68,6 @@ body.orb-inline .msg-row.companion {
   padding-left: var(--orb-indent);
 }
 
-/* Give companion rows enough bottom margin so the orb doesn't overlap the next message */
 .msg-row.companion {
   margin-bottom: calc(var(--orb-size, 36px) - var(--orb-overlap-y) + 8px);
 }
@@ -162,6 +180,25 @@ body.chat-scrolled-up #scroll-to-bottom { display: flex; }
   50%     { opacity: .65; }
 }
 
+/* ── Animation toggle helpers ─────────────────────────────────────────────── */
+/* When a toggle CSS var is 0, the element gets animation:none via these rules.
+   Since CSS can't branch on custom property values directly, orb.js injects
+   a data attribute on the orb element for each disabled animation. */
+#companion-orb[data-no-glow]   .orb-body  { animation: none !important; box-shadow: none !important; }
+#companion-orb[data-no-breath] .orb-body  { animation: none !important; }
+#companion-orb[data-no-ring]   .orb-ring  { animation: none !important; opacity: 0 !important; }
+#companion-orb[data-no-dots]   .orb-dots span { animation: none !important; opacity: 0.08 !important; }
+
+/* When only breath is disabled but glow is still on — keep glow, drop breath */
+#companion-orb[data-no-breath]:not([data-no-glow]) .orb-body {
+  animation: orbGlow var(--glow-speed, 2s) ease-in-out infinite !important;
+}
+/* When only glow is disabled but breath is still on — keep breath, drop glow */
+#companion-orb[data-no-glow]:not([data-no-breath]) .orb-body {
+  animation: orbBreath var(--breath-speed, 3s) ease-in-out infinite !important;
+  box-shadow: none !important;
+}
+
 /* ── State: idle ──────────────────────────────────────────────────────────── */
 .companion-orb.idle { opacity: 1; }
 .companion-orb.idle .orb-dots span { opacity: 0.12; animation: none; }
@@ -190,15 +227,7 @@ body.chat-scrolled-up #scroll-to-bottom { display: flex; }
 }
 
 /* ── State: streaming ─────────────────────────────────────────────────────── */
-.companion-orb.streaming {
-  opacity: 1;
-  --glow-color:  rgba(109,212,168,0.35);
-  --glow-min:    4px; --glow-max: 12px;
-  --ring-color:  rgba(109,212,168,0.25);
-  --orb-bg:      rgba(109,212,168,0.08);
-  --orb-border:  rgba(109,212,168,0.4);
-  --dot-color:   #6dd4a8;
-}
+.companion-orb.streaming { opacity: 1; }
 .companion-orb.streaming .orb-dots span {
   opacity: 0.5;
   animation: dotStream 1.4s ease-in-out infinite;
@@ -213,18 +242,7 @@ body.chat-scrolled-up #scroll-to-bottom { display: flex; }
 }
 
 /* ── State: heartbeat ─────────────────────────────────────────────────────── */
-.companion-orb.heartbeat {
-  opacity: 1;
-  --glow-color:  rgba(167,139,250,0.45);
-  --glow-min:    6px; --glow-max: 20px;
-  --glow-speed:  1.4s;
-  --ring-color:  rgba(167,139,250,0.35);
-  --ring-speed:  1.4s;
-  --orb-bg:      rgba(167,139,250,0.1);
-  --orb-border:  rgba(167,139,250,0.5);
-  --dot-color:   #a78bfa;
-  --dot-speed:   0.9s;
-}
+.companion-orb.heartbeat { opacity: 1; }
 .companion-orb.heartbeat .orb-dots span {
   opacity: 1;
   animation: dotBounce var(--dot-speed, 0.9s) ease-in-out infinite;
@@ -240,19 +258,7 @@ body.chat-scrolled-up #scroll-to-bottom { display: flex; }
 }
 
 /* ── State: chaos ─────────────────────────────────────────────────────────── */
-.companion-orb.chaos {
-  opacity: 1;
-  --glow-color:   rgba(251,191,36,0.5);
-  --glow-min:     8px; --glow-max: 24px;
-  --glow-speed:   0.8s;
-  --ring-color:   rgba(251,191,36,0.35);
-  --ring-speed:   0.9s;
-  --orb-bg:       rgba(251,191,36,0.08);
-  --orb-border:   rgba(251,191,36,0.5);
-  --dot-color:    #fbbf24;
-  --dot-speed:    0.6s;
-  --breath-speed: 0.6s;
-}
+.companion-orb.chaos { opacity: 1; }
 .companion-orb.chaos .orb-dots span {
   opacity: 1;
   animation: dotBounce var(--dot-speed, 0.6s) ease-in-out infinite;

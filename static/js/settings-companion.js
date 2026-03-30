@@ -128,6 +128,10 @@ async function spSaveCompanion(andClose = false) {
 
   _spClearDirty('companion');
   spShowSavedToast('Companion settings saved ✓');
+
+  // Reload heartbeat config live so changes take effect without a page refresh
+  if (typeof heartbeatReload === 'function') heartbeatReload();
+
   if (andClose) closeSettings();
 }
 

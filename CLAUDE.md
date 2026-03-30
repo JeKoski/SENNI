@@ -226,6 +226,20 @@ See `ORB_DESIGN.md` for full layout, state, and CSS variable documentation.
 - Presence presets: nested per-state dict, applied on every `setState()` call
 - Layout modes: `inline` (bubbles indented) / `strip` (orb only)
 
+### Color architecture (as of this session)
+Three independent color properties per state — all set by `orb.js`, consumed by CSS vars:
+- `dotColor` — dots above orb + icon tint (hex)
+- `edgeColor` — orb border (hex) — **was missing before, caused edge color bug**
+- `effectsColor` + `effectsAlpha` — glow box-shadow + ring (hex + 0–1 float)
+
+Legacy presets (single `glowColor`/`dotColor`) are migrated on read via `_migrateLegacyState()` — never broken on write.
+
+### Animation registry (`orb.ANIMATIONS`)
+Lives in `orb.js`. Each entry: `{ id, label, target, states }`. Adding a new animation = one registry entry; UI in companion-presence.js and companion-mood.js generates automatically from it. Current animations: `glowEnabled`, `breathEnabled`, `ringEnabled`, `dotsEnabled`. Toggled via `data-no-*` attributes on `#companion-orb`, targeted by CSS attribute selectors in `orb.css`.
+
+### Mood application
+Mood overrides are **additive** on top of the active Presence preset. A mood only needs to specify the properties it overrides. Each overrideable property has an explicit `_enabled` flag in the mood data: `{ _enabled: { dotColor: true, glowSpeed: true }, dotColor: '#ff0000', glowSpeed: 1.2 }`.
+
 ---
 
 ## Presence system — current state
@@ -235,7 +249,12 @@ See `ORB_DESIGN.md` for full layout, state, and CSS variable documentation.
 - Preset values re-applied on every state transition ✓
 - Avatar shown in orb ✓
 - Layout toggle in Presence tab ✓
+- Three-color architecture implemented (dotColor / edgeColor / effectsColor+alpha) ✓
+- Animation toggles implemented and driven from registry ✓
+- Orb edge color bug fixed ✓
+- Heartbeat state now correctly uses heartbeat preset values ✓
 - Mood system: backend done (`moods`, `active_mood` in config), UI not yet built
+- **Presence tab UI needs a redesign** — current layout (three fully-expanded color pickers + sliders + toggles) takes too much screen real estate and hides the preview. Design session needed before reimplementing. See Design sessions section.
 
 ### Module split
 - `companion.js` — coordinator: open/close, load, populate, tab switching, avatar, soul files, heartbeat, generation, save, toast
@@ -245,6 +264,18 @@ See `ORB_DESIGN.md` for full layout, state, and CSS variable documentation.
 When saving, `companion.js` calls `_cpGetPresencePayload()` from `companion-presence.js` and will call `_cpGetMoodPayload()` from `companion-mood.js` once built. The placeholder comment is already in `cpSave()`.
 
 `CP_STATE_DEFAULTS` lives in `companion-presence.js` and will be referenced by `companion-mood.js` — moods share the same visual properties.
+
+---
+
+## Heartbeat system — current state
+
+- Heartbeat fires correctly on all triggers ✓
+- Orb enters `heartbeat` state during a heartbeat turn (uses heartbeat preset, not idle) ✓
+- Duplicate bubble bug fixed — `streamWasRendered()` checked before appending ✓
+- Heartbeat settings now apply live after save (no refresh needed) ✓
+- Heartbeat messages persist across refresh — serialized with `heartbeat: true` flag in tab state ✓
+- `_annotateLastBubbleAsHeartbeat()` stamps ✦ meta onto stream-rendered bubble
+- **Still pending:** stop button during heartbeat processing, heartbeat event indicator pill (see Features)
 
 ---
 
@@ -283,8 +314,8 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### Orb / Presence
 
-- **Orb edge color not applying from presence preset** — edge stays blue (default) regardless of what color is configured in the preset. Effects colors (glow, overlay) may be unaffected — needs confirming when fix is attempted. Fix this when the color architecture split (below) is done, as the two are tightly related.
-- **Heartbeat state uses idle values** — heartbeat orb state reads idle preset values instead of the heartbeat preset. Related to above.
+- ~~**Orb edge color not applying from presence preset**~~ — **Fixed** (color architecture split this session)
+- ~~**Heartbeat state uses idle values**~~ — **Fixed** (heartbeat.js now calls `setPresenceState('heartbeat')`)
 
 ### Chat
 
@@ -292,6 +323,13 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - **Closing a tab during generation bleeds response into new active tab** — generation should be cancelled when its originating tab is closed.
 - **Active tab not remembered on restart/refresh** — defaults to the top tab instead of restoring the last active one. Possibly related to the existing localStorage chat history race condition.
 - **Streaming text visual (token-by-token appearance) regressed** — secondary priority.
+- **Message loss on restart/refresh suspected** — non-heartbeat messages may also be getting lost on refresh, possibly related to DOM/history drift or tab switching edge cases. Needs a focused investigation session reading `chat.js` `sendMessage()`, `_saveCurrentTabState()`, and `startSession()` together.
+
+### Heartbeat
+
+- ~~**Duplicate heartbeat bubble**~~ — **Fixed**
+- ~~**Heartbeat settings not applying until refresh**~~ — **Fixed** (`heartbeatReload()` now called on save)
+- ~~**Heartbeat chat log deleted on refresh**~~ — **Fixed** (serialized with `heartbeat: true` flag)
 
 ### Settings
 
@@ -313,21 +351,21 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
 
 ### Orb / Presence / Mood
 
-- **Color architecture split — Presence and Mood** *(do this first, before any Mood work)*
-  - Split orb visual properties into two independent groups: **container/edge colors** (the orb border) and **effects colors** (glow, overlay). Currently these are coupled.
-  - Applies to both Presence presets and Mood overrides.
-  - Unlocks significantly more design variety with minimal code overhead.
-  - This is a prerequisite for the Mood feature and fixes the orb edge color bug above.
+- ~~**Color architecture split — Presence and Mood**~~ — **Done this session.** `dotColor` / `edgeColor` / `effectsColor+alpha` are now independent. Animation toggle registry in `orb.ANIMATIONS`. Legacy presets migrated on read.
+
+- **Presence tab UI redesign** *(design session needed first — see Design sessions)*
+  - Current layout (three fully-expanded color pickers + sliders + toggles) is too tall, hides the preview, and feels cluttered. Needs a collapsible or grouped layout before the tab is pleasant to use.
+  - Design goal: preview always visible, controls grouped by relation (color + its toggle + its alpha), collapsed by default or accordion-style.
 
 - **Mood system UI** *(new `companion-mood.js`, new tab in `chat.html`)*
   - Backend already done (`moods`, `active_mood` in config). UI not yet built.
   - Visual: orb glow/color changes per mood (e.g. Playful = green, faster pulsing ring).
   - Optional mood pill next to orb showing current mood name — toggleable, hidden by default. Pill background = effects color, pill edge = orb edge color.
   - Users can define short descriptions per mood (injected into system prompt).
-  - Animation toggles: enable/disable specific effects and animations per mood (also add this to Presence).
+  - Animation toggles already built and reusable for Mood.
   - "Reset to default" option for both Mood and Presence.
   - `set_mood` tool for Qwenny — implement alongside Mood UI.
-  - *Depends on color architecture split above.*
+  - *Color architecture already done. Presence tab redesign should happen before Mood UI is built.*
 
 - **Heartbeat UI improvements** *(bundle with Mood/presence work)*
   - Add stop button during heartbeat processing (same red square used for regular responses).
@@ -391,6 +429,7 @@ See `Features & Changes.md` for the full wizard flow sketch. Summary of key desi
 
 These items are too open-ended to task out. They need a dedicated design conversation before any implementation.
 
+- **Presence tab UI redesign** *(next priority — do before Mood UI)* — Three fully-expanded color pickers plus sliders plus animation toggles is too tall and buries the preview orb. Need to design a collapsed/grouped layout where: (1) the preview is always visible, (2) controls are grouped by relation (e.g. each color channel with its toggle and alpha inline), (3) sections collapse or are compact enough to see everything at once. Mockup first, then implement.
 - **Main Chat UI redesign** — overall feel should be "smoother, fuller, cozier". Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
 - **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked "design needs expanding on" in the spec. These need fleshing out before wizard implementation begins.
 - **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard's closeness step is finalized.
