@@ -14,6 +14,7 @@ Search for it using project knowledge before doing anything else.
 - **Python bridge needs a full terminal restart** to pick up changes — the in-app restart only restarts llama-server.
 - **Suggest Extended Thinking** when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
 - **End every session by updating CLAUDE.md and any relevant design docs.** This is non-negotiable — it's what makes the next session productive.
+- Remind user to push changes and refresh project knowledge.
 
 ---
 
@@ -135,7 +136,7 @@ This is the most complex part of the server — read carefully before touching i
 ### State variables (in `server.py`)
 
 | Variable | Meaning |
-|----------|---------|
+|----------|---------| 
 | `_llama_process` | The `Popen` handle for the cmd.exe / llama-server process, or `None` |
 | `_boot_ready` | `True` once llama-server logs "server is listening" |
 | `_boot_launching` | `True` from launch start until either ready or failure — prevents duplicate spawns |
@@ -276,15 +277,123 @@ Key companion config fields:
 
 ---
 
-## Known issues / backlog
+## Bugs
 
-- Streaming text visual (tokens appearing one by one) regressed — secondary priority
-- Strip mode is a placeholder — needs status bar UI (thinking text, etc.) in a future session
-- Mood UI in Presence tab — future session (new `companion-mood.js` + new tab in `chat.html`)
-- `set_mood` tool for Qwenny — future session
-- `system-prompt.js` extraction from `chat.js` — low priority refactor
-- Chat history occasional rollback on reload (localStorage race condition, low priority)
-- User has noted additional bugs observed during refactor session — to be documented and triaged next session
+Bugs are grouped by area. Where a fix should be bundled with a feature, that is noted.
+
+### Orb / Presence
+
+- **Orb edge color not applying from presence preset** — edge stays blue (default) regardless of what color is configured in the preset. Effects colors (glow, overlay) may be unaffected — needs confirming when fix is attempted. Fix this when the color architecture split (below) is done, as the two are tightly related.
+- **Heartbeat state uses idle values** — heartbeat orb state reads idle preset values instead of the heartbeat preset. Related to above.
+
+### Chat
+
+- **Streaming cursor stuck at bottom of message bubble** — the typing cursor `|` sits at the bottom of the bubble rather than following the end of the streamed text. Should move with the text as tokens arrive, giving a "companion is typing" feel.
+- **Closing a tab during generation bleeds response into new active tab** — generation should be cancelled when its originating tab is closed.
+- **Active tab not remembered on restart/refresh** — defaults to the top tab instead of restoring the last active one. Possibly related to the existing localStorage chat history race condition.
+- **Streaming text visual (token-by-token appearance) regressed** — secondary priority.
+
+### Settings
+
+- **Markdown render toggle breaks on restart/companion switch** — markdown rendering stops working; toggling the setting off and back on fixes it. Inconsistent to reproduce — may be restart-only or may also affect companion switching.
+- **"Ask each time" image processing not working** — when image processing is set to "Ask each time", selecting "once" in the per-message dialog doesn't take effect (even after page refresh). The global "once" setting works correctly.
+- **Dirty tracking missing for several fields** — the following fields do not mark the settings panel as dirty (unsaved changes indicator not triggered):
+  - Global Settings: Vision mode, Agentic mode, Companion name, Heartbeat settings
+  - Companion Settings: all fields
+
+### UI / Layout
+
+- **Tool and thinking pills have alignment/padding issues** — pills are misaligned relative to each other and the orb. **Bundle this fix with the pill visual rework** — don't fix in isolation.
+
+---
+
+## Features & planned changes
+
+Grouped by area. Items marked **(design needed)** have open questions that should be resolved before implementation begins.
+
+### Orb / Presence / Mood
+
+- **Color architecture split — Presence and Mood** *(do this first, before any Mood work)*
+  - Split orb visual properties into two independent groups: **container/edge colors** (the orb border) and **effects colors** (glow, overlay). Currently these are coupled.
+  - Applies to both Presence presets and Mood overrides.
+  - Unlocks significantly more design variety with minimal code overhead.
+  - This is a prerequisite for the Mood feature and fixes the orb edge color bug above.
+
+- **Mood system UI** *(new `companion-mood.js`, new tab in `chat.html`)*
+  - Backend already done (`moods`, `active_mood` in config). UI not yet built.
+  - Visual: orb glow/color changes per mood (e.g. Playful = green, faster pulsing ring).
+  - Optional mood pill next to orb showing current mood name — toggleable, hidden by default. Pill background = effects color, pill edge = orb edge color.
+  - Users can define short descriptions per mood (injected into system prompt).
+  - Animation toggles: enable/disable specific effects and animations per mood (also add this to Presence).
+  - "Reset to default" option for both Mood and Presence.
+  - `set_mood` tool for Qwenny — implement alongside Mood UI.
+  - *Depends on color architecture split above.*
+
+- **Heartbeat UI improvements** *(bundle with Mood/presence work)*
+  - Add stop button during heartbeat processing (same red square used for regular responses).
+  - Add heartbeat event indicator pill — suggested: purple pill showing `[icon] Heartbeat: [trigger]`.
+
+- **Strip mode status bar** — strip layout mode is a placeholder. Needs a status bar showing thinking text and other state info.
+
+- **Presence & Mood: "Reset to default" option** — add reset buttons to both Presence and Mood settings.
+
+### Chat
+
+- **Pill visual rework** *(bundle alignment/padding bug fix with this)*
+  - Thinking pills: stream content in real time (like llama.cpp's own WebUI does) — makes long thinking waits much more bearable.
+  - Visual update to make pills thematically consistent with chat bubbles.
+
+- **File upload visualization in chat**
+  - Sent files should be visible in the chat message (no filename text, just the visual).
+  - Images: thumbnail inline, click to view full size.
+  - Audio: mini inline player.
+  - Text/other: format-relevant icon, click to view.
+
+- **Animated avatars** *(wishlist — no design yet)*
+  - Sprites, Live2D, or other — needs exploration. Document as future consideration only.
+
+### Settings & Tools
+
+- **Tool settings — global and per companion**
+  - Global Settings: toggle to completely disable/enable all tools (overrides companion settings); default settings per tool.
+  - Companion Settings: per-tool enable/disable toggles; per-tool per-companion settings (e.g. `get_time` format).
+
+- **Server restart loading overlay**
+  - When clicking restart server, show a blocking overlay (similar to companion switch) to prevent interaction and clearly communicate what's happening. Reuse the existing boot log display if possible.
+
+### TTS — Kokoro integration *(new feature, self-contained)*
+
+- Toggle to completely enable/disable (does not load at all when disabled).
+- CPU or GPU option — **note: Intel Arc / oneAPI support for Kokoro is unconfirmed, needs research before committing to GPU path.**
+- Streaming audio output.
+- Settings per companion.
+- Voice mixing: blend multiple Kokoro voice presets with per-preset sliders (e.g. 0.1 Bella + 0.4 Heart + ...).
+- Pitch and speed controls.
+- Mood integration: map moods to voice presets (null/neutral mood = companion default; each mood can override).
+- Future: Qwen3-TTS option for better tone/emphasis control — current hardware likely limits to Kokoro only for now.
+
+### Companion Creation Wizard *(design needed — large feature)*
+
+See `Features & Changes.md` for the full wizard flow sketch. Summary of key design points:
+
+- Sliders for personality traits (Creativity↔Logic, Formal↔Casual, Verbose↔Concise) — open question: map to model params (temperature, top_p) in addition to or instead of prompt templates?
+- Visual grids for appearance/type selections; every option has a "Custom" free-text fallback.
+- Adult Content toggle early in the flow (step 1) — gates what is shown in subsequent steps.
+- Age slider: 18–90, custom field for non-human characters (validated 18–1M).
+- Closeness scale at creation — may later become a gamified relationship progression system.
+- Step 8 (Memory & Agency): show a visual graph of memory↔mind↔soul flow; graph updates live as agentic mode is changed.
+- Heartbeat activity level presets map to existing heartbeat settings.
+- *Depends on Mood system being built first (mood/presence visuals are part of companion identity).*
+
+---
+
+## Design sessions needed
+
+These items are too open-ended to task out. They need a dedicated design conversation before any implementation.
+
+- **Main Chat UI redesign** — overall feel should be "smoother, fuller, cozier". Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
+- **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked "design needs expanding on" in the spec. These need fleshing out before wizard implementation begins.
+- **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard's closeness step is finalized.
 
 ---
 
