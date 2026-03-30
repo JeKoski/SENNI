@@ -227,18 +227,21 @@ See `ORB_DESIGN.md` for full layout, state, and CSS variable documentation.
 - Layout modes: `inline` (bubbles indented) / `strip` (orb only)
 
 ### Color architecture (as of this session)
-Three independent color properties per state — all set by `orb.js`, consumed by CSS vars:
-- `dotColor` — dots above orb + icon tint (hex)
-- `edgeColor` — orb border (hex) — **was missing before, caused edge color bug**
-- `effectsColor` + `effectsAlpha` — glow box-shadow + ring (hex + 0–1 float)
+Five independent color/alpha properties per state — all set by `orb.js`, consumed as CSS vars:
+- `dotColor` — dots + icon tint (hex)
+- `edgeColor` — orb border (hex)
+- `glowColor` + `glowAlpha` — glow box-shadow (hex + 0–1 float, default 0.4)
+- `ringColor` + `ringAlpha` — ring pulse, **fully independent from glow** (hex + 0–1 float, default 0.3)
 
-Legacy presets (single `glowColor`/`dotColor`) are migrated on read via `_migrateLegacyState()` — never broken on write.
+Legacy migration chain in `_migrateLegacyState()`:
+- Old `effectsColor`/`effectsAlpha` (intermediate format) → split into `glowColor`/`ringColor`
+- Old single-color presets → all fields derived from `dotColor`
 
 ### Animation registry (`orb.ANIMATIONS`)
-Lives in `orb.js`. Each entry: `{ id, label, target, states }`. Adding a new animation = one registry entry; UI in companion-presence.js and companion-mood.js generates automatically from it. Current animations: `glowEnabled`, `breathEnabled`, `ringEnabled`, `dotsEnabled`. Toggled via `data-no-*` attributes on `#companion-orb`, targeted by CSS attribute selectors in `orb.css`.
+Lives in `orb.js`. Each entry: `{ id, label, target, states }`. Adding a new animation = one registry entry; UI generates automatically. Current animations: `glowEnabled`, `breathEnabled`, `ringEnabled`, `dotsEnabled`. Toggled via `data-no-*` attributes on `#companion-orb`, targeted by CSS attribute selectors in `orb.css`.
 
 ### Mood application
-Mood overrides are **additive** on top of the active Presence preset. A mood only needs to specify the properties it overrides. Each overrideable property has an explicit `_enabled` flag in the mood data: `{ _enabled: { dotColor: true, glowSpeed: true }, dotColor: '#ff0000', glowSpeed: 1.2 }`.
+Mood overrides are **additive** on top of the active Presence preset. Each overrideable property has an explicit `_enabled` flag: `{ _enabled: { glowColor: true, ringColor: true }, glowColor: '#ff0000', ringColor: '#00ffff' }`. `glowColor` and `ringColor` are independently overrideable.
 
 ---
 
@@ -249,21 +252,34 @@ Mood overrides are **additive** on top of the active Presence preset. A mood onl
 - Preset values re-applied on every state transition ✓
 - Avatar shown in orb ✓
 - Layout toggle in Presence tab ✓
-- Three-color architecture implemented (dotColor / edgeColor / effectsColor+alpha) ✓
+- Five-color architecture: dotColor / edgeColor / glowColor+glowAlpha / ringColor+ringAlpha ✓
+- Ring color/alpha fully independent from glow ✓
 - Animation toggles implemented and driven from registry ✓
-- Orb edge color bug fixed ✓
-- Heartbeat state now correctly uses heartbeat preset values ✓
+- Presence tab redesigned — element-grouped accordion ✓
 - Mood system: backend done (`moods`, `active_mood` in config), UI not yet built
-- **Presence tab UI needs a redesign** — current layout (three fully-expanded color pickers + sliders + toggles) takes too much screen real estate and hides the preview. Design session needed before reimplementing. See Design sessions section.
+
+### Presence tab UI architecture
+Built around `CP_ELEMENTS` in `companion-presence.js` — a data-driven config array. Adding a new element = one entry in `CP_ELEMENTS`, no other changes needed.
+
+**Element groups (top to bottom — foundational first):** Orb → Dots → Glow → Ring
+
+**Layout:** Preview box (rounded top, no bottom border) → flush Preset/State block → Appearance accordion
+
+**Two-level disclosure:**
+- `cpPresenceToggleElement(elemId)` — opens/closes the category row
+- `cpPresenceToggleColorPicker(elemId)` — opens/closes the swatch grid within
+- Clicking the header color pip opens both at once
+
+**Chips:** Presets use `.cp-presence-chip`, states use `.cp-state-chip` (same visual style). `+ New` uses `.cp-presence-chip-new` (dashed border). All unified — no separate stab/tab styles.
+
+**Element bodies** are built lazily on first open via `_cpBuildElementBodies()`.
 
 ### Module split
 - `companion.js` — coordinator: open/close, load, populate, tab switching, avatar, soul files, heartbeat, generation, save, toast
 - `companion-presence.js` — all Presence tab logic: presets, state editor, preview orb, layout toggle, `_cpGetPresencePayload()`
 - `companion-mood.js` — future: Mood tab UI (not yet built)
 
-When saving, `companion.js` calls `_cpGetPresencePayload()` from `companion-presence.js` and will call `_cpGetMoodPayload()` from `companion-mood.js` once built. The placeholder comment is already in `cpSave()`.
-
-`CP_STATE_DEFAULTS` lives in `companion-presence.js` and will be referenced by `companion-mood.js` — moods share the same visual properties.
+`CP_STATE_DEFAULTS` and `CP_ELEMENTS` live in `companion-presence.js` and will be referenced by `companion-mood.js`.
 
 ---
 
@@ -351,11 +367,9 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
 
 ### Orb / Presence / Mood
 
-- ~~**Color architecture split — Presence and Mood**~~ — **Done this session.** `dotColor` / `edgeColor` / `effectsColor+alpha` are now independent. Animation toggle registry in `orb.ANIMATIONS`. Legacy presets migrated on read.
+- ~~**Color architecture split — Presence and Mood**~~ — **Done this session.** Five independent properties: `dotColor` / `edgeColor` / `glowColor+glowAlpha` / `ringColor+ringAlpha`. Ring is fully independent from glow. Animation toggle registry in `orb.ANIMATIONS`. Legacy presets migrated on read.
 
-- **Presence tab UI redesign** *(design session needed first — see Design sessions)*
-  - Current layout (three fully-expanded color pickers + sliders + toggles) is too tall, hides the preview, and feels cluttered. Needs a collapsible or grouped layout before the tab is pleasant to use.
-  - Design goal: preview always visible, controls grouped by relation (color + its toggle + its alpha), collapsed by default or accordion-style.
+- ~~**Presence tab UI redesign**~~ — **Done this session.** Element-grouped accordion (Orb → Dots → Glow → Ring), unified chip style for presets/states, preview flush with preset/state block, two-level color picker disclosure.
 
 - **Mood system UI** *(new `companion-mood.js`, new tab in `chat.html`)*
   - Backend already done (`moods`, `active_mood` in config). UI not yet built.
@@ -429,7 +443,6 @@ See `Features & Changes.md` for the full wizard flow sketch. Summary of key desi
 
 These items are too open-ended to task out. They need a dedicated design conversation before any implementation.
 
-- **Presence tab UI redesign** *(next priority — do before Mood UI)* — Three fully-expanded color pickers plus sliders plus animation toggles is too tall and buries the preview orb. Need to design a collapsed/grouped layout where: (1) the preview is always visible, (2) controls are grouped by relation (e.g. each color channel with its toggle and alpha inline), (3) sections collapse or are compact enough to see everything at once. Mockup first, then implement.
 - **Main Chat UI redesign** — overall feel should be "smoother, fuller, cozier". Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
 - **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked "design needs expanding on" in the spec. These need fleshing out before wizard implementation begins.
 - **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard's closeness step is finalized.
