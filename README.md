@@ -1,6 +1,7 @@
 # SENNI
 
 🚧 **Still very early in development — Not intended for end-users yet** 🚧
+
 Development version confirmed to be working specifically on Windows 10 and Ubuntu 25.10 using Intel Arc A750.
 While my focus is to ensure wide platform and hardware compatibility and ease of installation and use, we're not there yet.
 
