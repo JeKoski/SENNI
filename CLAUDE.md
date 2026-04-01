@@ -12,7 +12,7 @@ Search for it using project knowledge before doing anything else.
 - **Stop and check in** if things start going wrong rather than pushing through. Escalating complexity when stuck makes things worse.
 - **Never ask the user to remember to do things** at specific times — ADHD means this won't work. Automate it or build it into existing flows instead.
 - **Python bridge needs a full terminal restart** to pick up changes — the in-app restart only restarts llama-server.
-- **Suggest Extended Thinking** when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
+- **Suggest Extended Thinking** and/or Opus when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
 - **End every session by updating CLAUDE.md and any relevant design docs.** This is non-negotiable — it's what makes the next session productive.
 - Remind user to push changes and refresh project knowledge.
 
