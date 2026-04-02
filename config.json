@@ -1,8 +1,8 @@
 {
-  "companion_name": "Qwenny",
-  "companion_folder": "qwenny",
-  "model_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
-  "mmproj_path": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+  "companion_name": "S.E.N.N.I",
+  "companion_folder": "default",
+  "model_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+  "mmproj_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
   "gpu_type": "intel",
   "port_bridge": 8000,
   "port_model": 8081,
@@ -19,7 +19,7 @@
     "Windows": "intel",
     "Linux": "intel"
   },
-  "server_binary": "/home/sdesser/llama.cpp/build/bin/llama-server",
+  "server_binary": "C:/AI/llama-cpp/llama-b8398-sycl/llama-server.exe",
   "server_binaries": {
     "Windows": "C:/AI/llama-cpp/llama-b8398-sycl/llama-server.exe",
     "Linux": "/home/sdesser/llama.cpp/build/bin/llama-server"
@@ -57,7 +57,7 @@
     },
     "reasoning_format": {
       "flag": "--reasoning-format",
-      "enabled": true,
+      "enabled": false,
       "value": "deepseek"
     },
     "cache_reuse": {
