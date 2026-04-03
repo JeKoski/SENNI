@@ -5,6 +5,8 @@
 *.swo
 .env
 .env.local
+
+# Ignore user specific config file
 config.json
 
 # Optional: Ignore your memory folders if you want them separate
