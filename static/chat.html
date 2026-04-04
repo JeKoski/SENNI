@@ -203,16 +203,16 @@
         </div>
       </div>
       <div class="cp-section" style="margin-top:16px">Name</div>
-      <input type="text" class="cp-input" id="cp-companion-name" placeholder="Companion name" style="margin-bottom:16px"/>
+      <input type="text" class="cp-input" id="cp-companion-name" placeholder="Companion name" style="margin-bottom:16px" oninput="cpMarkDirty()"/>
       <div class="cp-section">Identity editing <span class="cp-note">what the companion can change about itself</span></div>
       <div id="cp-soul-edit-mode" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
-        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="locked" checked/> <span>Locked</span> <span class="cp-note">companion cannot edit its own identity</span></label>
-        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="self_notes"/> <span>Self notes</span> <span class="cp-note">can write to soul/self_notes.md</span></label>
-        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="agentic"/> <span>Fully agentic</span> <span class="cp-note">can rewrite companion_identity.md — auto-backed up</span></label>
-        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="chaos"/> <span>Chaos mode 🔥</span> <span class="cp-note">unrestricted across all folders</span></label>
+        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="locked" checked onchange="cpMarkDirty()"/> <span>Locked</span> <span class="cp-note">companion cannot edit its own identity</span></label>
+        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="self_notes" onchange="cpMarkDirty()"/> <span>Self notes</span> <span class="cp-note">can write to soul/self_notes.md</span></label>
+        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="agentic" onchange="cpMarkDirty()"/> <span>Fully agentic</span> <span class="cp-note">can rewrite companion_identity.md — auto-backed up</span></label>
+        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="chaos" onchange="cpMarkDirty()"/> <span>Chaos mode 🔥</span> <span class="cp-note">unrestricted across all folders</span></label>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
-        <div class="sp-tog on" id="cp-force-read" onclick="this.classList.toggle('on')"></div>
+        <div class="sp-tog on" id="cp-force-read" onclick="this.classList.toggle('on');cpMarkDirty()"></div>
         <span style="font-size:13px;color:rgba(221,225,240,0.6)">Require read before write <span class="cp-note" style="margin-left:4px">disable to reduce context burn</span></span>
       </div>
     </div>
@@ -220,17 +220,17 @@
     <div class="cp-tab-body" id="cp-tab-generation">
       <div class="cp-section">Core <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400">blank = inherit global</span></div>
       <div class="cp-row-2">
-        <div><div class="cp-field-label">Temperature</div><input type="number" class="cp-input" id="cp-g-temp" placeholder="global" min="0" max="2" step="0.05"/></div>
-        <div><div class="cp-field-label">Top-P</div><input type="number" class="cp-input" id="cp-g-topp" placeholder="global" min="0" max="1" step="0.01"/></div>
-        <div><div class="cp-field-label">Top-K</div><input type="number" class="cp-input" id="cp-g-topk" placeholder="global" min="0"/></div>
-        <div><div class="cp-field-label">Min-P <span class="cp-badge cp-badge-new">new</span></div><input type="number" class="cp-input" id="cp-g-minp" placeholder="0.0 (off)" min="0" max="1" step="0.01"/></div>
-        <div><div class="cp-field-label">Repeat penalty</div><input type="number" class="cp-input" id="cp-g-rpen" placeholder="global" min="1" max="2" step="0.05"/></div>
-        <div><div class="cp-field-label">Max response tokens</div><input type="number" class="cp-input" id="cp-g-maxt" placeholder="global" min="64"/></div>
+        <div><div class="cp-field-label">Temperature</div><input type="number" class="cp-input" id="cp-g-temp" placeholder="global" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Top-P</div><input type="number" class="cp-input" id="cp-g-topp" placeholder="global" min="0" max="1" step="0.01" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Top-K</div><input type="number" class="cp-input" id="cp-g-topk" placeholder="global" min="0" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Min-P <span class="cp-badge cp-badge-new">new</span></div><input type="number" class="cp-input" id="cp-g-minp" placeholder="0.0 (off)" min="0" max="1" step="0.01" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Repeat penalty</div><input type="number" class="cp-input" id="cp-g-rpen" placeholder="global" min="1" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Max response tokens</div><input type="number" class="cp-input" id="cp-g-maxt" placeholder="global" min="64" oninput="cpMarkDirty()"/></div>
       </div>
       <div class="cp-section" style="margin-top:14px">Repetition control</div>
       <div class="cp-row-2">
-        <div><div class="cp-field-label">Presence penalty <span class="cp-badge cp-badge-rec">recommended</span></div><input type="number" class="cp-input" id="cp-g-pres" placeholder="0.0 (off)" min="0" max="2" step="0.05"/></div>
-        <div><div class="cp-field-label">Frequency penalty</div><input type="number" class="cp-input" id="cp-g-freq" placeholder="0.0 (off)" min="0" max="2" step="0.05"/></div>
+        <div><div class="cp-field-label">Presence penalty <span class="cp-badge cp-badge-rec">recommended</span></div><input type="number" class="cp-input" id="cp-g-pres" placeholder="0.0 (off)" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Frequency penalty</div><input type="number" class="cp-input" id="cp-g-freq" placeholder="0.0 (off)" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
       </div>
       <div class="cp-adv-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.cp-arr').textContent=this.nextElementSibling.classList.contains('open')?'▾':'▸'">
         <span class="cp-arr">▸</span> <span>DRY sampler</span>
@@ -240,14 +240,14 @@
       <div class="cp-adv-body">
         <div class="cp-dry-info">DRY penalises repeated <em>sequences</em> of tokens — effective against looping patterns small models fall into.</div>
         <div class="cp-row-3">
-          <div><div class="cp-field-label">Multiplier</div><input type="number" class="cp-input" id="cp-g-dry-m" placeholder="0.0 (off)" min="0" step="0.1"/></div>
-          <div><div class="cp-field-label">Base</div><input type="number" class="cp-input" id="cp-g-dry-b" placeholder="1.75" min="1" step="0.05"/></div>
-          <div><div class="cp-field-label">Allowed length</div><input type="number" class="cp-input" id="cp-g-dry-l" placeholder="2" min="1"/></div>
+          <div><div class="cp-field-label">Multiplier</div><input type="number" class="cp-input" id="cp-g-dry-m" placeholder="0.0 (off)" min="0" step="0.1" oninput="cpMarkDirty()"/></div>
+          <div><div class="cp-field-label">Base</div><input type="number" class="cp-input" id="cp-g-dry-b" placeholder="1.75" min="1" step="0.05" oninput="cpMarkDirty()"/></div>
+          <div><div class="cp-field-label">Allowed length</div><input type="number" class="cp-input" id="cp-g-dry-l" placeholder="2" min="1" oninput="cpMarkDirty()"/></div>
         </div>
       </div>
       <div class="cp-section" style="margin-top:14px">Other</div>
       <div class="cp-row-2">
-        <div><div class="cp-field-label">Max tool rounds</div><input type="number" class="cp-input" id="cp-g-rounds" placeholder="global" min="1" max="20"/></div>
+        <div><div class="cp-field-label">Max tool rounds</div><input type="number" class="cp-input" id="cp-g-rounds" placeholder="global" min="1" max="20" oninput="cpMarkDirty()"/></div>
       </div>
     </div>
     <!-- Memory -->
@@ -263,24 +263,24 @@
     <div class="cp-tab-body" id="cp-tab-heartbeat">
       <div class="cp-section">Mode</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
-        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-silent" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">Silent tool turns <span class="cp-note">(update notes, research)</span></span></div>
-        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-message" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">Can send messages <span class="cp-note">(companion reaches out)</span></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-silent" onclick="this.classList.toggle('on');cpMarkDirty()"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">Silent tool turns <span class="cp-note">(update notes, research)</span></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-message" onclick="this.classList.toggle('on');cpMarkDirty()"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">Can send messages <span class="cp-note">(companion reaches out)</span></span></div>
       </div>
       <div class="cp-section">Triggers</div>
       <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
-        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-idle" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.5)">After</span><input type="number" class="cp-input" id="cp-hb-idle-min" value="15" min="1" max="120" style="width:58px;font-size:13px;padding:4px 8px"/><span style="font-size:13px;color:rgba(221,225,240,0.5)">minutes idle</span></div>
-        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-conv-end" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">When context is reset</span></div>
-        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-session" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">On session start</span></div>
-        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-ctx" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:rgba(221,225,240,0.5)">When context reaches</span><input type="number" class="cp-input" id="cp-hb-ctx-pct" value="75" min="10" max="95" style="width:58px;font-size:13px;padding:4px 8px"/><span style="font-size:13px;color:rgba(221,225,240,0.5)">%</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-idle" onclick="this.classList.toggle('on');cpMarkDirty()"></div><span style="font-size:13px;color:rgba(221,225,240,0.5)">After</span><input type="number" class="cp-input" id="cp-hb-idle-min" value="15" min="1" max="120" style="width:58px;font-size:13px;padding:4px 8px" oninput="cpMarkDirty()"/><span style="font-size:13px;color:rgba(221,225,240,0.5)">minutes idle</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-conv-end" onclick="this.classList.toggle('on');cpMarkDirty()"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">When context is reset</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-session" onclick="this.classList.toggle('on');cpMarkDirty()"></div><span style="font-size:13px;color:rgba(221,225,240,0.6)">On session start</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><div class="sp-tog" id="cp-hb-ctx" onclick="this.classList.toggle('on');cpMarkDirty()"></div><span style="font-size:13px;color:rgba(221,225,240,0.5)">When context reaches</span><input type="number" class="cp-input" id="cp-hb-ctx-pct" value="75" min="10" max="95" style="width:58px;font-size:13px;padding:4px 8px" oninput="cpMarkDirty()"/><span style="font-size:13px;color:rgba(221,225,240,0.5)">%</span></div>
       </div>
       <div class="cp-section">Instructions <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400">blank = use default</span></div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <div><div class="cp-field-label" style="font-size:11px;opacity:.7;margin-bottom:3px">Default (all triggers)</div><textarea class="cp-textarea" id="cp-hb-instr-default" rows="2" placeholder="Reflect on the conversation. Update session notes."></textarea></div>
-        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">After idle</div><textarea class="cp-textarea" id="cp-hb-instr-idle" rows="2" placeholder="(uses default if blank)"></textarea></div>
-        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Context reset</div><textarea class="cp-textarea" id="cp-hb-instr-conversation-end" rows="2" placeholder="(uses default if blank)"></textarea></div>
-        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Session start</div><textarea class="cp-textarea" id="cp-hb-instr-session-start" rows="2" placeholder="(uses default if blank)"></textarea></div>
-        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Context filling</div><textarea class="cp-textarea" id="cp-hb-instr-context-threshold" rows="2" placeholder="(uses default if blank)"></textarea></div>
-        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Manual trigger</div><textarea class="cp-textarea" id="cp-hb-instr-manual" rows="2" placeholder="(uses default if blank)"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.7;margin-bottom:3px">Default (all triggers)</div><textarea class="cp-textarea" id="cp-hb-instr-default" rows="2" placeholder="Reflect on the conversation. Update session notes." oninput="cpMarkDirty()"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">After idle</div><textarea class="cp-textarea" id="cp-hb-instr-idle" rows="2" placeholder="(uses default if blank)" oninput="cpMarkDirty()"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Context reset</div><textarea class="cp-textarea" id="cp-hb-instr-conversation-end" rows="2" placeholder="(uses default if blank)" oninput="cpMarkDirty()"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Session start</div><textarea class="cp-textarea" id="cp-hb-instr-session-start" rows="2" placeholder="(uses default if blank)" oninput="cpMarkDirty()"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Context filling</div><textarea class="cp-textarea" id="cp-hb-instr-context-threshold" rows="2" placeholder="(uses default if blank)" oninput="cpMarkDirty()"></textarea></div>
+        <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Manual trigger</div><textarea class="cp-textarea" id="cp-hb-instr-manual" rows="2" placeholder="(uses default if blank)" oninput="cpMarkDirty()"></textarea></div>
       </div>
     </div>
     <!-- Presence -->
@@ -433,7 +433,7 @@
       <div class="sp-row-2col" style="margin-top:14px">
         <div>
           <div class="sp-field-label">GPU</div>
-          <select class="sp-select" id="sp-gpu">
+          <select class="sp-select" id="sp-gpu" onchange="spMarkServerDirty()">
             <option value="intel">Intel Arc</option>
             <option value="nvidia">NVIDIA</option>
             <option value="amd">AMD</option>
@@ -442,11 +442,11 @@
         </div>
         <div>
           <div class="sp-field-label">Bridge port</div>
-          <input type="number" class="sp-input" id="sp-port-bridge" value="8000"/>
+          <input type="number" class="sp-input" id="sp-port-bridge" value="8000" oninput="spMarkServerDirty()"/>
         </div>
         <div>
           <div class="sp-field-label">Model port</div>
-          <input type="number" class="sp-input" id="sp-port-model" value="8081"/>
+          <input type="number" class="sp-input" id="sp-port-model" value="8081" oninput="spMarkServerDirty()"/>
         </div>
       </div>
       <div class="sp-section-label" style="margin-top:18px">Built-in arguments</div>
@@ -494,9 +494,9 @@
         <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">how images are handled across turns</span>
       </div>
       <div class="sp-radio-group" id="sp-vision-mode">
-        <label class="sp-radio"><input type="radio" name="vision-mode" value="always" checked/> <span>Always re-encode</span> <span class="sp-note">full vision every turn — best with GPU</span></label>
-        <label class="sp-radio"><input type="radio" name="vision-mode" value="once"/>   <span>Once per conversation</span> <span class="sp-note">faster on CPU, loses follow-up vision</span></label>
-        <label class="sp-radio"><input type="radio" name="vision-mode" value="ask"/>    <span>Ask each time</span> <span class="sp-note">prompt appears when attaching an image</span></label>
+        <label class="sp-radio"><input type="radio" name="vision-mode" value="always" checked onchange="spMarkGenerationDirty()"/> <span>Always re-encode</span> <span class="sp-note">full vision every turn — best with GPU</span></label>
+        <label class="sp-radio"><input type="radio" name="vision-mode" value="once"         onchange="spMarkGenerationDirty()"/>   <span>Once per conversation</span> <span class="sp-note">faster on CPU, loses follow-up vision</span></label>
+        <label class="sp-radio"><input type="radio" name="vision-mode" value="ask"          onchange="spMarkGenerationDirty()"/>    <span>Ask each time</span> <span class="sp-note">prompt appears when attaching an image</span></label>
       </div>
     </div>
 

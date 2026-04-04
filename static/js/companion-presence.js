@@ -301,6 +301,7 @@ function cpPresenceNewPreset() {
   cpPresenceRenderPresets();
   cpPresenceSelectPreset(n);
   _cpPresenceDirty = true;
+  if (typeof cpMarkDirty === 'function') cpMarkDirty();
 }
 
 function cpPresenceDeletePreset(name) {
@@ -311,6 +312,7 @@ function cpPresenceDeletePreset(name) {
   cpPresenceRenderPresets();
   cpPresenceSelectPreset(_cpActivePreset);
   _cpPresenceDirty = true;
+  if (typeof cpMarkDirty === 'function') cpMarkDirty();
 }
 
 // ── State selector ─────────────────────────────────────────────────────────
@@ -491,6 +493,7 @@ function cpPresenceSetValue(key, val) {
   }
   _cpPresenceData[_cpActivePreset][_cpEditingState][key] = val;
   _cpPresenceDirty = true;
+  if (typeof cpMarkDirty === 'function') cpMarkDirty();
 }
 
 function _cpCurrentStateData() {
@@ -577,6 +580,7 @@ function cpSetOrbLayout(mode) {
   orb.setMode(mode);
   document.querySelectorAll('.cp-layout-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.mode === mode));
+  if (typeof cpMarkDirty === 'function') cpMarkDirty();
 }
 
 // ── Save payload ───────────────────────────────────────────────────────────

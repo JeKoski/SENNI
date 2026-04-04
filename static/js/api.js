@@ -356,7 +356,9 @@ function _updateStreamBubble({ bubble }, text) {
   if (!bubble) return;
   bubble.dataset.rawText = text;
   const rendered = typeof renderMarkdown === "function" ? renderMarkdown(text) : text;
-  bubble.innerHTML = rendered;
+  // Inject the cursor span inline at the very end of the rendered content
+  // so it sits after the last character, not below the last paragraph block.
+  bubble.innerHTML = rendered + '<span class="stream-cursor"></span>';
   // Use scrollIfFollowing so we don't fight the user if they've scrolled up
   if (typeof scrollIfFollowing === "function") scrollIfFollowing();
   else if (typeof scrollToBottom === "function") scrollToBottom();

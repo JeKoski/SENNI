@@ -7,13 +7,13 @@ Search for it using project knowledge before doing anything else.
 
 ## Critical working rules
 
-- **Always provide complete files** — never code sections, never snippets, never "find X and replace with Y". The user has ADHD and finds partial edits extremely difficult. Full file replacements only.
+- **Always provide complete files** — never code sections, never snippets, never “find X and replace with Y”. The user has ADHD and finds partial edits extremely difficult. Full file replacements only.
 - **One file at a time** where possible. Flag upfront if a feature will require touching multiple files and get agreement before proceeding.
 - **Stop and check in** if things start going wrong rather than pushing through. Escalating complexity when stuck makes things worse.
-- **Never ask the user to remember to do things** at specific times — ADHD means this won't work. Automate it or build it into existing flows instead.
+- **Never ask the user to remember to do things** at specific times — ADHD means this won’t work. Automate it or build it into existing flows instead.
 - **Python bridge needs a full terminal restart** to pick up changes — the in-app restart only restarts llama-server.
 - **Suggest Extended Thinking** and/or Opus when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
-- **End every session by updating CLAUDE.md and any relevant design docs.** This is non-negotiable — it's what makes the next session productive.
+- **End every session by updating CLAUDE.md and any relevant design docs.** This is non-negotiable — it’s what makes the next session productive.
 - Remind user to push changes and refresh project knowledge.
 
 ---
@@ -60,17 +60,17 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 | `static/js/attachments.js` | File attachment handling |
 | `static/js/orb.js` | All orb logic (state, avatar, presets, layout mode) |
 | `static/js/message-renderer.js` | Markdown rendering, message/thinking/tool DOM builders |
-| `static/js/chat-ui.js` | DOM helpers, sidebar UI, input handling, orb delegation |
+| `static/js/chat-ui.js` | DOM helpers, sidebar UI, input handling, orb delegation, scroll tracking |
 | `static/js/chat-tabs.js` | Tab management, message serialization/replay |
-| `static/js/chat-controls.js` | Message controls, edit, regenerate |
+| `static/js/chat-controls.js` | Message controls, edit, regenerate, stop generation |
 | `static/js/chat.js` | Core chat logic, session management, system prompt, boot |
 | `static/js/heartbeat.js` | Heartbeat system |
-| `static/js/companion.js` | Companion settings window coordinator (open/close, load, save, tabs, avatar, soul files, heartbeat, generation) |
+| `static/js/companion.js` | Companion settings window coordinator (open/close, load, save, tabs, avatar, soul files, heartbeat, generation, dirty tracking) |
 | `static/js/companion-presence.js` | Presence tab: presets, state editor, preview orb, layout toggle |
 | `static/js/settings.js` | Settings panel coordinator (open/close, tab switch, load, toast, dirty tracking) |
 | `static/js/settings-server.js` | Settings → Server tab (BUILTIN_ARGS, file browsing, save, restart) |
 | `static/js/settings-generation.js` | Settings → Generation tab |
-| `static/js/settings-companion.js` | Settings → Companion tab + About tab (avatar crop, soul files, heartbeat, companion CRUD) |
+| `static/js/settings-companion.js` | Settings → Companion tab + About tab (companion list only — all other fields are in the Companion Window) |
 | `static/js/settings_os_paths.js` | Per-OS path cards in Settings → Server tab |
 
 ---
@@ -110,7 +110,7 @@ chat-controls.js
 chat.js
 heartbeat.js
 companion.js         ← coordinator, loads before presence
-companion-presence.js ← needs companion.js (cpSettings), orb.js
+companion-presence.js ← needs companion.js (cpSettings, cpMarkDirty), orb.js
 settings.js          ← coordinator, loads before tab files
 settings-server.js   ← needs settings.js
 settings-generation.js ← needs settings.js
@@ -136,7 +136,7 @@ This is the most complex part of the server — read carefully before touching i
 ### State variables (in `server.py`)
 
 | Variable | Meaning |
-|----------|---------| 
+|----------|---------|
 | `_llama_process` | The `Popen` handle for the cmd.exe / llama-server process, or `None` |
 | `_boot_ready` | `True` once llama-server logs "server is listening" |
 | `_boot_launching` | `True` from launch start until either ready or failure — prevents duplicate spawns |
@@ -148,7 +148,7 @@ This is the most complex part of the server — read carefully before touching i
 
 ### Boot sequence
 1. `chat.js` `DOMContentLoaded` → `loadStatus()` → checks `model_running` AND `model_launching`
-2. If `model_launching`: attach to existing SSE log stream, don't call `/api/boot`
+2. If `model_launching`: attach to existing SSE log stream, don’t call `/api/boot`
 3. If neither: call `/api/boot` → server sets `_boot_launching = True` inside lock → starts watcher thread
 4. Watcher thread sets `_llama_process`, reads stdout, sets `_boot_ready = True` when ready, sets `_boot_launching = False`
 5. SSE stream fires `{ready: true}` → chat.js calls `startSession()`
@@ -191,7 +191,7 @@ On Linux Intel, we use `exec` in the shell command so the shell replaces itself 
 }
 ```
 
-`resolve_platform_paths()` reads the current OS's entry into the flat value on load.
+`resolve_platform_paths()` reads the current OS’s entry into the flat value on load.
 `update_platform_paths()` writes the flat value back into the dict on save.
 Empty `server_binary` means auto-discover — never write an empty string to `server_binaries`.
 
@@ -205,7 +205,7 @@ Empty `server_binary` means auto-discover — never write an empty string to `se
 
 ## Settings UI — file browsing
 
-The Settings panel (and wizard) both use `/api/browse` to open a native OS file picker via tkinter. **Do not use hidden `<input type="file">` elements as the primary browse mechanism** — they can't return full paths in the browser security model.
+The Settings panel (and wizard) both use `/api/browse` to open a native OS file picker via tkinter. **Do not use hidden `<input type="file">` elements as the primary browse mechanism** — they can’t return full paths in the browser security model.
 
 `/api/browse` accepts `type`: `"model"` | `"mmproj"` | `"binary"`.
 
@@ -275,7 +275,7 @@ Built around `CP_ELEMENTS` in `companion-presence.js` — a data-driven config a
 **Element bodies** are built lazily on first open via `_cpBuildElementBodies()`.
 
 ### Module split
-- `companion.js` — coordinator: open/close, load, populate, tab switching, avatar, soul files, heartbeat, generation, save, toast
+- `companion.js` — coordinator: open/close, load, populate, tab switching, avatar, soul files, heartbeat, generation, save, toast, **dirty tracking**
 - `companion-presence.js` — all Presence tab logic: presets, state editor, preview orb, layout toggle, `_cpGetPresencePayload()`
 - `companion-mood.js` — future: Mood tab UI (not yet built)
 
@@ -290,15 +290,54 @@ Built around `CP_ELEMENTS` in `companion-presence.js` — a data-driven config a
 - Duplicate bubble bug fixed — `streamWasRendered()` checked before appending ✓
 - Heartbeat settings now apply live after save (no refresh needed) ✓
 - Heartbeat messages persist across refresh — serialized with `heartbeat: true` flag in tab state ✓
-- `_annotateLastBubbleAsHeartbeat()` stamps ✦ meta onto stream-rendered bubble
-- **Still pending:** stop button during heartbeat processing, heartbeat event indicator pill (see Features)
+- `_annotateLastBubbleAsHeartbeat()` stamps ✶ meta onto stream-rendered bubble ✓
+- **Stop button during heartbeat** — `_hbAbortCtrl` created in `heartbeatFire()`, passed to `callModel()`. `stopGeneration()` in `chat-controls.js` also aborts `_hbAbortCtrl`. Stop button shown/hidden around heartbeat generation ✓
+- **Heartbeat event pill** — purple `.heartbeat-pill` inserted at start of each heartbeat turn, removed on skip/abort/no-response ✓
 
 ---
 
-## Companion settings window
+## Companion settings window — current state
 
 - Avatar browse and drop working ✓
-- Old Settings panel Companion tab stripped — shows companion list + "Open companion settings" button only ✓
+- Old Settings panel Companion tab stripped — shows companion list + “Open companion settings” button only ✓
+- **Dirty tracking** — `cpMarkDirty()` / `cpClearDirty()` / `_cpUpdateFooterButtons()` implemented in `companion.js`. Footer Apply/Save buttons turn yellow on unsaved changes, same pattern as Settings panel. Wired to: name input, all soul-edit radios, force-read toggle, all 12 generation inputs, all 6 heartbeat toggles, heartbeat number inputs, all 6 instruction textareas. Presence changes (`cpPresenceSetValue`, new/delete preset, layout toggle) also call `cpMarkDirty()` via `typeof` guard. Window always opens clean (`cpClearDirty()` called in `cpLoad()`). ✓
+
+---
+
+## Settings panel — dirty tracking
+
+- Server tab: sliders, custom args, GPU select, port inputs ✓
+- Generation tab: sliders, max-tokens, max-tool-rounds, vision mode radios, markdown toggle ✓
+- Companion tab: shows companion list only — no editable fields here (all companion fields are in the Companion Window)
+
+---
+
+## Chat tabs — current state
+
+- Tab state serialized to localStorage per companion: `chat_tabs_<folder>` ✓
+- Format: `{ tabs: [...], activeTabId: "..." }` — both the tab list and the active tab are persisted ✓
+- Old plain-array format still supported on load (backward compat) ✓
+- Each tab object: `{ id, title, history, messages, created, tokens, visionMode }` ✓
+- `visionMode` per tab: `null` (use global setting), `'once'`, or `'always'` — set when user picks from the per-message vision dialog ✓
+- Closing the active tab during generation calls `stopGeneration()` to abort the in-flight request ✓
+
+---
+
+## Vision mode — how it works
+
+Three settings, two layers:
+
+**Global setting** (`config.generation.vision_mode`): `'always'` | `'once'` | `'ask'`
+- `'always'` — re-encode image on every turn
+- `'once'` — encode once, substitute text on follow-ups
+- `'ask'` — show a per-message dialog when an image is attached
+
+**Per-tab override** (`tab.visionMode`): `null` | `'once'` | `'always'`
+- Set when user picks from the `'ask'` dialog
+- Persists for the tab’s lifetime (saved in localStorage)
+- Overrides the global setting for that tab
+
+**In `api.js`:** reads `_activeTab?.visionMode || config.generation?.vision_mode || 'always'`. The string `'ask'` is treated as `'always'` — it’s a UI-only value that should never reach the image filter.
 
 ---
 
@@ -330,34 +369,36 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### Orb / Presence
 
-- ~~**Orb edge color not applying from presence preset**~~ — **Fixed** (color architecture split this session)
-- ~~**Heartbeat state uses idle values**~~ — **Fixed** (heartbeat.js now calls `setPresenceState('heartbeat')`)
+- ~~**Orb edge color not applying from presence preset**~~ — **Fixed**
+- ~~**Heartbeat state uses idle values**~~ — **Fixed**
 
 ### Chat
 
-- **Streaming cursor stuck at bottom of message bubble** — the typing cursor `|` sits at the bottom of the bubble rather than following the end of the streamed text. Should move with the text as tokens arrive, giving a "companion is typing" feel.
-- **Closing a tab during generation bleeds response into new active tab** — generation should be cancelled when its originating tab is closed.
-- **Active tab not remembered on restart/refresh** — defaults to the top tab instead of restoring the last active one. Possibly related to the existing localStorage chat history race condition.
-- **Streaming text visual (token-by-token appearance) regressed** — secondary priority.
+- **Streaming text visual (token-by-token appearance) regressed** — secondary priority. Needs investigation.
 - **Message loss on restart/refresh suspected** — non-heartbeat messages may also be getting lost on refresh, possibly related to DOM/history drift or tab switching edge cases. Needs a focused investigation session reading `chat.js` `sendMessage()`, `_saveCurrentTabState()`, and `startSession()` together.
+- ~~**Streaming cursor stuck at bottom of message bubble**~~ — **Fixed** (replaced `::after` pseudo-element with inline `.stream-cursor` span injected by `_updateStreamBubble`)
+- ~~**Closing a tab during generation bleeds response into new active tab**~~ — **Fixed** (`_doCloseTab` calls `stopGeneration()` when closing the active tab)
+- ~~**Active tab not remembered on restart/refresh**~~ — **Fixed** (`saveTabs` now persists `{ tabs, activeTabId }`, `loadTabs` restores it with old-format compat)
+- ~~**Scroll fighting during streaming**~~ — **Fixed** (`_userScrolled` flag + `scrollIfFollowing()` in `chat-ui.js`; `_updateStreamBubble` uses `scrollIfFollowing()` instead of `scrollToBottom()`)
 
 ### Heartbeat
 
 - ~~**Duplicate heartbeat bubble**~~ — **Fixed**
-- ~~**Heartbeat settings not applying until refresh**~~ — **Fixed** (`heartbeatReload()` now called on save)
-- ~~**Heartbeat chat log deleted on refresh**~~ — **Fixed** (serialized with `heartbeat: true` flag)
+- ~~**Heartbeat settings not applying until refresh**~~ — **Fixed**
+- ~~**Heartbeat chat log deleted on refresh**~~ — **Fixed**
+- ~~**No way to stop heartbeat processing**~~ — **Fixed** (`_hbAbortCtrl` + stop button lifecycle in `heartbeat.js`, `stopGeneration()` extended in `chat-controls.js`)
+- ~~**Heartbeat events give no user feedback**~~ — **Fixed** (purple `.heartbeat-pill` inserted at turn start)
 
 ### Settings
 
-- **Markdown render toggle breaks on restart/companion switch** — markdown rendering stops working; toggling the setting off and back on fixes it. Inconsistent to reproduce — may be restart-only or may also affect companion switching.
-- **"Ask each time" image processing not working** — when image processing is set to "Ask each time", selecting "once" in the per-message dialog doesn't take effect (even after page refresh). The global "once" setting works correctly.
-- **Dirty tracking missing for several fields** — the following fields do not mark the settings panel as dirty (unsaved changes indicator not triggered):
-  - Global Settings: Vision mode, Agentic mode, Companion name, Heartbeat settings
-  - Companion Settings: all fields
+- ~~**Settings TypeError on open**~~ — **Fixed** (`spPopulateCompanion` now only populates the companion list)
+- ~~**Markdown render toggle breaks on restart/companion switch**~~ — **Fixed** (`loadStatus` always calls `setMarkdownEnabled`, defaulting to `true` when field is absent)
+- ~~**“Ask each time” image processing not working**~~ — **Fixed** (`visionMode` added to tab serialization; `'ask'` mapped to `'always'` in `api.js`)
+- ~~**Dirty tracking missing for several fields**~~ — **Fixed**: Settings panel (vision mode radios, GPU select, port inputs); Companion Window (all identity, generation, heartbeat fields + presence via hooks)
 
 ### UI / Layout
 
-- **Tool and thinking pills have alignment/padding issues** — pills are misaligned relative to each other and the orb. **Bundle this fix with the pill visual rework** — don't fix in isolation.
+- **Tool and thinking pills have alignment/padding issues** — pills are misaligned relative to each other and the orb. **Bundle this fix with the pill visual rework** — don’t fix in isolation.
 
 ---
 
@@ -367,9 +408,8 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
 
 ### Orb / Presence / Mood
 
-- ~~**Color architecture split — Presence and Mood**~~ — **Done this session.** Five independent properties: `dotColor` / `edgeColor` / `glowColor+glowAlpha` / `ringColor+ringAlpha`. Ring is fully independent from glow. Animation toggle registry in `orb.ANIMATIONS`. Legacy presets migrated on read.
-
-- ~~**Presence tab UI redesign**~~ — **Done this session.** Element-grouped accordion (Orb → Dots → Glow → Ring), unified chip style for presets/states, preview flush with preset/state block, two-level color picker disclosure.
+- ~~**Color architecture split — Presence and Mood**~~ — **Done**
+- ~~**Presence tab UI redesign**~~ — **Done**
 
 - **Mood system UI** *(new `companion-mood.js`, new tab in `chat.html`)*
   - Backend already done (`moods`, `active_mood` in config). UI not yet built.
@@ -377,22 +417,17 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
   - Optional mood pill next to orb showing current mood name — toggleable, hidden by default. Pill background = effects color, pill edge = orb edge color.
   - Users can define short descriptions per mood (injected into system prompt).
   - Animation toggles already built and reusable for Mood.
-  - "Reset to default" option for both Mood and Presence.
+  - “Reset to default” option for both Mood and Presence.
   - `set_mood` tool for Qwenny — implement alongside Mood UI.
-  - *Color architecture already done. Presence tab redesign should happen before Mood UI is built.*
-
-- **Heartbeat UI improvements** *(bundle with Mood/presence work)*
-  - Add stop button during heartbeat processing (same red square used for regular responses).
-  - Add heartbeat event indicator pill — suggested: purple pill showing `[icon] Heartbeat: [trigger]`.
 
 - **Strip mode status bar** — strip layout mode is a placeholder. Needs a status bar showing thinking text and other state info.
 
-- **Presence & Mood: "Reset to default" option** — add reset buttons to both Presence and Mood settings.
+- **Presence & Mood: “Reset to default” option** — add reset buttons to both Presence and Mood settings.
 
 ### Chat
 
 - **Pill visual rework** *(bundle alignment/padding bug fix with this)*
-  - Thinking pills: stream content in real time (like llama.cpp's own WebUI does) — makes long thinking waits much more bearable.
+  - Thinking pills: stream content in real time (like llama.cpp’s own WebUI does) — makes long thinking waits much more bearable.
   - Visual update to make pills thematically consistent with chat bubbles.
 
 - **File upload visualization in chat**
@@ -411,7 +446,7 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
   - Companion Settings: per-tool enable/disable toggles; per-tool per-companion settings (e.g. `get_time` format).
 
 - **Server restart loading overlay**
-  - When clicking restart server, show a blocking overlay (similar to companion switch) to prevent interaction and clearly communicate what's happening. Reuse the existing boot log display if possible.
+  - When clicking restart server, show a blocking overlay (similar to companion switch) to prevent interaction and clearly communicate what’s happening. Reuse the existing boot log display if possible.
 
 ### TTS — Kokoro integration *(new feature, self-contained)*
 
@@ -429,7 +464,7 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
 See `Features & Changes.md` for the full wizard flow sketch. Summary of key design points:
 
 - Sliders for personality traits (Creativity↔Logic, Formal↔Casual, Verbose↔Concise) — open question: map to model params (temperature, top_p) in addition to or instead of prompt templates?
-- Visual grids for appearance/type selections; every option has a "Custom" free-text fallback.
+- Visual grids for appearance/type selections; every option has a “Custom” free-text fallback.
 - Adult Content toggle early in the flow (step 1) — gates what is shown in subsequent steps.
 - Age slider: 18–90, custom field for non-human characters (validated 18–1M).
 - Closeness scale at creation — may later become a gamified relationship progression system.
@@ -443,9 +478,9 @@ See `Features & Changes.md` for the full wizard flow sketch. Summary of key desi
 
 These items are too open-ended to task out. They need a dedicated design conversation before any implementation.
 
-- **Main Chat UI redesign** — overall feel should be "smoother, fuller, cozier". Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
-- **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked "design needs expanding on" in the spec. These need fleshing out before wizard implementation begins.
-- **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard's closeness step is finalized.
+- **Main Chat UI redesign** — overall feel should be “smoother, fuller, cozier”. Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
+- **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked “design needs expanding on” in the spec. These need fleshing out before wizard implementation begins.
+- **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard’s closeness step is finalized.
 
 ---
 
@@ -454,7 +489,7 @@ These items are too open-ended to task out. They need a dedicated design convers
 - **CLAUDE.md** — operational instructions + current state of every system. Update at end of every session.
 - **ORB_DESIGN.md** — orb/presence architecture decisions. Update when orb system is touched.
 - Other design docs (add as needed) — document *why* decisions were made, not *what* the code does.
-- Rule: when we touch a system in a session, we document it in that session. Don't defer.
+- Rule: when we touch a system in a session, we document it in that session. Don’t defer.
 
 ---
 

@@ -114,7 +114,7 @@
     "dry_multiplier": 0.0,
     "dry_base": 1.75,
     "dry_allowed_length": 2,
-    "max_tokens": 6000,
+    "max_tokens": 2048,
     "max_tool_rounds": 10,
     "vision_mode": "always",
     "markdown_enabled": true

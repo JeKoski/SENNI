@@ -74,8 +74,9 @@
 .msg-row.user .msg-time { text-align: right; }
 
 /* ── Streaming cursor ─────────────────────────────────────────────────────── */
-.bubble.stream-bubble::after {
-  content: '';
+/* Injected as a real <span> by _updateStreamBubble so it sits inline at the
+   end of the last text token, not after the last block element. */
+.stream-cursor {
   display: inline-block;
   width: 2px;
   height: 0.85em;

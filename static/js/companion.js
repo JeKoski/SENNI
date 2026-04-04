@@ -12,6 +12,28 @@ let cpFolder   = '';     // active companion folder
 let cpSoulFile = null;   // currently selected soul file name
 let cpDirty    = false;  // unsaved changes flag
 
+// ── Dirty tracking ────────────────────────────────────────────────────────────
+function cpMarkDirty() {
+  cpDirty = true;
+  _cpUpdateFooterButtons();
+}
+
+function cpClearDirty() {
+  cpDirty = false;
+  _cpUpdateFooterButtons();
+}
+
+function _cpUpdateFooterButtons() {
+  document.querySelectorAll('.companion-panel-footer .sp-btn-ghost, .companion-panel-footer .sp-btn-primary')
+    .forEach(btn => {
+      if (btn.textContent.includes('Apply') || btn.textContent.includes('Save')) {
+        btn.style.background  = cpDirty ? 'rgba(251,191,36,0.15)' : '';
+        btn.style.borderColor = cpDirty ? 'rgba(251,191,36,0.5)'  : '';
+        btn.style.color       = cpDirty ? 'rgba(251,191,36,0.9)'  : '';
+      }
+    });
+}
+
 // ── Open / close ──────────────────────────────────────────────────────────────
 async function openCompanionWindow() {
   document.getElementById('companion-overlay').classList.add('open');
@@ -34,6 +56,7 @@ async function cpLoad() {
     const res  = await fetch('/api/settings');
     cpSettings = await res.json();
     cpFolder   = cpSettings.config?.companion_folder || 'default';
+    cpClearDirty();
     cpPopulate();
   } catch(e) { console.warn('cpLoad failed:', e); }
 }
@@ -189,7 +212,7 @@ function cpAvatarCrop() {
   _cpCropper.destroy(); _cpCropper = null;
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
   if (resetWrap) resetWrap.style.display = 'inline';
-  cpDirty = true;
+  cpMarkDirty();
 }
 
 function cpAvatarReset() {
@@ -197,7 +220,7 @@ function cpAvatarReset() {
   if (preview) preview.innerHTML = '✦';
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
   if (resetWrap) resetWrap.style.display = 'none';
-  cpDirty = true;
+  cpMarkDirty();
 }
 
 function cpAvatarFile(input) {
@@ -377,6 +400,7 @@ async function cpSave(andClose = false) {
     }
 
     cpShowToast('Companion saved ✓');
+    cpClearDirty();
     if (andClose) {
       cpPresenceReset();
       closeCompanionWindow();
