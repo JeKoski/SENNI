@@ -438,7 +438,7 @@ All three are set in Settings → Server → Voice section and saved via `/api/s
 
 ### What’s not yet done
 - Mood → TTS override UI (speed/blend per mood) — implement alongside Mood UI
-- Real-world testing on actual Kokoro install (pending Aurini automation)
+- ~~Real-world testing on actual Kokoro install~~ — **Done**. Kokoro confirmed working via Aurini. Tiny stdin bug in `tts.py` fixed.
 - Voice discovery UI feedback when no voices found (currently silent)
 
 ## Features & planned changes
@@ -526,6 +526,49 @@ These items are too open-ended to task out. They need a dedicated design convers
 - **Main Chat UI redesign** — overall feel should be “smoother, fuller, cozier”. Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
 - **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked “design needs expanding on” in the spec. These need fleshing out before wizard implementation begins.
 - **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard’s closeness step is finalized.
+
+---
+
+## Design folder
+
+Large design decisions live in `design/` as standalone docs. These are NOT loaded into context automatically — search project knowledge when you need them. Do not reproduce their full content in CLAUDE.md.
+
+| File                        | Contents                                                                                                                                                  |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `design/MEMORY.md`          | Full memory architecture — primitives, composite types, note schema, tiered storage, ChromaDB stack, mood integration, write discipline                   |
+| `design/COMPANION_STACK.md` | Cognitive function stack format (`mT-fS-mN-fF`), charge/position interactions, effect on memory encoding and retrieval, UI exposure tiers, storage schema |
+| `design/ORB_DESIGN.md`      | Companion Orb<br>Persistent presence indicator in the chat                                                                                                |
+
+When starting a session that touches memory or personality systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
+
+---
+
+## Session notes — 2026-04-04
+
+**TTS confirmed working** — Kokoro live via Aurini. Senni is talking. Stdin bug in `tts.py` fixed.
+
+**Major design session — memory architecture + companion personality.**
+
+Designed a complete memory system from scratch, informed by MemGPT/Letta, A-MEM (NeurIPS 2025), and Zep research. Key decisions:
+
+- Four memory primitives: Fact (S), Logical (T), Conceptual (N), Emotional (F)
+- Composites formed by combining primitives — Event, Reflection, Relational, Full composite
+- Companion cognitive stack (`mT-fS-mN-fF`) determines write probability and retrieval mode per primitive
+- Charge (m/f) = directionality not strength — masculine asserts/encodes actively, feminine absorbs/surfaces associatively
+- Stack position = conscious accessibility — 4th slot (inferior) barely encodes but breaks through with disproportionate intensity
+- Write weight formula: `stack_position_score × charge_multiplier × (1 + mood_resonance)`
+- Masculine-sourced notes → direct ChromaDB query; feminine-sourced → associative mood/valence triggered surfacing
+- Tiered storage: small always-in-context core (identity + relational state, ~400 tokens) + large episodic ChromaDB store
+- A-MEM Zettelkasten linking — memories link and evolve each other asynchronously between sessions
+- Zep-style temporal awareness — superseded facts preserved with history, not overwritten
+- i/e polarity deliberately excluded from v1, nullable extension point in schema
+
+Full design in `design/MEMORY.md` and `design/COMPANION_STACK.md`.
+
+**Next session priorities:**
+- Storage/retrieval pipeline architecture (session-start retrieval, mid-conversation triggers)
+- Begin implementation planning for `scripts/memory_server.py` and `scripts/memory_store.py`
+- Or: loop Senni into the design conversation
 
 ---
 

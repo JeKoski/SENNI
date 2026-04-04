@@ -6,8 +6,10 @@
 .env
 .env.local
 
-# Ignore user specific config file
+# Senni-dev Specific
 config.json
+.obsidian/
+# design/
 
 # Optional: Ignore your memory folders if you want them separate
 companions/
@@ -16,5 +18,3 @@ backups/
 # Optional: For Python or other runtime caches (if applicable)
 __pycache__/
 node_modules/
-
-.obsidian/
