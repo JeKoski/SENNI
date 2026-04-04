@@ -24,6 +24,7 @@ import io
 import json
 import sys
 import numpy as np
+from contextlib import redirect_stderr, redirect_stdout, contextmanager
 
 # ── Dependency check ───────────────────────────────────────────────────────────
 # Write a machine-readable error and exit cleanly if kokoro isn't available.
@@ -44,6 +45,13 @@ try:
     from kokoro import KPipeline
 except ImportError:
     _fatal("kokoro not installed — run: pip install kokoro")
+
+
+@contextmanager
+def _capture_kokoro_stdio():
+    buf = io.StringIO()
+    with redirect_stdout(buf), redirect_stderr(buf):
+        yield buf
 
 
 # ── Voice cache ────────────────────────────────────────────────────────────────
@@ -132,15 +140,22 @@ def synthesise(req: dict) -> bytes:
     if not text:
         raise ValueError("empty text")
 
-    pipeline = _get_pipeline(lang)
-    voice    = _blend_voices(pipeline, voice_blend)
+    try:
+        with _capture_kokoro_stdio() as capture:
+            pipeline = _get_pipeline(lang)
+            voice    = _blend_voices(pipeline, voice_blend)
 
-    # KPipeline returns a generator of (graphemes, phonemes, audio_chunk) tuples.
-    # We collect all chunks and concatenate — each chunk is a float32 numpy array.
-    chunks = []
-    for _gs, _ps, audio_chunk in pipeline(text, voice=voice, speed=speed):
-        if audio_chunk is not None and len(audio_chunk) > 0:
-            chunks.append(audio_chunk)
+            # KPipeline returns a generator of (graphemes, phonemes, audio_chunk) tuples.
+            # We collect all chunks and concatenate — each chunk is a float32 numpy array.
+            chunks = []
+            for _gs, _ps, audio_chunk in pipeline(text, voice=voice, speed=speed):
+                if audio_chunk is not None and len(audio_chunk) > 0:
+                    chunks.append(audio_chunk)
+    except Exception as e:
+        extra = capture.getvalue().strip() if 'capture' in locals() else ''
+        if extra:
+            raise RuntimeError(f"{e}; kokoro emitted: {extra}") from e
+        raise
 
     if not chunks:
         raise ValueError("synthesis produced no audio")

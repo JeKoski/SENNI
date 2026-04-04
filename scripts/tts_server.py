@@ -288,7 +288,12 @@ def _synthesise_blocking(text: str, voices: dict, speed: float,
     if not header_line:
         raise RuntimeError("TTS subprocess closed stdout unexpectedly")
 
-    header = json.loads(header_line)
+    log.debug("Raw TTS header line: %r", header_line)
+    try:
+        header = json.loads(header_line)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"TTS synthesis header parse failed: {e}; raw header line: {header_line!r}") from e
+
     if header.get("id") != req_id:
         raise RuntimeError(f"TTS response ID mismatch: expected {req_id}, got {header.get('id')}")
 

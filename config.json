@@ -104,10 +104,10 @@
   "server_args_custom": [],
   "presence_presets": {},
   "tts": {
-    "enabled": false,
-    "python_path": "C:/AI/Kokoro/Kokoro-Local-Gui-main/.venv/Scripts/kokoro.exe",
-    "voices_path": "",
-    "espeak_path": ""
+    "enabled": true,
+    "python_path": "C:/Users/jesse/AppData/Local/Programs/Python/Python311/python.exe",
+    "voices_path": "C:\\AI\\Kokoro\\Kokoro-82M\\voices",
+    "espeak_path": "C:/Program Files/eSpeak NG/espeak-ng.exe"
   },
   "generation": {
     "temperature": 0.8,
