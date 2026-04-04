@@ -318,5 +318,18 @@ async function spRestartServer() {
 async function spFactoryReset() {
   if (!confirm('Factory reset? This will delete ALL companions, history, and settings. This cannot be undone.')) return;
   await fetch('/api/factory-reset', { method: 'POST' });
+  // Wipe all chat history and tab state stored in localStorage.
+  // Keys are companion-scoped (e.g. chat_tabs_default, chat_history_default)
+  // so we iterate and remove anything matching those prefixes.
+  try {
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('chat_tabs_') || key.startsWith('chat_history_') || key === 'sidebar_width')) {
+        toRemove.push(key);
+      }
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  } catch (e) { console.warn('Could not clear localStorage on factory reset:', e); }
   window.location.reload();
 }

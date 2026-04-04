@@ -7,6 +7,11 @@ function stopGeneration() {
     _abortCtrl.abort();
     _abortCtrl = null;
   }
+  // Also abort any in-flight heartbeat generation
+  if (typeof _hbAbortCtrl !== 'undefined' && _hbAbortCtrl) {
+    _hbAbortCtrl.abort();
+    _hbAbortCtrl = null;
+  }
 }
 
 function showStopButton() {

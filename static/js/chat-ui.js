@@ -75,8 +75,37 @@ function removeTyping(id) {
 
 function scrollToBottom() {
   const el = document.getElementById('messages');
-  if (el) el.scrollTop = el.scrollHeight;
+  if (el) {
+    el.scrollTop = el.scrollHeight;
+    _userScrolled = false;  // hard scroll always resets the flag
+  }
 }
+
+// ── Auto-scroll tracking ──────────────────────────────────────────────────────
+// When the user manually scrolls up during streaming we stop auto-scrolling.
+// scrollToBottom() (used on send, tab switch, etc.) always resets the flag.
+// scrollIfFollowing() is used by the streaming path — only scrolls when the
+// user hasn't scrolled away.
+let _userScrolled = false;
+
+function scrollIfFollowing() {
+  if (!_userScrolled) scrollToBottom();
+}
+
+(function _initScrollTracking() {
+  const run = () => {
+    const el = document.getElementById('messages');
+    if (!el) return;
+    el.addEventListener('scroll', () => {
+      // Consider "at bottom" if within 80px — accounts for rounding and
+      // the small gap that appears before the last bubble fully renders.
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      _userScrolled = !atBottom;
+    }, { passive: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+})();
 
 // ── Input helpers ─────────────────────────────────────────────────────────────
 function initInput() {

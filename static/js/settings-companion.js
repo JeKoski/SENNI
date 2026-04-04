@@ -12,9 +12,15 @@ let spCropDragStart = null;
 let spCropPosStart  = null;
 
 // ── Populate ──────────────────────────────────────────────────────────────────
+// NOTE: The Settings panel companion tab only contains the companion list
+// (#sp-companion-list) and a button to open the Companion Window.
+// All other companion fields (name, avatar, heartbeat, soul files, etc.)
+// live in the Companion Window — cpPopulateCompanion() handles those.
+// DO NOT reference those IDs here; they don't exist in this context.
 function spPopulateCompanion() {
   const companions = spSettings.companions || [];
   const listEl = document.getElementById('sp-companion-list');
+  if (!listEl) return;
   listEl.innerHTML = '';
   companions.forEach(c => {
     const item     = document.createElement('div');
@@ -39,48 +45,6 @@ function spPopulateCompanion() {
       </div>`;
     listEl.appendChild(item);
   });
-
-  const active = spSettings.active_companion || {};
-  document.getElementById('sp-companion-name-input').value = active.companion_name || '';
-
-  const preview = document.getElementById('sp-avatar-preview');
-  if (preview) {
-    const data = spSettings.companions?.find(c => c.folder === spActiveFolder)?.avatar_data || '';
-    preview.innerHTML = data
-      ? `<img src="${data}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
-      : '✦';
-  }
-
-  const frc = document.getElementById('tog-force-read');
-  if (frc) frc.classList.toggle('on', active.force_read_before_write !== false);
-
-  const soulModeEl = document.getElementById('sp-soul-mode');
-  if (soulModeEl) soulModeEl.value = active.soul_edit_mode || 'locked';
-
-  // Heartbeat toggles
-  const hb = active.heartbeat || {};
-  const setTog = (id, val) => document.getElementById(id)?.classList.toggle('on', !!val);
-  setTog('hb-tog-silent',    hb.silent_enabled);
-  setTog('hb-tog-message',   hb.message_enabled);
-  setTog('hb-tog-idle',      hb.idle_trigger);
-  setTog('hb-tog-conv-end',  hb.conversation_end_trigger);
-  setTog('hb-tog-sess-start',hb.session_start_trigger);
-  setTog('hb-tog-ctx',       hb.context_threshold_trigger);
-  const idleMin = document.getElementById('hb-idle-minutes');
-  if (idleMin) idleMin.value = hb.idle_minutes ?? 15;
-  const ctxPct = document.getElementById('hb-ctx-pct');
-  if (ctxPct) ctxPct.value = hb.context_threshold_pct ?? 75;
-
-  const instr = hb.instructions || {};
-  const setInstr = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-  setInstr('hb-instr-default',           instr.default           || '');
-  setInstr('hb-instr-idle',              instr.idle              || '');
-  setInstr('hb-instr-conversation-end',  instr.conversation_end  || '');
-  setInstr('hb-instr-session-start',     instr.session_start     || '');
-  setInstr('hb-instr-context-threshold', instr.context_threshold || '');
-  setInstr('hb-instr-manual',            instr.manual            || '');
-
-  spLoadSoulFiles();
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────────

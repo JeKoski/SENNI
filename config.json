@@ -19,9 +19,9 @@
     "Windows": "intel",
     "Linux": "intel"
   },
-  "server_binary": "C:/AI/llama-cpp/llama-b8398-sycl/llama-server.exe",
+  "server_binary": "C:/Users/jesse/llama.cpp_test/build/bin/llama-server.exe",
   "server_binaries": {
-    "Windows": "C:/AI/llama-cpp/llama-b8398-sycl/llama-server.exe",
+    "Windows": "C:/Users/jesse/llama.cpp_test/build/bin/llama-server.exe",
     "Linux": "/home/sdesser/llama.cpp/build/bin/llama-server"
   },
   "server_args": {
@@ -115,7 +115,7 @@
     "dry_base": 1.75,
     "dry_allowed_length": 2,
     "max_tokens": 6000,
-    "max_tool_rounds": 20,
+    "max_tool_rounds": 10,
     "vision_mode": "always",
     "markdown_enabled": true
   }

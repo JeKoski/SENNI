@@ -160,10 +160,15 @@ async function callModel(system, messages, abortSignal = null) {
     }
 
     // ── Path D: tool call in thinking block ───────────────────────────────
-    if (!rawText && thinkContent) {
+    // Qwen3 often places tool calls inside <think> even when it also outputs
+    // some text. Run this check unconditionally (not just when rawText is empty)
+    // so those calls aren't silently dropped.
+    if (thinkContent) {
       const rescuedCalls = parseXmlToolCalls(thinkContent);
       if (rescuedCalls.length > 0) {
         console.log("[api] rescued", rescuedCalls.length, "tool call(s) from thinking block");
+        // If the model also produced text, push it as the assistant turn first
+        if (rawText) msgs.push({ role: "assistant", content: rawText });
         const results = [];
         for (const { name, args } of rescuedCalls) {
           const result = await _execTool(name, args);
@@ -345,7 +350,9 @@ function _updateStreamBubble({ bubble }, text) {
   bubble.dataset.rawText = text;
   const rendered = typeof renderMarkdown === "function" ? renderMarkdown(text) : text;
   bubble.innerHTML = rendered;
-  if (typeof scrollToBottom === "function") scrollToBottom();
+  // Use scrollIfFollowing so we don't fight the user if they've scrolled up
+  if (typeof scrollIfFollowing === "function") scrollIfFollowing();
+  else if (typeof scrollToBottom === "function") scrollToBottom();
 }
 
 function _finaliseStreamBubble({ row, bubble }, text) {

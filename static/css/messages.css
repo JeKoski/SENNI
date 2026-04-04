@@ -437,6 +437,26 @@ body.controls-always-visible .msg-controls {
   padding: 8px 0;
 }
 
+/* ── Heartbeat event pill ─────────────────────────────────────────────────── */
+.heartbeat-pill {
+  align-self: flex-start;
+  display: flex; align-items: center; gap: 6px;
+  border-radius: 20px;
+  font-size: 11.5px; font-family: 'DM Sans', sans-serif;
+  padding: 5px 12px;
+  margin: 4px 0;
+  background: rgba(167,139,250,0.07);
+  border: 1px solid rgba(167,139,250,0.22);
+  color: rgba(196,181,253,0.65);
+  pointer-events: none;
+  animation: msgIn .25s ease both;
+}
+.heartbeat-pill-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(167,139,250,0.6);
+}
+
+
 /* ── Context progress bar ─────────────────────────────────────────────────── */
 #ctx-bar-wrap {
   padding: 5px 40px 0;

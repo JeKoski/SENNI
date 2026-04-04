@@ -6,6 +6,7 @@ let _hbPollInterval  = null;   // setInterval handle for idle polling
 let _hbLastActivity  = Date.now();
 let _hbRunning       = false;
 let _hbFiredTriggers = new Set(); // prevent context threshold firing repeatedly
+let _hbAbortCtrl     = null;   // AbortController for in-flight heartbeat generation
 
 // ── Config accessor ───────────────────────────────────────────────────────────
 function _hbCfg() {
@@ -146,17 +147,30 @@ async function heartbeatFire(trigger) {
   _hbRunning = true;
   console.log('[heartbeat] firing, trigger:', trigger);
 
+  // Insert a purple event pill so the user knows a heartbeat turn is starting
+  const pill = _appendHeartbeatPill(trigger);
+
+  // Show stop button so the user can cancel heartbeat generation
+  if (typeof showStopButton === 'function') showStopButton();
+
   // Set orb to heartbeat state for the duration of this turn
   if (typeof setPresenceState === 'function') setPresenceState('heartbeat');
+
+  // Create an AbortController — stopGeneration() in chat-controls.js will
+  // reach _hbAbortCtrl via the typeof guard added there.
+  _hbAbortCtrl = new AbortController();
 
   try {
     const prompt   = _buildHeartbeatPrompt(trigger);
     const history  = _buildHeartbeatHistory();
-    const response = await callModel(prompt, history);
+    const response = await callModel(prompt, history, _hbAbortCtrl.signal);
 
     if (response && response.trim()) {
       const text = response.trim();
       const skip = text === '[skip]' || text.toLowerCase() === '[skip]';
+
+      // No output — remove the pill
+      if (skip && pill) pill.remove();
 
       if (c.message_enabled && !skip) {
         // callModel → _streamFinalReply already rendered the bubble and pushed
@@ -181,13 +195,24 @@ async function heartbeatFire(trigger) {
         _saveCurrentTabState();
         if (typeof saveTabs === 'function') saveTabs();
       }
+    } else if (pill) {
+      // No response at all — clean up the pill
+      pill.remove();
     }
   } catch(e) {
-    if (e.name !== 'AbortError') console.warn('[heartbeat] error:', e);
+    if (e.name === 'AbortError') {
+      console.log('[heartbeat] aborted by user');
+    } else {
+      console.warn('[heartbeat] error:', e);
+    }
+    if (pill) pill.remove();
   }
 
-  // Restore orb to idle
+  _hbAbortCtrl = null;
+
+  // Restore orb to idle and hide stop button
   if (typeof setPresenceState === 'function') setPresenceState('idle');
+  if (typeof hideStopButton === 'function') hideStopButton();
   _hbRunning = false;
 }
 
@@ -258,6 +283,19 @@ function _annotateLastBubbleAsHeartbeat(trigger) {
     meta.textContent = metaText;
     targetRow.querySelector('div')?.appendChild(meta);
   }
+}
+
+function _appendHeartbeatPill(trigger) {
+  const list = document.getElementById('messages');
+  if (!list) return null;
+  const pill = document.createElement('div');
+  pill.className = 'heartbeat-pill';
+  pill.innerHTML =
+    '<div class="heartbeat-pill-dot"></div>' +
+    '\u2736 Heartbeat: ' + _triggerLabel(trigger);
+  list.appendChild(pill);
+  scrollToBottom();
+  return pill;
 }
 
 function _appendHeartbeatMessage(text, trigger) {
