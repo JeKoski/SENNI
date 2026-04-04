@@ -193,7 +193,7 @@ async function ensureServerRunning() {
   });
 }
 
-// ── Boot overlay ──────────────────────────────────────────────────────────────
+// ── Boot overlay (startup — lives inside messages list) ───────────────────────
 function showBootOverlay(initialMsg) {
   removeEmptyState();
   document.getElementById('boot-overlay')?.remove();
@@ -216,13 +216,56 @@ function showBootOverlay(initialMsg) {
 }
 
 function updateBootStatus(line) {
-  const el = document.getElementById('boot-status-line');
+  // Update whichever status line is currently visible
+  const el = document.getElementById('restart-status-line') ||
+             document.getElementById('boot-status-line');
   if (el) el.textContent = line;
 }
 
 function hideBootOverlay(errorMsg) {
   document.getElementById('boot-overlay')?.remove();
   if (errorMsg) { appendSystemNote(`${errorMsg}`); enableInput(); }
+}
+
+// ── Restart overlay (in-app restart — full-screen blocking overlay) ───────────
+function showRestartOverlay() {
+  // Close settings panel if open — restart supersedes it
+  const settingsOverlay = document.getElementById('settings-overlay');
+  if (settingsOverlay?.classList.contains('open')) {
+    settingsOverlay.classList.remove('open');
+  }
+
+  document.getElementById('restart-overlay')?.remove();
+  const el = document.createElement('div');
+  el.id = 'restart-overlay';
+  el.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:500',
+    'background:rgba(0,0,0,0.72)',
+    'display:flex', 'flex-direction:column',
+    'align-items:center', 'justify-content:center',
+    'gap:16px', 'padding:40px', 'text-align:center',
+    'color:var(--text-muted)',
+    'opacity:0', 'transition:opacity 0.2s ease',
+  ].join(';');
+  el.innerHTML = `
+    <div style="width:40px;height:40px;border-radius:50%;
+      border:2px solid rgba(129,140,248,0.15);border-top-color:var(--indigo);
+      animation:spin 1s linear infinite"></div>
+    <div style="font-family:'Lora',serif;font-size:18px;color:#eef0fb">Restarting model server\u2026</div>
+    <div id="restart-status-line" style="font-size:12px;font-family:'DM Mono',monospace;
+      color:var(--text-dim);max-width:480px;word-break:break-all;min-height:1.4em;
+      white-space:pre-wrap;text-align:left">
+      Stopping current process\u2026
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = '1'; }));
+}
+
+function hideRestartOverlay() {
+  const el = document.getElementById('restart-overlay');
+  if (!el) return;
+  el.style.opacity = '0';
+  setTimeout(() => el.remove(), 260);
 }
 
 // ── Boot log SSE ──────────────────────────────────────────────────────────────
