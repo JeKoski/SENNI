@@ -62,7 +62,7 @@
     },
     "cache_reuse": {
       "flag": "--cache-reuse",
-      "enabled": true,
+      "enabled": false,
       "value": 256
     },
     "batch": {
@@ -72,7 +72,7 @@
     },
     "ubatch": {
       "flag": "-ub",
-      "enabled": true,
+      "enabled": false,
       "value": 256
     },
     "flash_attn": {

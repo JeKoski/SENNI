@@ -11,24 +11,38 @@ function _tabsKey() {
 
 function saveTabs() {
   try {
-    localStorage.setItem(_tabsKey(), JSON.stringify(_tabs));
+    localStorage.setItem(_tabsKey(), JSON.stringify({ tabs: _tabs, activeTabId: _activeTabId }));
   } catch(e) { console.warn('saveTabs failed:', e); }
 }
 
 function loadTabs() {
   try {
     const raw = localStorage.getItem(_tabsKey());
-    if (raw) _tabs = JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Support both old format (plain array) and new format ({tabs, activeTabId})
+      if (Array.isArray(parsed)) {
+        _tabs = parsed;
+      } else {
+        _tabs = parsed.tabs || [];
+        if (parsed.activeTabId) _activeTabId = parsed.activeTabId;
+      }
+    }
   } catch {}
   if (!_tabs.length) _tabs = [_makeTab()];
   _tabs = _tabs.map(t => ({
-    id:       t.id       || _uid(),
-    title:    t.title    || 'New chat',
-    history:  t.history  || [],
-    messages: t.messages || [],
-    created:  t.created  || Date.now(),
-    tokens:   t.tokens   || 0,
+    id:          t.id          || _uid(),
+    title:       t.title       || 'New chat',
+    history:     t.history     || [],
+    messages:    t.messages    || [],
+    created:     t.created     || Date.now(),
+    tokens:      t.tokens      || 0,
+    visionMode:  t.visionMode  || null,
   }));
+  // Validate that the restored activeTabId actually exists
+  if (_activeTabId && !_tabs.find(t => t.id === _activeTabId)) {
+    _activeTabId = null;
+  }
 }
 
 function _uid() {
@@ -36,7 +50,7 @@ function _uid() {
 }
 
 function _makeTab(title = 'New chat') {
-  return { id: _uid(), title, history: [], messages: [], created: Date.now(), tokens: 0 };
+  return { id: _uid(), title, history: [], messages: [], created: Date.now(), tokens: 0, visionMode: null };
 }
 
 // ── Tab operations ────────────────────────────────────────────────────────────
@@ -116,6 +130,12 @@ function closeTab(id, e) {
 }
 
 function _doCloseTab(id) {
+  // If we're closing the tab that owns the current generation, abort it now
+  // so the response doesn't bleed into whatever tab becomes active next.
+  if (id === _activeTabId && typeof stopGeneration === 'function') {
+    stopGeneration();
+  }
+
   if (_tabs.length === 1) {
     _tabs[0] = _makeTab();
     _activeTabId = _tabs[0].id;

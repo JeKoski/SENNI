@@ -73,11 +73,11 @@ async function loadStatus() {
     if (data.context_size) _contextSize = data.context_size;
 
     // markdown_enabled lives in global generation — read from data.config directly
-    // so companion generation overrides don't accidentally wipe it
-    if (data.config?.generation?.markdown_enabled !== undefined) {
-      _markdownEnabled = !!data.config.generation.markdown_enabled;
-      if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(_markdownEnabled);
-    }
+    // so companion generation overrides don't accidentally wipe it.
+    // Default to true (matches DEFAULTS) when the field is absent.
+    const mdEnabled = data.config?.generation?.markdown_enabled ?? true;
+    _markdownEnabled = !!mdEnabled;
+    if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(_markdownEnabled);
 
     renderToolPills(tools);
     updateMemoryCounts();

@@ -23,7 +23,14 @@ async function callModel(system, messages, abortSignal = null) {
   _clearReadCache();
 
   const _activeTab = (typeof _tabs !== "undefined") && _tabs.find(t => t.id === _activeTabId);
-  const visionMode = _activeTab?.visionMode || config.generation?.vision_mode || "always";
+  // visionMode drives how images in conversationHistory are sent to the model.
+  // 'once'   = encode only on the message that introduced the image; substitute text for older turns.
+  // 'always' = re-encode the image on every turn (default).
+  // 'ask'    is a UI-only setting — per-message choice is resolved before callModel is called
+  //          and stored on the tab as 'once' or 'always'. It should never reach here as-is,
+  //          but guard against it by treating it the same as 'always'.
+  const _rawVisionMode = _activeTab?.visionMode || config.generation?.vision_mode || "always";
+  const visionMode = (_rawVisionMode === "ask") ? "always" : _rawVisionMode;
 
   let lastUserIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
