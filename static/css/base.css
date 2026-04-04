@@ -286,3 +286,22 @@ body::before {
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(140,145,220,0.18); border-radius: 3px; }
+
+/* ── Shared spinner keyframe (used by boot overlay, panel loading states) ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Panel loading spinner — injected by JS into settings / companion panels */
+.panel-loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+.panel-loading-spinner::before {
+  content: '';
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(129,140,248,0.15);
+  border-top-color: var(--indigo);
+  animation: spin 0.9s linear infinite;
+}

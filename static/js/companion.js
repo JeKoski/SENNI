@@ -36,13 +36,50 @@ function _cpUpdateFooterButtons() {
 
 // ── Open / close ──────────────────────────────────────────────────────────────
 async function openCompanionWindow() {
-  document.getElementById('companion-overlay').classList.add('open');
+  const overlay = document.getElementById('companion-overlay');
+  overlay.classList.add('open');
+  _cpShowLoadingState(true);
   await cpLoad();
+  _cpShowLoadingState(false);
   cpSwitchTab('identity');
 }
 
+function _cpShowLoadingState(isLoading) {
+  const panel = document.querySelector('.companion-panel');
+  if (!panel) return;
+
+  const toggleEls = panel.querySelectorAll(
+    '.companion-tabs-strip, .cp-tab-body, .companion-panel-footer'
+  );
+  let spinner = panel.querySelector('.cp-loading-spinner');
+  if (!spinner) {
+    spinner = document.createElement('div');
+    spinner.className = 'panel-loading-spinner cp-loading-spinner';
+    const header = panel.querySelector('.companion-panel-header');
+    if (header) header.after(spinner);
+    else panel.prepend(spinner);
+  }
+
+  if (isLoading) {
+    spinner.style.display = 'flex';
+    toggleEls.forEach(el => { el.style.visibility = 'hidden'; el.style.opacity = '0'; });
+  } else {
+    spinner.style.display = 'none';
+    toggleEls.forEach(el => {
+      el.style.visibility = '';
+      el.style.transition = 'opacity 0.18s ease';
+      el.style.opacity = '0';
+      requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = ''; }));
+    });
+  }
+}
+
 function closeCompanionWindow() {
+  if (cpDirty) {
+    if (!confirm('You have unsaved changes. Close anyway?')) return;
+  }
   cpPresenceReset();  // allow fresh init on next open (defined in companion-presence.js)
+  cpClearDirty();
   document.getElementById('companion-overlay').classList.remove('open');
 }
 

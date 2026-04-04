@@ -77,14 +77,18 @@ DEFAULTS = {
     # Presence presets
     "presence_presets": {
         "Default": {
-            "thinking":  {"glowColor":"rgba(129,140,248,0.4)",  "glowMax":16, "glowSpeed":2.0, "ringSpeed":1.8, "dotColor":"#818cf8", "dotSpeed":1.2, "breathSpeed":3.0, "orbSize":52},
-            "streaming": {"glowColor":"rgba(109,212,168,0.35)", "glowMax":12, "glowSpeed":2.5, "ringSpeed":2.4, "dotColor":"#6dd4a8", "dotSpeed":1.4, "breathSpeed":4.0, "orbSize":52},
-            "idle":      {"glowColor":"rgba(129,140,248,0.15)", "glowMax":6,  "glowSpeed":4.0, "ringSpeed":4.0, "dotColor":"#818cf8", "dotSpeed":3.0, "breathSpeed":5.0, "orbSize":52},
+            "thinking":  {"dotColor":"#818cf8", "edgeColor":"#818cf8", "glowColor":"#818cf8", "glowAlpha":0.40, "ringColor":"#818cf8", "ringAlpha":0.28, "glowMax":16, "glowSpeed":2.0, "ringSpeed":1.8, "dotSpeed":1.2, "breathSpeed":3.0, "orbSize":52},
+            "streaming": {"dotColor":"#6dd4a8", "edgeColor":"#6dd4a8", "glowColor":"#6dd4a8", "glowAlpha":0.35, "ringColor":"#6dd4a8", "ringAlpha":0.22, "glowMax":12, "glowSpeed":2.5, "ringSpeed":2.4, "dotSpeed":1.4, "breathSpeed":3.0, "orbSize":52},
+            "heartbeat": {"dotColor":"#a78bfa", "edgeColor":"#a78bfa", "glowColor":"#a78bfa", "glowAlpha":0.45, "ringColor":"#a78bfa", "ringAlpha":0.30, "glowMax":20, "glowSpeed":1.4, "ringSpeed":1.4, "dotSpeed":0.9, "breathSpeed":2.0, "orbSize":52},
+            "chaos":     {"dotColor":"#fbbf24", "edgeColor":"#fbbf24", "glowColor":"#fbbf24", "glowAlpha":0.50, "ringColor":"#fbbf24", "ringAlpha":0.35, "glowMax":24, "glowSpeed":0.8, "ringSpeed":0.9, "dotSpeed":0.6, "breathSpeed":0.6, "orbSize":52},
+            "idle":      {"dotColor":"#818cf8", "edgeColor":"#818cf8", "glowColor":"#818cf8", "glowAlpha":0.15, "ringColor":"#818cf8", "ringAlpha":0.12, "glowMax":6,  "glowSpeed":4.0, "ringSpeed":4.0, "dotSpeed":2.0, "breathSpeed":5.0, "orbSize":52},
         },
         "Warm": {
-            "thinking":  {"glowColor":"rgba(251,191,36,0.4)",   "glowMax":18, "glowSpeed":1.8, "ringSpeed":1.6, "dotColor":"#fbbf24", "dotSpeed":1.0, "breathSpeed":2.5, "orbSize":52},
-            "streaming": {"glowColor":"rgba(251,146,60,0.35)",  "glowMax":14, "glowSpeed":2.2, "ringSpeed":2.0, "dotColor":"#fb923c", "dotSpeed":1.2, "breathSpeed":3.5, "orbSize":52},
-            "idle":      {"glowColor":"rgba(251,191,36,0.12)",  "glowMax":6,  "glowSpeed":4.0, "ringSpeed":4.0, "dotColor":"#fb923c", "dotSpeed":2.0, "breathSpeed":5.0, "orbSize":52},
+            "thinking":  {"dotColor":"#fbbf24", "edgeColor":"#f59e0b", "glowColor":"#fbbf24", "glowAlpha":0.40, "ringColor":"#f59e0b", "ringAlpha":0.28, "glowMax":18, "glowSpeed":1.8, "ringSpeed":1.6, "dotSpeed":1.0, "breathSpeed":2.5, "orbSize":52},
+            "streaming": {"dotColor":"#fb923c", "edgeColor":"#f97316", "glowColor":"#fb923c", "glowAlpha":0.35, "ringColor":"#f97316", "ringAlpha":0.22, "glowMax":14, "glowSpeed":2.2, "ringSpeed":2.0, "dotSpeed":1.2, "breathSpeed":3.5, "orbSize":52},
+            "heartbeat": {"dotColor":"#fda4af", "edgeColor":"#fb7185", "glowColor":"#fda4af", "glowAlpha":0.45, "ringColor":"#fb7185", "ringAlpha":0.30, "glowMax":20, "glowSpeed":1.4, "ringSpeed":1.4, "dotSpeed":0.9, "breathSpeed":2.0, "orbSize":52},
+            "chaos":     {"dotColor":"#fcd34d", "edgeColor":"#fbbf24", "glowColor":"#fcd34d", "glowAlpha":0.55, "ringColor":"#fbbf24", "ringAlpha":0.38, "glowMax":26, "glowSpeed":0.7, "ringSpeed":0.8, "dotSpeed":0.5, "breathSpeed":0.5, "orbSize":52},
+            "idle":      {"dotColor":"#fbbf24", "edgeColor":"#f59e0b", "glowColor":"#fbbf24", "glowAlpha":0.12, "ringColor":"#f59e0b", "ringAlpha":0.10, "glowMax":6,  "glowSpeed":4.5, "ringSpeed":4.5, "dotSpeed":2.5, "breathSpeed":5.5, "orbSize":52},
         },
     },
 

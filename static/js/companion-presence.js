@@ -130,6 +130,9 @@ function cpPresenceInit() {
   cpPresenceRenderPresets();
   cpPresenceSelectPreset(_cpActivePreset);
 
+  // Sync state chips so the correct one is highlighted from the start
+  _cpSyncStateChips(_cpEditingState);
+
   // Mirror avatar into preview
   const avSrc = document.querySelector('#companion-avatar img')?.src;
   const previewIcon = document.getElementById('cpp-icon');
@@ -316,12 +319,23 @@ function cpPresenceDeletePreset(name) {
 }
 
 // ── State selector ─────────────────────────────────────────────────────────
-function cpPresenceSwitchState(state, el) {
-  _cpEditingState = state;
-  document.querySelectorAll('.cp-state-chip').forEach(c => c.classList.remove('active'));
-  if (el) el.classList.add('active');
+// Sync the active class on state chips to match the given state name.
+// Chips are identified by their onclick attribute containing the state string.
+// Called on init (so chips start correctly) and on every state switch.
+function _cpSyncStateChips(state) {
+  document.querySelectorAll('.cp-state-chip').forEach(c => {
+    // Match onclick="cpPresenceSwitchState('thinking',this)" — extract first arg
+    const match = (c.getAttribute('onclick') || '').match(/cpPresenceSwitchState\('([^']+)'/);
+    const chipState = match ? match[1] : null;
+    c.classList.toggle('active', chipState === state);
+  });
   const lbl = document.getElementById('cpp-state-label');
   if (lbl) lbl.textContent = state;
+}
+
+function cpPresenceSwitchState(state, el) {
+  _cpEditingState = state;
+  _cpSyncStateChips(state);
   cpPresenceRenderState(state);
 }
 

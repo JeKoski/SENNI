@@ -48,9 +48,43 @@ function _spUpdateFooterButtons() {
 
 // ── Open / close ──────────────────────────────────────────────────────────────
 async function openSettings() {
-  document.getElementById('settings-overlay').classList.add('open');
+  const overlay = document.getElementById('settings-overlay');
+  overlay.classList.add('open');
+  _spShowLoadingState(true);
   await spLoad();
+  _spShowLoadingState(false);
   spSwitchTab('server');
+}
+
+function _spShowLoadingState(isLoading) {
+  const panel = document.getElementById('settings-panel');
+  if (!panel) return;
+
+  // Elements to show/hide around the spinner
+  const toggleEls = panel.querySelectorAll('.sp-tabs, .tab-body, .sp-footer-row');
+
+  let spinner = panel.querySelector('.sp-loading-spinner');
+  if (!spinner) {
+    spinner = document.createElement('div');
+    spinner.className = 'panel-loading-spinner sp-loading-spinner';
+    // Insert after the header
+    const header = panel.querySelector('.sp-header');
+    if (header) header.after(spinner);
+    else panel.prepend(spinner);
+  }
+
+  if (isLoading) {
+    spinner.style.display = 'flex';
+    toggleEls.forEach(el => { el.style.visibility = 'hidden'; el.style.opacity = '0'; });
+  } else {
+    spinner.style.display = 'none';
+    toggleEls.forEach(el => {
+      el.style.visibility = '';
+      el.style.transition = 'opacity 0.18s ease';
+      el.style.opacity = '0';
+      requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = ''; }));
+    });
+  }
 }
 
 function closeSettings() {
