@@ -288,7 +288,7 @@ def _synthesise_blocking(text: str, voices: dict, speed: float,
     if not header_line:
         raise RuntimeError("TTS subprocess closed stdout unexpectedly")
 
-    log.debug("Raw TTS header line: %r", header_line)
+    # log.debug("Raw TTS header line: %r", header_line)
     try:
         header = json.loads(header_line)
     except json.JSONDecodeError as e:
