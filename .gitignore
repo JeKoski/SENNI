@@ -16,3 +16,5 @@ backups/
 # Optional: For Python or other runtime caches (if applicable)
 __pycache__/
 node_modules/
+
+.obsidian/

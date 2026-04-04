@@ -11,7 +11,6 @@ Search for it using project knowledge before doing anything else.
 - **One file at a time** where possible. Flag upfront if a feature will require touching multiple files and get agreement before proceeding.
 - **Stop and check in** if things start going wrong rather than pushing through. Escalating complexity when stuck makes things worse.
 - **Never ask the user to remember to do things** at specific times — ADHD means this won’t work. Automate it or build it into existing flows instead.
-- **Python bridge needs a full terminal restart** to pick up changes — the in-app restart only restarts llama-server.
 - **Suggest Extended Thinking** and/or Opus when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
 - **End every session by updating CLAUDE.md and any relevant design docs.** This is non-negotiable — it’s what makes the next session productive.
 - Remind user to push changes and refresh project knowledge.
@@ -20,7 +19,7 @@ Search for it using project knowledge before doing anything else.
 
 ## Project overview
 
-SENNI is a local AI companion framework. The companion is Qwenny (Qwen3.5 9B Q4_K_M, Intel Arc GPU).
+SENNI is a local AI companion framework. Currently running with Qwen3.5 9B Q4_K_M, Intel Arc GPU.
 
 Two servers:
 - **Python bridge** (`scripts/server.py`) — FastAPI, handles UI, tools, config. Needs terminal restart for changes.
@@ -395,6 +394,8 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - ~~**Markdown render toggle breaks on restart/companion switch**~~ — **Fixed** (`loadStatus` always calls `setMarkdownEnabled`, defaulting to `true` when field is absent)
 - ~~**“Ask each time” image processing not working**~~ — **Fixed** (`visionMode` added to tab serialization; `'ask'` mapped to `'always'` in `api.js`)
 - ~~**Dirty tracking missing for several fields**~~ — **Fixed**: Settings panel (vision mode radios, GPU select, port inputs); Companion Window (all identity, generation, heartbeat fields + presence via hooks)
+- Companion Settings exiting with dirty edits without confirmation: Should ask for confirmation just like in regular Settings to prevent loss of edits
+- Companion Settings - Presence: Some default presets have non-hex color codes (don't work) and wrong colors (especially in Warm, multiple colors are same as regular instead of Warm tones)
 
 ### UI / Layout
 
@@ -452,12 +453,18 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
 
 - Toggle to completely enable/disable (does not load at all when disabled).
 - CPU or GPU option — **note: Intel Arc / oneAPI support for Kokoro is unconfirmed, needs research before committing to GPU path.**
+- Setting for inference device (CPU, GPU)
 - Streaming audio output.
 - Settings per companion.
 - Voice mixing: blend multiple Kokoro voice presets with per-preset sliders (e.g. 0.1 Bella + 0.4 Heart + ...).
 - Pitch and speed controls.
 - Mood integration: map moods to voice presets (null/neutral mood = companion default; each mood can override).
 - Future: Qwen3-TTS option for better tone/emphasis control — current hardware likely limits to Kokoro only for now.
+
+# Multilayered persistent memory
+- Look into best options - What open source options are there already that we could just use instead of reinventing the wheel?
+- Automatic vector/embedding?
+- Memory decay over time when not used?
 
 ### Companion Creation Wizard *(design needed — large feature)*
 
