@@ -103,6 +103,12 @@
   },
   "server_args_custom": [],
   "presence_presets": {},
+  "tts": {
+    "enabled": false,
+    "python_path": "C:/AI/Kokoro/Kokoro-Local-Gui-main/.venv/Scripts/kokoro.exe",
+    "voices_path": "",
+    "espeak_path": ""
+  },
   "generation": {
     "temperature": 0.8,
     "top_p": 0.95,

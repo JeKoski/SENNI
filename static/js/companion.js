@@ -79,6 +79,7 @@ function closeCompanionWindow() {
     if (!confirm('You have unsaved changes. Close anyway?')) return;
   }
   cpPresenceReset();  // allow fresh init on next open (defined in companion-presence.js)
+  if (typeof cpTtsReset === 'function') cpTtsReset();
   cpClearDirty();
   document.getElementById('companion-overlay').classList.remove('open');
 }
@@ -159,6 +160,11 @@ function cpPopulate() {
   // ── Presence ──
   cpPresenceInit();
 
+  // ── Voice (TTS) ── populate if tab already initialised
+  if (_cpTtsInitDone && typeof cpTtsPopulate === 'function') {
+    cpTtsPopulate(c.tts || {});
+  }
+
   // ── Heartbeat ──
   const hb = c.heartbeat || {};
   const hbTog = (id, val) => { const el = document.getElementById(id); if (el) el.classList.toggle('on', !!val); };
@@ -194,6 +200,9 @@ function cpSwitchTab(tab) {
       cpPresenceRenderPresets();
       cpPresenceRenderState(_cpEditingState);
     }
+  }
+  if (tab === 'voice') {
+    if (typeof cpTtsInit === 'function') cpTtsInit();
   }
 }
 
@@ -385,6 +394,7 @@ async function cpSave(andClose = false) {
       force_read_before_write: document.getElementById('cp-force-read')?.classList.contains('on') ?? true,
       heartbeat:               hb,
       ..._cpGetPresencePayload(),   // from companion-presence.js
+      ...(typeof _cpGetTtsPayload === 'function' ? _cpGetTtsPayload() : {}),
       // ..._cpGetMoodPayload(),    // from companion-mood.js (future)
     };
 

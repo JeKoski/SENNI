@@ -184,6 +184,7 @@
       <button class="cp-tab" data-tab="memory"     onclick="cpSwitchTab('memory')">Memory</button>
       <button class="cp-tab" data-tab="heartbeat"  onclick="cpSwitchTab('heartbeat')">Heartbeat</button>
       <button class="cp-tab" data-tab="presence"   onclick="cpSwitchTab('presence')" style="color:rgba(167,139,250,0.7)">Presence ✦</button>
+      <button class="cp-tab" data-tab="voice"      onclick="cpSwitchTab('voice')">Voice</button>
     </div>
     <!-- Identity -->
     <div class="cp-tab-body" id="cp-tab-identity">
@@ -388,6 +389,50 @@
       </div>
 
     </div>
+        <!-- Voice (TTS) -->
+    <div class="cp-tab-body" id="cp-tab-voice">
+
+      <!-- Shown when kokoro/espeak not installed -->
+      <div class="cp-tts-unavailable" id="cp-tts-unavailable">
+        <strong>Kokoro TTS not found.</strong><br>
+        Install Kokoro via Aurini or manually: <code>pip install kokoro soundfile</code>
+        and <code>espeak-ng</code>, then set the Python path in
+        Settings → Voice and restart SENNI.
+      </div>
+
+      <!-- Main content (hidden when unavailable) -->
+      <div id="cp-tts-content">
+
+        <div class="cp-section">Voice blend <span class="cp-note">up to 5 voices — weights are normalised</span></div>
+        <div id="cp-tts-blend-slots"></div>
+        <button class="cp-add-btn" id="cp-tts-add-voice" onclick="cpTtsAddVoice()" style="margin-bottom:14px">+ Add voice</button>
+
+        <div class="cp-section" style="margin-top:4px">Delivery</div>
+        <div class="cp-row-2" style="margin-bottom:14px">
+          <div>
+            <div class="cp-field-label">Speed <span class="cp-note">0.5 – 2.0</span></div>
+            <input type="number" class="cp-input" id="cp-tts-speed"
+              value="1.0" min="0.5" max="2.0" step="0.05"
+              oninput="cpMarkDirty()"/>
+          </div>
+          <div>
+            <div class="cp-field-label">Pitch <span class="cp-note">0.5 – 2.0</span></div>
+            <input type="number" class="cp-input" id="cp-tts-pitch"
+              value="1.0" min="0.5" max="2.0" step="0.05"
+              oninput="cpMarkDirty()"/>
+          </div>
+        </div>
+
+        <div class="cp-section">Preview</div>
+        <div class="cp-tts-preview-row">
+          <input type="text" class="cp-input" id="cp-tts-preview-text"
+            placeholder="Hello! This is a preview of my voice."/>
+          <button class="sp-btn-ghost cp-tts-preview-btn" id="cp-tts-preview-btn"
+            onclick="cpTtsPreview()">▶ Preview</button>
+        </div>
+
+      </div>
+    </div>
         <!-- Footer -->
     <div class="companion-panel-footer">
       <button class="sp-btn-ghost" onclick="cpSave()">Apply</button>
@@ -458,6 +503,35 @@
       <div id="sp-custom-args"></div>
       <div class="sp-restart-note" id="sp-restart-note" style="display:none">
         ⚠ A server restart is needed to apply these changes
+      </div>
+
+      <div class="sp-section-label" style="margin-top:22px">
+        Voice (Kokoro TTS)
+        <span style="font-size:10px;color:rgba(221,225,240,0.3);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px">optional — requires separate install</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="sp-tog" id="sp-tts-enabled" onclick="this.classList.toggle('on');spMarkServerDirty()"></div>
+        <span style="font-size:13px;color:rgba(221,225,240,0.6)">Enable Kokoro TTS</span>
+      </div>
+      <div id="sp-tts-paths">
+        <div class="sp-field-label">Python executable <span style="font-size:10.5px;color:rgba(221,225,240,0.25);font-weight:400">(with kokoro installed — blank = auto)</span></div>
+        <div class="sp-file-row" style="margin-bottom:10px">
+          <div class="sp-file-display" id="sp-tts-python-display">Auto-detect</div>
+          <button class="sp-btn-sm" onclick="spBrowseTts('python')">Browse</button>
+          <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('python')">Clear</button>
+        </div>
+        <div class="sp-field-label">Voices directory <span style="font-size:10.5px;color:rgba(221,225,240,0.25);font-weight:400">(folder containing .pt files — blank = auto)</span></div>
+        <div class="sp-file-row" style="margin-bottom:10px">
+          <div class="sp-file-display" id="sp-tts-voices-display">Auto-detect</div>
+          <button class="sp-btn-sm" onclick="spBrowseTts('voices')">Browse</button>
+          <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('voices')">Clear</button>
+        </div>
+        <div class="sp-field-label">espeak-ng path <span style="font-size:10.5px;color:rgba(221,225,240,0.25);font-weight:400">(blank = use PATH)</span></div>
+        <div class="sp-file-row">
+          <div class="sp-file-display" id="sp-tts-espeak-display">Auto-detect</div>
+          <button class="sp-btn-sm" onclick="spBrowseTts('espeak')">Browse</button>
+          <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('espeak')">Clear</button>
+        </div>
       </div>
     </div>
 
@@ -577,8 +651,10 @@
 <script src="/static/js/chat-controls.js"></script>
 <script src="/static/js/chat.js"></script>
 <script src="/static/js/heartbeat.js"></script>
+<script src="/static/js/tts.js"></script>
 <script src="/static/js/companion.js"></script>
 <script src="/static/js/companion-presence.js"></script>
+<script src="/static/js/companion-tts.js"></script>
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/settings-server.js"></script>
 <script src="/static/js/settings-generation.js"></script>

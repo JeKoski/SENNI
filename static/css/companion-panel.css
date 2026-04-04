@@ -677,3 +677,107 @@
   font-size: 11px; font-family: 'DM Mono', monospace;
   color: rgba(165,180,252,0.6); width: 34px; text-align: right;
 }
+
+/* ── Voice (TTS) tab ──────────────────────────────────────────────────────── */
+.cp-tts-unavailable {
+  display: none;
+  background: rgba(248,113,113,0.07);
+  border: 1px solid rgba(248,113,113,0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  color: rgba(248,113,113,0.8);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+.cp-tts-unavailable a {
+  color: rgba(165,180,252,0.8);
+  text-decoration: none;
+}
+.cp-tts-unavailable a:hover { text-decoration: underline; }
+
+/* Voice blend slots */
+.cp-tts-blend-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cp-tts-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cp-tts-voice-select {
+  width: 160px;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-family: 'DM Mono', monospace;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(165,180,252,0.5)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+
+.cp-tts-weight-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cp-tts-weight-slider {
+  flex: 1;
+  accent-color: #818cf8;
+  height: 3px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.cp-tts-weight-pct {
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  color: rgba(165,180,252,0.6);
+  width: 34px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.cp-tts-remove-btn {
+  background: none;
+  border: 1px solid rgba(248,113,113,0.2);
+  border-radius: 6px;
+  color: rgba(248,113,113,0.5);
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: all .15s;
+  padding: 0;
+}
+.cp-tts-remove-btn:hover {
+  background: rgba(248,113,113,0.1);
+  border-color: rgba(248,113,113,0.4);
+  color: rgba(248,113,113,0.9);
+}
+
+/* Preview row */
+.cp-tts-preview-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 10px;
+}
+.cp-tts-preview-row .cp-input {
+  flex: 1;
+  font-size: 12.5px;
+}
+.cp-tts-preview-btn {
+  flex-shrink: 0;
+}

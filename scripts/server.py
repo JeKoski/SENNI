@@ -65,6 +65,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── TTS router ─────────────────────────────────────────────────────────────────
+try:
+    from scripts.tts_server import router as tts_router, kill_tts_server
+    app.include_router(tts_router)
+    _tts_available = True
+except Exception as _tts_import_err:
+    log.warning("TTS module failed to import (non-fatal): %s", _tts_import_err)
+    _tts_available  = False
+    kill_tts_server = lambda: None  # noqa: E731
+
 STATIC_DIR = PROJECT_ROOT / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -102,6 +112,7 @@ async def on_startup():
 
     # Belt-and-suspenders: also kill on abnormal Python exit
     atexit.register(_kill_llama_server)
+    atexit.register(kill_tts_server)
 
     try:
         from scripts.auto_backup import run_backup
@@ -115,6 +126,7 @@ async def on_shutdown():
     """Called by uvicorn on clean exit (Ctrl+C, SIGTERM). Kills llama-server tree."""
     log.info("Shutting down — stopping llama-server…")
     _kill_llama_server()
+    kill_tts_server()
     _executor.shutdown(wait=False)
 
 
@@ -791,6 +803,27 @@ async def api_save_generation_settings(request: Request):
     return {"ok": True}
 
 
+@app.post("/api/settings/tts")
+async def api_save_tts_settings(request: Request):
+    """Save global TTS settings (enable/disable, paths). Restarts TTS process if needed."""
+    body   = await request.json()
+    config = load_config()
+    config["tts"] = {
+        **DEFAULTS.get("tts", {}),
+        **config.get("tts", {}),
+        **body,
+    }
+    save_config(config)
+    # If TTS was just enabled, start the subprocess; if disabled, stop it.
+    if _tts_available:
+        if config["tts"].get("enabled"):
+            from scripts.tts_server import _ensure_tts_running
+            _ensure_tts_running()
+        else:
+            kill_tts_server()
+    return {"ok": True}
+
+
 @app.post("/api/settings/companion")
 async def api_save_companion_settings(request: Request):
     body             = await request.json()
@@ -800,7 +833,7 @@ async def api_save_companion_settings(request: Request):
 
     for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode",
                 "heartbeat", "force_read_before_write", "presence_presets",
-                "active_presence_preset", "moods", "active_mood"):
+                "active_presence_preset", "moods", "active_mood", "tts"):
         if key in body:
             companion_cfg[key] = body[key]
 

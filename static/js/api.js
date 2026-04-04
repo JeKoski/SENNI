@@ -12,6 +12,7 @@
 let onToolCall    = null;
 let onThinking    = null;  // set by chat.js: (thinkText) => void
 let onUsageUpdate = null;  // set by chat.js: (promptTokens, totalTokens) => void
+let onTtsToken    = null;  // set by tts.js: (token) => void — feeds sentence buffer
 
 // ── callModel ─────────────────────────────────────────────────────────────────
 async function callModel(system, messages, abortSignal = null) {
@@ -216,6 +217,8 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
   let thinkAccum   = "";
   let thinkShown   = false;
 
+  if (typeof ttsStartGeneration === "function") ttsStartGeneration();
+
   const ensureBubble = () => {
     if (!bubbleHandle) {
       document.querySelector(".typing-row")?.remove();
@@ -286,6 +289,7 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
         if (!token) continue;
 
         accumulated += token;
+        if (typeof onTtsToken === "function") onTtsToken(token);
         const bh = ensureBubble();
         if (bh) {
           if (typeof setPresenceState === "function") setPresenceState("streaming");
@@ -299,6 +303,7 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
     }
   } catch(e) {
     if (e.name === "AbortError") {
+      if (typeof ttsStop === "function") ttsStop();
       if (bubbleHandle) _finaliseStreamBubble(bubbleHandle, accumulated);
       throw e;
     }
@@ -310,6 +315,7 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
   if (bubbleHandle) {
     _finaliseStreamBubble(bubbleHandle, accumulated);
   }
+  if (typeof ttsEndGeneration === "function") ttsEndGeneration();
   return accumulated.trim() || null;
 }
 

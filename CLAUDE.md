@@ -36,6 +36,8 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 |------|---------|
 | `scripts/server.py` | FastAPI bridge — API endpoints, tool routing, process management |
 | `scripts/config.py` | Config read/write, per-OS path resolution, DEFAULTS |
+| `scripts/tts.py` | Kokoro TTS subprocess worker — stdin JSON → WAV bytes stdout |
+| `scripts/tts_server.py` | FastAPI router for `/api/tts/*`, TTS process lifecycle |
 
 ### HTML
 | File | Purpose |
@@ -66,6 +68,8 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 | `static/js/heartbeat.js` | Heartbeat system |
 | `static/js/companion.js` | Companion settings window coordinator (open/close, load, save, tabs, avatar, soul files, heartbeat, generation, dirty tracking) |
 | `static/js/companion-presence.js` | Presence tab: presets, state editor, preview orb, layout toggle |
+| `static/js/companion-tts.js` | Voice tab: voice blend UI (up to 5 slots), speed/pitch, preview |
+| `static/js/tts.js` | TTS client: sentence buffer, fetch queue, Web Audio playback, stop/abort |
 | `static/js/settings.js` | Settings panel coordinator (open/close, tab switch, load, toast, dirty tracking) |
 | `static/js/settings-server.js` | Settings → Server tab (BUILTIN_ARGS, file browsing, save, restart) |
 | `static/js/settings-generation.js` | Settings → Generation tab |
@@ -108,8 +112,10 @@ chat-tabs.js         ← needs message-renderer.js, chat-ui.js, chat-controls.js
 chat-controls.js
 chat.js
 heartbeat.js
-companion.js         ← coordinator, loads before presence
+tts.js               ← needs api.js (onTtsToken), no DOM deps at load time
+companion.js         ← coordinator, loads before presence and tts
 companion-presence.js ← needs companion.js (cpSettings, cpMarkDirty), orb.js
+companion-tts.js     ← needs companion.js (cpSettings, cpMarkDirty), tts.js
 settings.js          ← coordinator, loads before tab files
 settings-server.js   ← needs settings.js
 settings-generation.js ← needs settings.js
@@ -390,18 +396,50 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### Settings
 
-- ~~**Settings TypeError on open**~~ — **Fixed** (`spPopulateCompanion` now only populates the companion list)
-- ~~**Markdown render toggle breaks on restart/companion switch**~~ — **Fixed** (`loadStatus` always calls `setMarkdownEnabled`, defaulting to `true` when field is absent)
-- ~~**“Ask each time” image processing not working**~~ — **Fixed** (`visionMode` added to tab serialization; `'ask'` mapped to `'always'` in `api.js`)
-- ~~**Dirty tracking missing for several fields**~~ — **Fixed**: Settings panel (vision mode radios, GPU select, port inputs); Companion Window (all identity, generation, heartbeat fields + presence via hooks)
-- Companion Settings exiting with dirty edits without confirmation: Should ask for confirmation just like in regular Settings to prevent loss of edits
-- Companion Settings - Presence: Some default presets have non-hex color codes (don't work) and wrong colors (especially in Warm, multiple colors are same as regular instead of Warm tones)
+- ~~**Settings TypeError on open**~~ — **Fixed**
+- ~~**Markdown render toggle breaks on restart/companion switch**~~ — **Fixed**
+- ~~**“Ask each time” image processing not working**~~ — **Fixed**
+- ~~**Dirty tracking missing for several fields**~~ — **Fixed**
+- ~~**Companion Settings exiting with dirty edits without confirmation**~~ — **Fixed**
+- ~~**Settings/Companion windows populate and shift on open**~~ — **Fixed** (spinner + fade-in on both panels)
+- ~~**Settings windows don’t reflect active tab/state on open**~~ — **Fixed** (`_cpSyncStateChips` on presence init; content hidden until load resolves)
+- ~~**Default presence presets have non-hex colors and missing fields**~~ — **Fixed** in `config.py` DEFAULTS — but **existing companion `config.json` files on disk still have the old `rgba(...)` format**. Needs a one-time migration function in `config.py` or a factory reset. Low priority until public release.
 
 ### UI / Layout
 
 - **Tool and thinking pills have alignment/padding issues** — pills are misaligned relative to each other and the orb. **Bundle this fix with the pill visual rework** — don’t fix in isolation.
 
 ---
+
+---
+
+## TTS system — current state
+
+Kokoro TTS integrated as an optional subprocess. SENNI runs cleanly without it.
+
+### Architecture
+- `scripts/tts.py` — standalone subprocess. Reads JSON lines from stdin (text + voice blend + speed + pitch), writes length-prefixed WAV bytes to stdout. Exits with code 2 if `kokoro` or `soundfile` not installed — `tts_server.py` surfaces this as a clean "unavailable" state, never a crash.
+- `scripts/tts_server.py` — FastAPI router mounted into `server.py` via `app.include_router(tts_router)`. Owns process lifecycle. All endpoints return `{"ok": false, "reason": "..."}` on unavailability — never 500s.
+- `static/js/tts.js` — hooks `onTtsToken` in `api.js`. Accumulates tokens into sentence buffer, flushes on `.!?…` boundaries (min 15 chars). Sequential fetch queue to `/api/tts/speak` preserves sentence order. Web Audio API queue for gapless playback. `ttsStop()` aborts everything on user stop/tab close/new message.
+- `static/js/companion-tts.js` — Voice tab UI. Up to 5 voice blend slots with weight sliders (shows live normalised percentages). Speed + pitch inputs. Preview button.
+
+### Config schema
+Global TTS config lives in `config.json["tts"]`: `enabled`, `python_path`, `voices_path`, `espeak_path`.
+Per-companion TTS lives in `companions/<folder>/config.json["tts"]`: `voice_blend` (dict of voice → weight), `speed`, `pitch`.
+Mood TTS overrides are **schema-ready** but UI not yet built — will follow mood system UI.
+
+### Aurini integration boundary
+Aurini owns installation of Kokoro (pip install + espeak-ng). SENNI just needs:
+- `python_path` — path to Python executable with kokoro installed (empty = sys.executable)
+- `voices_path` — path to `voices/` dir with `.pt` files (empty = auto-discover next to tts.py)
+- `espeak_path` — path to espeak-ng binary (empty = rely on PATH)
+
+All three are set in Settings → Server → Voice section and saved via `/api/settings/tts`.
+
+### What’s not yet done
+- Mood → TTS override UI (speed/blend per mood) — implement alongside Mood UI
+- Real-world testing on actual Kokoro install (pending Aurini automation)
+- Voice discovery UI feedback when no voices found (currently silent)
 
 ## Features & planned changes
 
@@ -446,10 +484,10 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
   - Global Settings: toggle to completely disable/enable all tools (overrides companion settings); default settings per tool.
   - Companion Settings: per-tool enable/disable toggles; per-tool per-companion settings (e.g. `get_time` format).
 
-- **Server restart loading overlay**
+- ~~**Server restart loading overlay**~~ — **Done** (full-screen blocking overlay, reuses boot spinner, fades in/out, closes settings panel if open)
   - When clicking restart server, show a blocking overlay (similar to companion switch) to prevent interaction and clearly communicate what’s happening. Reuse the existing boot log display if possible.
 
-### TTS — Kokoro integration *(new feature, self-contained)*
+- ~~**TTS — Kokoro integration**~~ — **Done (v1)**. See TTS system section above. Mood integration and real-world testing pending.
 
 - Toggle to completely enable/disable (does not load at all when disabled).
 - CPU or GPU option — **note: Intel Arc / oneAPI support for Kokoro is unconfirmed, needs research before committing to GPU path.**
