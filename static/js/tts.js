@@ -20,10 +20,18 @@ let _ttsAudioCtx   = null;    // Web Audio context (lazy init)
 let _ttsSource     = null;    // currently playing AudioBufferSourceNode
 let _ttsSentenceBuf = '';     // accumulates tokens until a sentence boundary
 
-// Sentence-ending punctuation followed by whitespace or end-of-token.
-// Min length 15 chars avoids speaking "Oh." or "Hmm." as isolated chunks.
-const _TTS_SENTENCE_RE = /[.!?…]+(?:\s|$)/;
-const _TTS_MIN_CHARS   = 15;
+// Sentence-ending punctuation followed by whitespace or end-of-string.
+//
+// Negative lookbehind (?<!\d) prevents splitting on decimal points and
+// version numbers: "7.8GB", "v1.4", "3.14" won't trigger a boundary.
+// The pattern still matches "end." followed by a space or end-of-string.
+//
+// _TTS_MIN_CHARS: segments shorter than this are held in the buffer and
+// prepended to the next segment rather than being dropped or dispatched
+// alone. Keeps "I see." and "Sounds good." attached to what follows
+// while still preventing lone punctuation tokens from going to TTS.
+const _TTS_SENTENCE_RE = /(?<!\d)[.!?…]+(?:\s|$)/;
+const _TTS_MIN_CHARS   = 10;
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 
@@ -63,21 +71,30 @@ function _ttsFeedToken(token) {
     const match = _TTS_SENTENCE_RE.exec(_ttsSentenceBuf);
     if (!match) break;
 
-    const endIdx   = match.index + match[0].length;
-    const sentence = _ttsSentenceBuf.slice(0, endIdx).trim();
+    const endIdx  = match.index + match[0].length;
+    const segment = _ttsSentenceBuf.slice(0, endIdx).trim();
     _ttsSentenceBuf = _ttsSentenceBuf.slice(endIdx);
 
-    if (sentence.length >= _TTS_MIN_CHARS) {
-      _ttsEnqueue(sentence);
+    if (segment.length >= _TTS_MIN_CHARS) {
+      // Long enough — dispatch immediately
+      _ttsEnqueue(segment);
+    } else {
+      // Too short to speak alone — hold it by prepending back onto the
+      // buffer so the next sentence boundary picks it up and joins them.
+      // e.g. "I see. " + "That makes sense." → "I see. That makes sense."
+      _ttsSentenceBuf = segment + ' ' + _ttsSentenceBuf;
+      // Nothing more to flush from this boundary — wait for more tokens
+      break;
     }
   }
 }
 
 function _ttsFlushBuffer() {
-  // Called at end of generation — speak any remaining buffered text
+  // Called at end of generation — speak any remaining buffered text,
+  // even if it didn't end with punctuation or meet the min length.
   const remainder = _ttsSentenceBuf.trim();
   _ttsSentenceBuf = '';
-  if (_ttsEnabled && remainder.length >= 4) {
+  if (_ttsEnabled && remainder.length >= 2) {
     _ttsEnqueue(remainder);
   }
 }
