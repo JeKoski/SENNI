@@ -1,18 +1,18 @@
 {
   "companion_name": "S.E.N.N.I",
   "companion_folder": "default",
-  "model_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
-  "mmproj_path": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+  "model_path": "C:/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/gemma-4-E4B-it-Q4_K_M.gguf",
+  "mmproj_path": "C:/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-gemma-4-E4B-it-F16.gguf",
   "gpu_type": "intel",
   "port_bridge": 8000,
   "port_model": 8081,
   "first_run": false,
   "model_paths": {
-    "Windows": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+    "Windows": "C:/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/gemma-4-E4B-it-Q4_K_M.gguf",
     "Linux": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf"
   },
   "mmproj_paths": {
-    "Windows": "C:\\AI\\ComfyUI_Windows_portable\\ComfyUI\\models\\text_encoders\\mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+    "Windows": "C:/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-gemma-4-E4B-it-F16.gguf",
     "Linux": "/mnt/windows_data/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf"
   },
   "gpu_types": {
@@ -67,7 +67,7 @@
     },
     "batch": {
       "flag": "-b",
-      "enabled": true,
+      "enabled": false,
       "value": 256
     },
     "ubatch": {
@@ -101,7 +101,18 @@
       "value": null
     }
   },
-  "server_args_custom": [],
+  "server_args_custom": [
+    {
+      "flag": "--flash-attn",
+      "value": "on",
+      "enabled": true
+    },
+    {
+      "flag": "--verbose",
+      "value": null,
+      "enabled": true
+    }
+  ],
   "presence_presets": {},
   "tts": {
     "enabled": true,
@@ -110,11 +121,11 @@
     "espeak_path": "C:/Program Files/eSpeak NG/espeak-ng.exe"
   },
   "generation": {
-    "temperature": 0.8,
+    "temperature": 1,
     "top_p": 0.95,
-    "top_k": 40,
+    "top_k": 64,
     "min_p": 0.0,
-    "repeat_penalty": 1.1,
+    "repeat_penalty": 1,
     "presence_penalty": 0.0,
     "frequency_penalty": 0.0,
     "dry_multiplier": 0.0,

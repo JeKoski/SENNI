@@ -1,11 +1,13 @@
 // tool-parser.js — Tool call parsing and stripping
 //
 // Owns:
-//   TOOL_DEFINITIONS  — full tool schema array (used by api.js for model requests)
-//   TOOL_NAMES        — derived name list
-//   parseInlineToolCalls(text)  → [{ name, args, raw }, ...]
-//   parseXmlToolCalls(text)     → [{ name, args }, ...]
-//   stripToolCalls(text, calls) → cleaned string
+//   TOOL_DEFINITIONS         — full tool schema array (used by api.js for model requests)
+//   TOOL_NAMES               — derived name list
+//   parseInlineToolCalls(text)   → [{ name, args, raw }, ...]   Gemma 3 / inline style
+//   parseXmlToolCalls(text)      → [{ name, args }, ...]         Qwen3 XML style
+//   parseGemma4ToolCalls(text)   → [{ name, args }, ...]         Gemma 4 native token style
+//   formatGemma4ToolResponse(name, result) → string              Gemma 4 response token
+//   stripToolCalls(text, calls)  → cleaned string
 //
 // No DOM dependency. No side effects. Load before api.js.
 
@@ -71,6 +73,7 @@ function sanitizeJson(s) {
 
 // ── Inline tool call parser ───────────────────────────────────────────────────
 // Handles calls written as:  toolName({ "key": "value" })
+// Used by Gemma 3 / older models that write tool calls as inline function syntax.
 function parseInlineToolCalls(text) {
   const calls = [];
 
@@ -136,6 +139,7 @@ function parseInlineToolCalls(text) {
 // ── XML tool call parser ──────────────────────────────────────────────────────
 // Handles calls written as:
 //   <tool_use><function=name><parameter=key>value</parameter></tool_call>
+// Used by Qwen3 and similar models.
 function parseXmlToolCalls(text) {
   const calls = [];
   const blockRe = /<tool_use>([\s\S]*?)<\/tool_call>/g;
@@ -155,6 +159,64 @@ function parseXmlToolCalls(text) {
     calls.push({ name, args });
   }
   return calls;
+}
+
+// ── Gemma 4 tool call parser ──────────────────────────────────────────────────
+// Handles Gemma 4's native token-delimited format:
+//   <|tool_call>call:tool_name{param:<|"|>value<|"|>,num:42}<tool_call|>
+//
+// Gemma 4 uses <|"|> as its string-quoting escape inside the brace-delimited
+// argument block instead of real JSON double-quotes. We unescape it before
+// parsing so the result is a normal JS object.
+//
+// Note: tool names are matched against TOOL_NAMES so unknown tool names from
+// the model's own schema (e.g. code_execution) are silently skipped rather
+// than causing errors.
+function parseGemma4ToolCalls(text) {
+  const calls = [];
+  // Match the full token block: <|tool_call>call:name{...}<tool_call|>
+  // The body is captured lazily so multiple calls in one response are each caught.
+  const re = /<\|tool_call>call:([a-zA-Z_][a-zA-Z0-9_]*)(\{[\s\S]*?\})<tool_call\|>/g;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const name    = match[1].trim();
+    const rawBody = match[2];
+    if (!TOOL_NAMES.includes(name)) continue;
+
+    // Unescape Gemma 4's <|"|> string delimiter → real double-quote
+    const jsonStr = rawBody.replace(/<\|"\|>/g, '"');
+
+    let args = {};
+    try {
+      args = JSON.parse(jsonStr);
+    } catch {
+      // Fallback: try relaxing unquoted keys (e.g. {action:read} → {"action":"read"})
+      try {
+        const relaxed = jsonStr.replace(/([{,]\s*)([a-zA-Z_]\w*)(\s*:)/g, '$1"$2"$3');
+        args = JSON.parse(relaxed);
+      } catch {
+        console.warn("[gemma4] failed to parse tool call args:", rawBody);
+        continue;
+      }
+    }
+    calls.push({ name, args });
+  }
+  return calls;
+}
+
+// ── Gemma 4 tool response formatter ──────────────────────────────────────────
+// Builds the response token string that Gemma 4's chat template expects when
+// feeding tool results back into the conversation.
+//
+// Format: <|tool_response>response:name{result:<|"|>value<|"|>}<tool_response|>
+//
+// Results are injected as a single "result" field. Gemma 4 reads this token
+// block to understand what the tool returned before generating its final reply.
+function formatGemma4ToolResponse(name, result) {
+  // Escape any real double-quotes inside the result string so the round-trip
+  // stays well-formed, then wrap with Gemma 4's <|"|> quoting convention.
+  const escaped = String(result).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `<|tool_response>response:${name}{result:<|"|>${escaped}<|"|>}<tool_response|>`;
 }
 
 // ── Strip inline tool calls from visible reply ────────────────────────────────

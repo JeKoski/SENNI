@@ -19,7 +19,7 @@ Search for it using project knowledge before doing anything else.
 
 ## Project overview
 
-SENNI is a local AI companion framework. Currently running with Qwen3.5 9B Q4_K_M, Intel Arc GPU.
+SENNI is a local AI companion framework. Currently running with Qwen3.5 9B Q4_K_M on Linux, Gemma 4 E4B Q4_K_M on Windows (testing), Intel Arc GPU both platforms.
 
 Two servers:
 - **Python bridge** (`scripts/server.py`) — FastAPI, handles UI, tools, config. Needs terminal restart for changes.
@@ -543,6 +543,31 @@ When starting a session that touches memory or personality systems, search proje
 
 ---
 
+## Session notes — 2026-04-05
+
+**Gemma 4 E4B testing on Windows / SYCL.**
+
+Diagnosed two issues from llama-server log:
+
+1. **CPU spike (18 graph splits)** — Gemma 4's alternating SWA/global attention architecture hits SYCL ops not yet fused natively. All 43 layers offload to VRAM correctly, but 18 graph splits means constant GPU↔CPU data shuffling per decode step. Not a Senni bug — a llama.cpp SYCL limitation. Workarounds: larger `-b`/`-ub`, `--flash-attn`. Will improve as llama.cpp matures Gemma 4 SYCL support.
+
+2. **Tool calls not firing** — Gemma 4 uses a completely different native tool call format from Qwen3/Gemma 3: `<|tool_call>call:name{param:<|"|>value<|"|>}<tool_call|>`. None of Paths A–D matched it. llama-server's `peg-gemma4` grammar may or may not convert these to structured `tool_calls` (Path A); when it doesn't, they land as raw content.
+
+**Added Path E (Gemma 4 native tool calls):**
+- `parseGemma4ToolCalls()` in `tool-parser.js` — regex over `<|tool_call>...<tool_call|>` blocks, unescapes `<|"|>` → `"`, parses args as JSON with relaxed fallback
+- `formatGemma4ToolResponse()` in `tool-parser.js` — formats results as `<|tool_response>response:name{result:<|"|>...<|"|>}<tool_response|>` tokens that Gemma 4's chat template reads natively
+- Path E in `api.js` — sits between Path D and plain reply; on match, pushes raw assistant turn + user turn of formatted response tokens, then loops
+
+**Files changed:** `static/js/tool-parser.js`, `static/js/api.js`
+
+**Next session priorities:**
+- Test Gemma 4 tool calls live — verify Path E fires correctly, check browser console for `[api] gemma4 tool call(s):` log lines
+- If Path A (structured tool_calls) fires instead of Path E, that's fine — means llama-server's peg-gemma4 grammar is working. Both paths should work correctly.
+- Consider whether `--reasoning-format` needs to be disabled or changed for Gemma 4 (it's a Qwen3 flag; Gemma 4 has its own thinking token format)
+- Memory system implementation planning (see MEMORY.md + COMPANION_STACK.md)
+
+---
+
 ## Session notes — 2026-04-04
 
 **TTS confirmed working** — Kokoro live via Aurini. Senni is talking. Stdin bug in `tts.py` fixed.
@@ -585,8 +610,18 @@ Full design in `design/MEMORY.md` and `design/COMPANION_STACK.md`.
 
 - OS: Linux (primary) + Windows (also supported and tested)
 - GPU: Intel Arc A750
-- Model: Qwen3.5 9B Q4_K_M
+- Model: Qwen3.5 9B Q4_K_M (Linux primary), Gemma 4 E4B Q4_K_M (Windows testing)
 - llama-server: SYCL build on Windows, oneAPI build on Linux
 - Temperature: 0.8 (critical — higher breaks tool call syntax)
-- `--reasoning-format deepseek` enabled
+- `--reasoning-format deepseek` enabled for Qwen3; disable for Gemma 4
 - Flash attention: auto-enabled by llama-server
+
+### Gemma 4 / SYCL performance notes (Windows)
+
+Gemma 4 E4B has alternating SWA (sliding window attention) + global attention layers. The SYCL backend in llama.cpp doesn't yet fuse SWA ops natively, causing **18 graph splits** per inference step — each split is a GPU↔CPU round-trip, which spikes CPU to 100%.
+
+Workarounds while SYCL SWA support matures:
+- Set `-b 2048` (or higher) and `-ub 512` — larger batches amortize the split overhead significantly
+- Enable `--flash-attn` — has specific optimisations for sliding window patterns
+- ReBar (Resizable BAR) would help further but Arc A750 on this board doesn't support it
+- Watch llama.cpp changelog for `ggml_sycl` commits mentioning `gemma4` or `swa`

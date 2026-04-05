@@ -1,13 +1,17 @@
 // api.js — Model communication + tool execution
 //
-// callModel(system, messages) — sends to llama-server, handles both:
-//   • Structured tool_calls (OpenAI format)
-//   • Inline text calls written by Gemma: memory({"action":"write",...})
+// callModel(system, messages) — sends to llama-server, handles:
+//   • Structured tool_calls (OpenAI format)                           → Path A
+//   • Inline text calls (Gemma 3 style): memory({"action":"write"})  → Path B
+//   • XML-style calls: <tool_use><function=name>...                   → Path C
+//   • Tool calls rescued from thinking block (Qwen3)                  → Path D
+//   • Gemma 4 native: <|tool_call>call:name{...}<tool_call|>          → Path E
 //
 // onToolCall(name, args, status, result) — UI callback, set by chat.js
 //
 // Depends on: tool-parser.js (TOOL_DEFINITIONS, TOOL_NAMES, parseInlineToolCalls,
-//             parseXmlToolCalls, stripToolCalls)
+//             parseXmlToolCalls, parseGemma4ToolCalls, formatGemma4ToolResponse,
+//             stripToolCalls)
 
 let onToolCall    = null;
 let onThinking    = null;  // set by chat.js: (thinkText) => void
@@ -117,7 +121,10 @@ async function callModel(system, messages, abortSignal = null) {
       onThinking(thinkContent);
     }
 
-    // ── Path A: structured tool_calls ────────────────────────────────────
+    // ── Path A: structured tool_calls (OpenAI format) ─────────────────────
+    // llama-server may parse some model formats natively into tool_calls.
+    // Gemma 4 via llama-server currently lands here only if the peg-gemma4
+    // grammar successfully parses the call — otherwise it falls through to Path E.
     if (choice.finish_reason === "tool_calls" && msg.tool_calls?.length) {
       msgs.push({ role: "assistant", content: msg.content || null, tool_calls: msg.tool_calls });
       for (const tc of msg.tool_calls) {
@@ -133,7 +140,8 @@ async function callModel(system, messages, abortSignal = null) {
       continue;
     }
 
-    // ── Path B: inline text tool calls ───────────────────────────────────
+    // ── Path B: inline text tool calls ────────────────────────────────────
+    // Gemma 3 / older models that write: toolName({"key": "value"})
     const inlineCalls = parseInlineToolCalls(rawText);
     if (inlineCalls.length > 0) {
       const results = [];
@@ -150,7 +158,8 @@ async function callModel(system, messages, abortSignal = null) {
       continue;
     }
 
-    // ── Path C: XML-style tool calls ─────────────────────────────────────
+    // ── Path C: XML-style tool calls ──────────────────────────────────────
+    // <tool_use><function=name><parameter=key>value</parameter></tool_call>
     const xmlCalls = parseXmlToolCalls(rawText);
     if (xmlCalls.length > 0) {
       const results = [];
@@ -167,7 +176,7 @@ async function callModel(system, messages, abortSignal = null) {
       continue;
     }
 
-    // ── Path D: tool call in thinking block ───────────────────────────────
+    // ── Path D: tool call rescued from thinking block ─────────────────────
     // Qwen3 often places tool calls inside <think> even when it also outputs
     // some text. Run this check unconditionally (not just when rawText is empty)
     // so those calls aren't silently dropped.
@@ -188,6 +197,33 @@ async function callModel(system, messages, abortSignal = null) {
         });
         continue;
       }
+    }
+
+    // ── Path E: Gemma 4 native tool calls ────────────────────────────────
+    // Format: <|tool_call>call:name{param:<|"|>value<|"|>}<tool_call|>
+    //
+    // llama-server passes these through as raw content when the peg-gemma4
+    // grammar doesn't convert them to structured tool_calls (Path A). We
+    // parse the raw tokens ourselves and feed results back using Gemma 4's
+    // own <|tool_response>...</tool_response|> token syntax, which its chat
+    // template understands natively.
+    const gemma4Calls = parseGemma4ToolCalls(rawText);
+    if (gemma4Calls.length > 0) {
+      console.log("[api] gemma4 tool call(s):", gemma4Calls.map(c => c.name));
+      // Push the raw assistant turn so the model retains context of its own call
+      msgs.push({ role: "assistant", content: rawText });
+      const responseParts = [];
+      for (const { name, args } of gemma4Calls) {
+        const result = await _execTool(name, args);
+        responseParts.push(formatGemma4ToolResponse(name, result));
+      }
+      // Inject all tool responses as a single user turn using Gemma 4's token syntax.
+      // The model reads these response tokens before generating its final reply.
+      msgs.push({
+        role: "user",
+        content: responseParts.join("\n")
+      });
+      continue;
     }
 
     // ── Plain reply — stream it live ──────────────────────────────────────
