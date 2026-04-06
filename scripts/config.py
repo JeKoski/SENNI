@@ -99,6 +99,20 @@ DEFAULTS = {
         "espeak_path": "",
     },
 
+    # Memory system (ChromaDB + all-MiniLM-L6-v2)
+    # enabled: master switch. False = memory endpoints return memory_disabled,
+    #          no ChromaDB import attempted.
+    # embedding_model: sentence-transformers model name. Changing this requires
+    #                  re-indexing existing notes (not yet automated).
+    # session_start_k: how many notes to surface at session start.
+    # mid_convo_k: how many notes to surface on associative mid-convo trigger.
+    "memory": {
+        "enabled":         False,
+        "embedding_model": "all-MiniLM-L6-v2",
+        "session_start_k": 6,
+        "mid_convo_k":     4,
+    },
+
     # Generation defaults (per-request, no restart needed)
     "generation": {
         "temperature":        0.8,
@@ -451,6 +465,25 @@ def load_companion_config(companion_folder: str) -> dict:
             "speed":        1.0,
             "pitch":        1.0,
         },
+        # ── Cognitive stack ──
+        # Determines memory encoding weights and retrieval mode per primitive.
+        # stack_initialised: False = neutral default was assigned automatically,
+        #                    user hasn't set it deliberately yet.
+        # Format: mT-fS-mN-fF (charge + function, 4 slots).
+        # Constraint: each function (T/S/N/F) exactly once; charges exactly 2m + 2f.
+        "cognitive_stack": {
+            "slots": [
+                {"position": 1, "charge": "m", "function": "T", "polarity": None},
+                {"position": 2, "charge": "f", "function": "S", "polarity": None},
+                {"position": 3, "charge": "m", "function": "N", "polarity": None},
+                {"position": 4, "charge": "f", "function": "F", "polarity": None},
+            ],
+            "stack_initialised": False,
+        },
+        # ── Memory bookkeeping ──
+        # last_consolidated_at: ISO timestamp of last successful consolidation run.
+        # None = never consolidated (new companion, or crash recovery needed at next boot).
+        "last_consolidated_at": None,
     }
     if not path.exists():
         return base
@@ -464,7 +497,11 @@ def load_companion_config(companion_folder: str) -> dict:
             base["moods"] = saved["moods"]
         if "tts" in saved:
             base["tts"] = {**base["tts"], **saved["tts"]}
-        skip = {"generation", "heartbeat", "moods", "tts"}
+        # cognitive_stack: saved value replaces default entirely — if it's present
+        # on disk, the user set it intentionally (stack_initialised will be True).
+        if "cognitive_stack" in saved:
+            base["cognitive_stack"] = saved["cognitive_stack"]
+        skip = {"generation", "heartbeat", "moods", "tts", "cognitive_stack"}
         return {**base, **{k: v for k, v in saved.items() if k not in skip}}
     except Exception:
         return base

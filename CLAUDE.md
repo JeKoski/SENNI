@@ -545,6 +545,33 @@ When starting a session that touches memory or personality systems, search proje
 
 ---
 
+## Session notes — 2026-04-06 #2
+
+**Memory system tool files and config — complete.**
+
+### Files written/changed
+
+- `tools/write_memory.py` — complete. Reads active mood automatically from companion config, posts to `/api/memory/write`, returns short confirmation with truncated note ID.
+- `tools/retrieve_memory.py` — complete. Formats returned notes with composite label, affect descriptor, intensity, and recency. Includes truncated note ID so companion can supersede later.
+- `tools/update_relational_state.py` — complete. Soft word-count warning if block exceeds ~200 tokens. Posts to `/api/memory/relational-state`.
+- `scripts/config.py` — `memory` block added to global DEFAULTS (enabled, embedding_model, session_start_k, mid_convo_k). `cognitive_stack` + `last_consolidated_at` added to companion config base + merge logic in `load_companion_config`.
+
+### Confirmed already done (from previous session)
+- `notify_message_activity()` wired in `server.py` tools/call branch — was already there.
+
+### Still needed — chat.js system prompt changes
+Full plan for next session:
+1. Add `let _memoryContext = '';` near `_soulFiles` declaration
+2. Add `reloadMemoryContext()` — calls `/api/memory/init` with companion_folder + active mood, stores `session_context` result
+3. Call `await reloadMemoryContext()` in `startSession()` alongside `reloadSoulFiles()`
+4. Remove `session_notes.md` from `seedTemplates()` seeds array — deprecated
+5. Rewrite `MEMORY RULES` block in `buildSystemPrompt()`: remove all session_notes instructions, add write discipline (2–5/session, type-specific guidance), add descriptions for write_memory / retrieve_memory / update_relational_state tools
+6. Inject `_memoryContext` into prompt after soul files (only when non-empty)
+
+The `/api/memory/init` endpoint already returns `session_context` — no new endpoint needed.
+
+---
+
 ## Session notes — 2026-04-06
 
 **Memory system design finalised and implementation begun.**
@@ -643,13 +670,8 @@ Still needed in server.py:
 
 ### Next session priorities
 
-1. `tools/write_memory.py` — tool file, same pattern as existing tools
-2. `tools/retrieve_memory.py` — tool file
-3. `tools/update_relational_state.py` — tool file
-4. `notify_message_activity()` call in `mcp_handler` tools/call branch in `server.py`
-5. System prompt changes — remove session notes instructions, add write discipline + tool descriptions
-6. `scripts/config.py` — add memory config block to DEFAULTS + `last_consolidated_at` to companion config
-7. Test with Senni — verify ChromaDB install, first write, first retrieval
+1. `static/js/chat.js` — memory context wiring + system prompt rewrite (see session notes 2026-04-06 #2 below)
+2. Test with Senni — verify ChromaDB install, first write, first retrieval
 
 ### Known issue — Qwen3.5 9B tool calls in thinking blocks
 
