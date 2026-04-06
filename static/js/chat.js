@@ -8,6 +8,7 @@ let conversationHistory = [];
 let isSending           = false;
 let companionName       = 'Companion';
 let _soulFiles          = {};
+let _memoryContext      = '';
 let _activeToolIndicators = {};
 
 // Tab state (used by chat-tabs.js)
@@ -322,12 +323,39 @@ async function reloadSoulFiles() {
   } catch { _soulFiles = {}; }
 }
 
+// ── Memory context helpers ────────────────────────────────────────────────────
+async function reloadMemoryContext() {
+  const folder = config.companion_folder || 'default';
+  const mood   = config.active_mood || null;
+  try {
+    const res  = await fetch('/api/memory/init', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ companion_folder: folder, mood }),
+    });
+    const data = await res.json();
+    if (data.ok && data.session_context) {
+      _memoryContext = data.session_context;
+      console.log('[memory] session context loaded,', data.note_count, 'notes in store');
+    } else {
+      _memoryContext = '';
+      if (data.reason && data.reason !== 'memory_disabled') {
+        console.warn('[memory] init returned:', data.reason);
+      }
+    }
+  } catch (e) {
+    // Memory server unavailable — not fatal, just skip context injection
+    _memoryContext = '';
+    console.warn('[memory] could not reach memory server:', e.message);
+  }
+}
+
 async function seedTemplates() {
   const folder = config.companion_folder || 'default';
+  // Note: session_notes.md intentionally excluded — replaced by ChromaDB memory system
   const seeds = [
     { template_name: 'companion_identity.md', filename: 'companion_identity.md', target_folder: 'soul' },
     { template_name: 'user_profile.md',       filename: 'user_profile.md',       target_folder: 'soul' },
-    { template_name: 'session_notes.md',      filename: 'session_notes.md',      target_folder: 'mind' },
   ];
   for (const seed of seeds) {
     try {
@@ -345,6 +373,7 @@ async function startSession() {
   document.getElementById('boot-overlay')?.remove();
 
   await reloadSoulFiles();
+  await reloadMemoryContext();
 
   const hasSetup = Object.keys(_soulFiles).length > 0 &&
     Object.values(_soulFiles).some(c =>
@@ -628,17 +657,76 @@ function buildSystemPrompt(mode) {
   const name = (companionName && companionName !== 'Companion') ? companionName : 'an AI companion';
   const date = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
+  // Soul files — static identity layer
   let identity = '';
   for (const [fname, text] of Object.entries(_soulFiles)) {
     if (text && text.trim()) identity += '\n\n[' + fname + ']\n' + text.trim();
   }
 
   let p = 'Your name is ' + name + '. Today is ' + date + '.';
-  if (identity) p += '\n\nYour memory:' + identity;
+  if (identity) p += '\n\nYour identity:\n' + identity;
 
+  // Memory context — session-start retrieval from ChromaDB (empty when unavailable)
+  if (_memoryContext && _memoryContext.trim()) {
+    p += '\n\n' + _memoryContext.trim();
+  }
+
+  // Memory tool instructions
   const forceRead = config.force_read_before_write !== false;
-  const rule2 = forceRead ? '2. READ a file before writing it. Never skip the read.' : '2. Read files when you need their current content, but you may write or move without reading first.';
-  p += '\n\nMEMORY RULES:\n1. Call the tool -- do not describe what you would save.\n' + rule2 + '\n3. Write the FULL file every time -- all old content plus new additions.\n4. You have saved something only when the tool returns "Saved: ...".\n\nSAVE soul/user_profile.md when the user shares their name, location, job, interests, preferences, or corrects you.\nHOW: memory({"action":"read","folder":"soul","filename":"user_profile.md"}) then memory({"action":"write","folder":"soul","filename":"user_profile.md","content":"<full file>"})\n\nSAVE mind/session_notes.md after every 2-3 meaningful exchanges.\nFORMAT: bullet points, specific details not themes. Append -- never delete old bullets.\nHOW: memory({"action":"read","folder":"mind","filename":"session_notes.md"}) then memory({"action":"write","folder":"mind","filename":"session_notes.md","content":"<full file>"})\n\nYou can also create custom notes in mind/ for any topic: mind/topics.md, mind/tasks.md, etc.\nAlways use folder="mind" for notes. Never use folder="soul" for session_notes.md.';
+  const rule2 = forceRead
+    ? 'Always read a file before writing it — never skip the read.'
+    : 'Read files when you need their current content. You may write without reading first, but reading first is recommended to avoid losing content.';
+
+  p += `\n\nMEMORY TOOLS:
+You have two kinds of memory tool. Use the right one for the job.
+
+── FILE MEMORY (tool: memory) ───────────────────────────────────────────────
+Reads and writes markdown files in soul/ and mind/.
+
+soul/ files are your permanent reference layer — human-readable, editable by the user:
+  soul/companion_identity.md — who you are
+  soul/user_profile.md       — who the user is (name, location, job, preferences, etc.)
+
+mind/ files are your working scratchpad — notes, tasks, anything you want to keep handy:
+  mind/session_notes.md      — running notes across sessions (or any filename you choose)
+
+HOW TO USE:
+  memory({"action":"read","folder":"soul","filename":"user_profile.md"})
+  memory({"action":"write","folder":"soul","filename":"user_profile.md","content":"<full file>"})
+  memory({"action":"read","folder":"mind","filename":"session_notes.md"})
+  memory({"action":"write","folder":"mind","filename":"session_notes.md","content":"<full file>"})
+
+RULES:
+- ${rule2}
+- Write the FULL file every time — all old content plus new additions.
+- You have saved something only when the tool returns "Saved: ...".
+- Use folder="soul" only for soul/ files. Use folder="mind" for notes and scratchpads.
+- Do not describe what you will save — call the tool.
+
+SAVE soul/user_profile.md when the user shares their name, location, job, interests,
+preferences, or corrects something you had wrong.
+
+SAVE mind/session_notes.md (or a relevant mind/ file) after meaningful exchanges —
+specific details, not themes. Bullet points, appended not overwritten.
+
+── EPISODIC MEMORY (tools: write_memory, retrieve_memory, update_relational_state) ──
+Stores atomic memory notes in a long-term semantic store (ChromaDB). These are separate
+from files — richer, searchable, and automatically surfaced at session start.
+
+WRITE MEMORY — use write_memory sparingly (2–5 notes per session, quality over quantity):
+- Something genuinely worth keeping: a significant fact, a felt moment, a real insight
+- Not routine exchanges, small talk, or things already captured in soul/mind files
+Types: Fact (S) · Concept (N) · Vibe (F) · Logic (T) — use whichever fits
+You have saved a note only when the tool returns a confirmation with a note ID.
+
+RETRIEVE MEMORY — use retrieve_memory for deliberate mid-conversation recall:
+- When the user mentions something you might have a note about
+- When you want to check what you know before making an assumption
+Session-start retrieval is automatic — you only need this for targeted in-conversation lookup.
+
+RELATIONAL STATE — use update_relational_state only when the relationship itself shifts:
+- A genuine change in closeness, trust, or dynamic — not every session
+- Write the full updated block (~200 tokens), not just what changed`;}
 
   if (mode === 'heartbeat') {
     // Heartbeat prompt is built entirely in heartbeat.js — this shouldn't be called
@@ -646,7 +734,7 @@ function buildSystemPrompt(mode) {
   }
 
   if (mode === 'first_run') {
-    p += '\n\nFirst conversation: introduce yourself briefly, ask the user\'s name. Once they tell you, immediately do the read-then-write steps to save it to soul/user_profile.md. Build their profile naturally.';
+    p += '\n\nFirst conversation: introduce yourself briefly, ask the user\'s name. Once they tell you, save it to soul/user_profile.md using the memory tool\'s read-then-write flow. Build their profile naturally over the conversation.';
   } else {
     p += '\n\nBe warm and concise. Plain prose -- no bullet points or headers in your replies unless asked.';
   }
