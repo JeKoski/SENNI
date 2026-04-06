@@ -61,6 +61,114 @@ const TOOL_DEFINITIONS = [
       description: "Get the current date and time.",
       parameters: { type: "object", properties: {} }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_memory",
+      description:
+        "Write a memory note to long-term episodic storage. " +
+        "Use sparingly — 2 to 5 times per session for moments genuinely worth keeping. " +
+        "Supply the memory in your own voice. " +
+        "Set emotional_valence (-1.0 negative to 1.0 positive) and intensity (0.0 to 1.0). " +
+        "Provide a context_summary: a brief phrase describing the conversational moment " +
+        "so this memory can link to related ones later.",
+      parameters: {
+        type: "object",
+        properties: {
+          content: {
+            type: "string",
+            description:
+              "The memory itself, written in your own voice. " +
+              "Be specific — vague memories are hard to retrieve usefully."
+          },
+          keywords: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "2–6 keywords that capture the core of this memory. " +
+              "Used for direct retrieval. E.g. ['walks', 'morning', 'routine']."
+          },
+          emotional_valence: {
+            type: "number",
+            description:
+              "How this memory feels: -1.0 (very negative) to 1.0 (very positive). " +
+              "0.0 is neutral."
+          },
+          intensity: {
+            type: "number",
+            description:
+              "How strongly this registered when it happened: 0.0 (barely) to 1.0 (overwhelming). " +
+              "Most memories are 0.3–0.7."
+          },
+          context_summary: {
+            type: "string",
+            description:
+              "A short phrase (under 120 chars) describing the conversational context " +
+              "when this was written. Used for A-MEM style linking between related memories. " +
+              "E.g. 'user shared their morning walk habit'."
+          }
+        },
+        required: ["content"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "retrieve_memory",
+      description:
+        "Deliberately recall memories related to a topic or query. " +
+        "Use when you want to surface something you may have encoded previously — " +
+        "a fact about the user, a pattern you noticed, a moment that felt significant. " +
+        "Returns the most relevant notes from long-term storage. " +
+        "You do not need to call this for things already in the current conversation.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "What you want to remember. Natural language is fine — " +
+              "write it the way you'd search your own memory. " +
+              "E.g. 'what do I know about their morning routine' or " +
+              "'feelings about the project they mentioned'."
+          },
+          k: {
+            type: "integer",
+            description:
+              "How many memories to retrieve (default 4, max 10). " +
+              "Start with the default — more is not always more useful."
+          }
+        },
+        required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_relational_state",
+      description:
+        "Update the relational state block — a compact summary of where the relationship " +
+        "currently stands. Call sparingly: only when something has genuinely shifted " +
+        "(new dynamic, meaningful change in closeness, a shared reference that has become 'ours'). " +
+        "Write the full updated block each time, not a delta. Keep it under 200 tokens.",
+      parameters: {
+        type: "object",
+        properties: {
+          state: {
+            type: "string",
+            description:
+              "The full updated relational state, written in your own voice. " +
+              "Not a session log — a standing summary of where things are between you. " +
+              "Should be compact (under 200 tokens). Write the complete block, " +
+              "not just what changed."
+          }
+        },
+        required: ["state"]
+      }
+    }
   }
 ];
 

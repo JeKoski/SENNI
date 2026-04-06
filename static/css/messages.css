@@ -531,3 +531,37 @@ body.controls-always-visible .msg-controls {
 
 /* ── Shared animation ─────────────────────────────────────────────────────── */
 @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Memory pill ──────────────────────────────────────────────────────────── */
+/* Shown when the system surfaces associative memories mid-conversation.       */
+/* Teal/cyan identity to distinguish from purple heartbeat pills.              */
+.memory-pill {
+  align-self: flex-start;
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+  border-radius: 20px;
+  font-size: 11.5px; font-family: 'DM Sans', sans-serif;
+  padding: 5px 12px;
+  margin: 4px 0;
+  background: rgba(45,212,191,0.07);
+  border: 1px solid rgba(45,212,191,0.22);
+  color: rgba(94,234,212,0.7);
+  animation: msgIn .25s ease both;
+  user-select: none;
+}
+.memory-pill-icon {
+  font-size: 10px;
+  opacity: 0.75;
+}
+.memory-pill-detail {
+  display: none;
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(45,212,191,0.15);
+  font-size: 11px;
+  color: rgba(94,234,212,0.55);
+  white-space: pre-wrap;
+  line-height: 1.5;
+  cursor: default;
+}

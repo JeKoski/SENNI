@@ -111,7 +111,7 @@ api.js               ← needs tool-parser.js
 attachments.js
 orb.js
 message-renderer.js  ← no deps
-chat-ui.js           ← needs message-renderer.js, orb.js
+chat-ui.js           ← needs message-renderer.js, orb.js, appendMemoryPill() now required by chat-tabs.js (_replayMessage) and api.js (onMemorySurface) — load order already correct
 chat-tabs.js         ← needs message-renderer.js, chat-ui.js, chat-controls.js
 chat-controls.js
 chat.js
@@ -570,6 +570,47 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 When starting a session that touches memory or personality systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
 
 ---
+
+## Session notes — 2026-04-06 #4
+
+**Disk-backed history, associative memory retrieval, memory pill UI.**
+
+### Files written/changed this session
+
+- `static/js/tool-parser.js` — added `write_memory`, `retrieve_memory`, `update_relational_state` to `TOOL_DEFINITIONS`. These were missing — Senni could see the instructions but couldn't call the tools.
+- `static/js/chat.js` — fixed `Illegal return statement` crash (single-quoted multiline string in `buildSystemPrompt` → template literal). Also wired `onMemorySurface` callback.
+- `static/js/chat-tabs.js` — **full rewrite**. localStorage now holds a lightweight tab index only (IDs, titles, tokens). Full history saved to disk via `/api/history/*`. Legacy migration on first load. Image content stripped from API history before save (saved as separate files). Memory pill replay added to `_replayMessage`.
+- `static/js/api.js` — added `onMemorySurface` callback + `_assocTurnsSinceLast` turn counter. Every `ASSOC_INTERVAL` (4) user turns, calls `/api/memory/associative` and injects result as hidden system turn + fires `onMemorySurface` for UI pill.
+- `static/js/chat-ui.js` — added `appendMemoryPill(notesText)`. Teal pill with expand-on-click to show full surfaced notes.
+- `static/css/messages.css` — memory pill styles (`.memory-pill`, `.memory-pill-icon`, `.memory-pill-detail`).
+- `scripts/server.py` — added full history API: `/api/history/save`, `/api/history/load`, `/api/history/list`, `/api/history/delete`, `/api/history/media/...`. Images saved as files in session folders.
+- `scripts/memory_server.py` — added `/api/memory/associative` endpoint, wiring the existing `trigger_associative_retrieval()` function that had no HTTP exposure.
+
+### History folder structure
+
+```
+companions/<folder>/history/
+  <tab-id>/
+    meta.json
+    <YYYY-MM-DD_HHMMSS>/
+      session.json        ← messages + history, consolidated: false
+      img_001.jpg         ← media files referenced by path
+```
+
+### Still to do / known gaps
+
+- **Background embedding queue** — process unembedded session files into ChromaDB on startup. `consolidated: false` flag is in place, pipeline not yet built.
+- **Embed soul/mind markdown files** — so episodic retrieval can search identity/profile content.
+- **Export update** — exporting a session should zip the whole session folder (images + JSON). Currently images not included in exports.
+- **Import update** — importing should handle the new session folder format.
+- **`mid_convo_k` config wiring** — `ASSOC_INTERVAL` is hardcoded to 4 turns. Should read from `config.memory.mid_convo_k` for the k value (already done) but interval itself could be configurable.
+- **CLAUDE.md splitting** — file is very large (~775 lines). Split design content into `design/` folder. Do as a dedicated session.
+
+### Next session priorities
+
+1. Test the full history save/load flow end-to-end
+2. Test associative retrieval + memory pill appearing in UI
+3. Background embedding queue (startup consolidation of unprocessed sessions)
 
 ## Session notes — 2026-04-06 #3
 

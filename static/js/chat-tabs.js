@@ -3,47 +3,245 @@
 //             chat-ui.js (appendMessage, appendSystemNote, scrollToBottom, removeEmptyState, enableInput)
 //             chat-controls.js (_attachMessageControls)
 //             attachments.js (_esc)
+//
+// History is persisted to disk via /api/history/* endpoints.
+// localStorage holds only a lightweight tab index (IDs + active tab) so the
+// browser never hits quota limits regardless of conversation length.
+//
+// Session folder structure on disk:
+//   companions/<folder>/history/<tab-id>/
+//     meta.json                        ← title, created, tokens, vision_mode
+//     <YYYY-MM-DD_HHMMSS>/             ← one folder per session
+//       session.json                   ← messages (DOM replay) + history (API format)
+//       img_001.jpg, img_002.png       ← media files (future: full media attachment UI)
 
-// ── Tab helpers ───────────────────────────────────────────────────────────────
-function _tabsKey() {
-  return `chat_tabs_${config.companion_folder || 'default'}`;
+// ── Tab index (localStorage — lightweight only) ───────────────────────────────
+
+function _tabIndexKey() {
+  return `chat_tab_index_${config.companion_folder || 'default'}`;
 }
 
-function saveTabs() {
+function _saveTabIndex() {
   try {
-    localStorage.setItem(_tabsKey(), JSON.stringify({ tabs: _tabs, activeTabId: _activeTabId }));
-  } catch(e) { console.warn('saveTabs failed:', e); }
-}
-
-function loadTabs() {
-  try {
-    const raw = localStorage.getItem(_tabsKey());
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      // Support both old format (plain array) and new format ({tabs, activeTabId})
-      if (Array.isArray(parsed)) {
-        _tabs = parsed;
-      } else {
-        _tabs = parsed.tabs || [];
-        if (parsed.activeTabId) _activeTabId = parsed.activeTabId;
-      }
-    }
-  } catch {}
-  if (!_tabs.length) _tabs = [_makeTab()];
-  _tabs = _tabs.map(t => ({
-    id:          t.id          || _uid(),
-    title:       t.title       || 'New chat',
-    history:     t.history     || [],
-    messages:    t.messages    || [],
-    created:     t.created     || Date.now(),
-    tokens:      t.tokens      || 0,
-    visionMode:  t.visionMode  || null,
-  }));
-  // Validate that the restored activeTabId actually exists
-  if (_activeTabId && !_tabs.find(t => t.id === _activeTabId)) {
-    _activeTabId = null;
+    const index = {
+      activeTabId: _activeTabId,
+      tabs: _tabs.map(t => ({
+        id:         t.id,
+        title:      t.title,
+        created:    t.created,
+        tokens:     t.tokens,
+        visionMode: t.visionMode || null,
+      })),
+    };
+    localStorage.setItem(_tabIndexKey(), JSON.stringify(index));
+  } catch (e) {
+    console.warn('[tabs] could not save tab index to localStorage:', e);
   }
 }
+
+function _loadTabIndex() {
+  try {
+    const raw = localStorage.getItem(_tabIndexKey());
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+// ── Session tracking ──────────────────────────────────────────────────────────
+// Each page load starts a new session. The session ID is stable for the
+// lifetime of the page so all saves within one session go to the same folder.
+
+let _currentSessionId = _makeSessionId();
+
+function _makeSessionId() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}` +
+         `_${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
+}
+
+// ── Disk save / load ──────────────────────────────────────────────────────────
+
+// Strip inline base64 image content from API history entries before saving.
+// Images are saved as separate files; the history entry keeps a path reference.
+// Pending image file extraction is handled by _pendingImages (set by chat.js
+// before calling saveTabs()).
+let _pendingImages = []; // [{name, data_url}] to flush on next save
+
+function _stripImagesFromHistory(history) {
+  return history.map(msg => {
+    if (!Array.isArray(msg.content)) return msg;
+    const stripped = msg.content.map(part => {
+      if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
+        // Save the file; return a reference instead of the blob
+        const name = `img_${String(_pendingImages.length + 1).padStart(3, '0')}` +
+                     _extFromDataUrl(part.image_url.url);
+        _pendingImages.push({ name, data_url: part.image_url.url });
+        return { type: 'image_ref', path: name };
+      }
+      return part;
+    });
+    return { ...msg, content: stripped };
+  });
+}
+
+function _extFromDataUrl(dataUrl) {
+  const m = dataUrl.match(/^data:image\/(\w+);/);
+  if (!m) return '.bin';
+  const t = m[1].toLowerCase();
+  if (t === 'jpeg') return '.jpg';
+  return '.' + t;
+}
+
+async function saveTabs() {
+  _saveTabIndex();
+  await _saveCurrentSessionToDisk();
+}
+
+async function _saveCurrentSessionToDisk() {
+  if (!_activeTabId) return;
+  const tab = _tabs.find(t => t.id === _activeTabId);
+  if (!tab) return;
+
+  const images  = _pendingImages.splice(0); // consume pending images
+  const history = _stripImagesFromHistory(conversationHistory);
+
+  try {
+    await fetch('/api/history/save', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companion_folder: config.companion_folder || 'default',
+        tab_id:           tab.id,
+        session_id:       _currentSessionId,
+        title:            tab.title,
+        tokens:           tab.tokens || 0,
+        vision_mode:      tab.visionMode || null,
+        messages:         _serializeMessages(),
+        history:          history,
+        images:           images,
+        started_at:       new Date().toISOString(),
+      }),
+    });
+  } catch (e) {
+    console.warn('[tabs] disk save failed:', e);
+  }
+}
+
+async function loadTabs() {
+  // 1. Restore lightweight tab index from localStorage
+  const index = _loadTabIndex();
+
+  if (index && Array.isArray(index.tabs) && index.tabs.length) {
+    _tabs = index.tabs.map(t => _hydrateTabShell(t));
+    if (index.activeTabId) _activeTabId = index.activeTabId;
+  }
+
+  // 2. Migrate from old localStorage format (full history stored in browser)
+  if (!_tabs.length) {
+    _migrateLegacyLocalStorage();
+  }
+
+  // 3. If still nothing, fall back to listing from disk
+  if (!_tabs.length) {
+    await _loadTabsFromDisk();
+  }
+
+  if (!_tabs.length) _tabs = [_makeTab()];
+
+  // Validate activeTabId
+  if (!_activeTabId || !_tabs.find(t => t.id === _activeTabId)) {
+    _activeTabId = _tabs[0].id;
+  }
+}
+
+function _hydrateTabShell(t) {
+  return {
+    id:         t.id         || _uid(),
+    title:      t.title      || 'New chat',
+    created:    t.created    || Date.now(),
+    tokens:     t.tokens     || 0,
+    visionMode: t.visionMode || null,
+    history:    [],   // loaded from disk on demand
+    messages:   [],   // loaded from disk on demand
+  };
+}
+
+async function _loadTabsFromDisk() {
+  try {
+    const res  = await fetch(`/api/history/list?companion_folder=${encodeURIComponent(config.companion_folder || 'default')}`);
+    const data = await res.json();
+    if (data.ok && data.tabs?.length) {
+      _tabs = data.tabs.map(meta => _hydrateTabShell({
+        id:         meta.tab_id,
+        title:      meta.title,
+        created:    meta.created ? new Date(meta.created).getTime() : Date.now(),
+        tokens:     meta.tokens || 0,
+        visionMode: meta.vision_mode || null,
+      }));
+    }
+  } catch (e) {
+    console.warn('[tabs] could not load tab list from disk:', e);
+  }
+}
+
+async function _loadSessionFromDisk(tabId) {
+  try {
+    const res  = await fetch('/api/history/load', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companion_folder: config.companion_folder || 'default',
+        tab_id: tabId,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok && data.session) {
+      return data.session;
+    }
+  } catch (e) {
+    console.warn('[tabs] could not load session from disk:', e);
+  }
+  return null;
+}
+
+// ── Legacy migration ──────────────────────────────────────────────────────────
+// One-time migration from the old full-history localStorage format.
+
+function _migrateLegacyLocalStorage() {
+  const oldKey = `chat_tabs_${config.companion_folder || 'default'}`;
+  try {
+    const raw = localStorage.getItem(oldKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const oldTabs = Array.isArray(parsed) ? parsed : (parsed.tabs || []);
+    if (!oldTabs.length) return;
+
+    _tabs = oldTabs.map(t => _hydrateTabShell(t));
+
+    // Best-effort: migrate history into memory so it gets saved to disk
+    // on the next saveTabs() call.
+    oldTabs.forEach(oldTab => {
+      const tab = _tabs.find(t => t.id === oldTab.id);
+      if (tab) {
+        tab.history  = oldTab.history  || [];
+        tab.messages = oldTab.messages || [];
+      }
+    });
+
+    if (parsed.activeTabId) _activeTabId = parsed.activeTabId;
+
+    // Remove old key after successful migration
+    localStorage.removeItem(oldKey);
+    console.log('[tabs] migrated', _tabs.length, 'tab(s) from legacy localStorage');
+  } catch (e) {
+    console.warn('[tabs] legacy migration failed:', e);
+  }
+}
+
+// ── UID / tab factory ─────────────────────────────────────────────────────────
 
 function _uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -54,6 +252,7 @@ function _makeTab(title = 'New chat') {
 }
 
 // ── Tab operations ────────────────────────────────────────────────────────────
+
 function newTab() {
   _saveCurrentTabState();
   const tab = _makeTab();
@@ -62,12 +261,26 @@ function newTab() {
   switchTab(tab.id);
 }
 
-function switchTab(id) {
+async function switchTab(id) {
   if (_activeTabId === id) return;
   _saveCurrentTabState();
+  await saveTabs();
+
   _activeTabId = id;
   const tab = _tabs.find(t => t.id === id);
   if (!tab) return;
+
+  // New session ID for this page visit on this tab
+  _currentSessionId = _makeSessionId();
+
+  // Load history from disk if not already in memory
+  if (!tab.history?.length && !tab.messages?.length) {
+    const session = await _loadSessionFromDisk(id);
+    if (session) {
+      tab.history  = session.history  || [];
+      tab.messages = session.messages || [];
+    }
+  }
 
   conversationHistory = tab.history || [];
 
@@ -90,9 +303,8 @@ function switchTab(id) {
   updateContextBar();
   enableInput();
   document.getElementById('msg-input')?.focus();
-  saveTabs();
+  _saveTabIndex();
 
-  // Fire session_start heartbeat when switching to an empty tab
   if (!tab.messages?.length && typeof heartbeatOnSessionStart === 'function') {
     heartbeatOnSessionStart();
   }
@@ -129,11 +341,19 @@ function closeTab(id, e) {
   modal.addEventListener('click', e => { if (e.target === modal) close(); });
 }
 
-function _doCloseTab(id) {
-  // If we're closing the tab that owns the current generation, abort it now
-  // so the response doesn't bleed into whatever tab becomes active next.
+async function _doCloseTab(id) {
   if (id === _activeTabId && typeof stopGeneration === 'function') {
     stopGeneration();
+  }
+
+  // Delete history from disk
+  const folder = config.companion_folder || 'default';
+  try {
+    await fetch(`/api/history/${encodeURIComponent(folder)}/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  } catch (e) {
+    console.warn('[tabs] could not delete history from disk:', e);
   }
 
   if (_tabs.length === 1) {
@@ -142,15 +362,16 @@ function _doCloseTab(id) {
     conversationHistory = [];
     document.getElementById('messages').innerHTML = '';
     renderTabList();
-    saveTabs();
+    _saveTabIndex();
     enableInput();
     return;
   }
+
   const idx    = _tabs.findIndex(t => t.id === id);
   _tabs.splice(idx, 1);
   const nextId = _tabs[Math.min(idx, _tabs.length - 1)].id;
   _activeTabId = null;
-  saveTabs();
+  _saveTabIndex();
   switchTab(nextId);
 }
 
@@ -167,6 +388,7 @@ function renameTab(id, e) {
 }
 
 // ── Tab state save/restore ────────────────────────────────────────────────────
+
 function _saveCurrentTabState() {
   if (!_activeTabId) return;
   const tab = _tabs.find(t => t.id === _activeTabId);
@@ -189,7 +411,6 @@ function _serializeMessages() {
       const time   = el.querySelector('.msg-time');
       if (bubble) {
         const entry = { type: 'message', role, html: bubble.innerHTML, time: time?.textContent || '' };
-        // Preserve heartbeat identity so it restores with the right styling
         if (el.classList.contains('heartbeat-msg')) entry.heartbeat = true;
         msgs.push(entry);
       }
@@ -206,6 +427,10 @@ function _serializeMessages() {
 
     } else if (el.classList.contains('system-note')) {
       msgs.push({ type: 'system', text: el.textContent });
+
+    } else if (el.classList.contains('memory-pill')) {
+      // Persist memory pills so they replay correctly
+      msgs.push({ type: 'memory-pill', text: el.querySelector('.memory-pill-text')?.textContent || '' });
     }
   });
   return msgs;
@@ -268,10 +493,14 @@ function _replayMessage(m) {
     note.className   = 'system-note';
     note.textContent = m.text;
     list.appendChild(note);
+
+  } else if (m.type === 'memory-pill') {
+    appendMemoryPill(m.text);
   }
 }
 
 // ── Tab list rendering ────────────────────────────────────────────────────────
+
 function renderTabList() {
   const list = document.getElementById('tab-list');
   if (!list) return;

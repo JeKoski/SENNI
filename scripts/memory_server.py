@@ -711,3 +711,40 @@ async def api_memory_init(request: Request):
         "note_count": _store.count() if _store else 0,
         "session_context": context,
     }
+
+
+@router.post("/api/memory/associative")
+async def api_memory_associative(request: Request):
+    """
+    System-driven feminine-pathway retrieval.
+    Called mid-conversation when a topic/mood shift is detected.
+    Body: { query, mood, valence, k }
+    Returns: { ok, notes_text } where notes_text is ready to inject as a system turn.
+    """
+    err = _check_available()
+    if err:
+        return err
+
+    body    = await request.json()
+    mood    = body.get("mood") or None
+    valence = body.get("valence")
+    k       = int(body.get("k", 3))
+    k       = max(1, min(10, k))
+
+    if valence is not None:
+        try:
+            valence = float(valence)
+        except (TypeError, ValueError):
+            valence = None
+
+    loop = asyncio.get_event_loop()
+    notes = await loop.run_in_executor(
+        None,
+        lambda: trigger_associative_retrieval(mood=mood, valence=valence, k=k),
+    )
+
+    if not notes:
+        return {"ok": True, "notes_text": "", "count": 0}
+
+    text = _format_notes_for_prompt(notes, label="Surfaced memories")
+    return {"ok": True, "notes_text": text, "count": len(notes)}

@@ -181,3 +181,35 @@ function autoResize(el) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
   else run();
 })();
+
+// ── Memory pill ───────────────────────────────────────────────────────────────
+// Shown in the chat timeline when the system surfaces associative memories.
+// Styled like a heartbeat pill but with a memory/sparkle identity.
+function appendMemoryPill(notesText) {
+  const list = document.getElementById('messages');
+  if (!list) return;
+
+  const pill = document.createElement('div');
+  pill.className = 'memory-pill';
+  pill.innerHTML = `
+    <span class="memory-pill-icon">✦</span>
+    <span class="memory-pill-text">Memory surfaced</span>`;
+
+  // Expand/collapse full notes on click
+  if (notesText) {
+    pill.title  = notesText;
+    pill.style.cursor = 'pointer';
+    let expanded = false;
+    const detail = document.createElement('div');
+    detail.className = 'memory-pill-detail';
+    detail.textContent = notesText;
+    pill.appendChild(detail);
+    pill.addEventListener('click', () => {
+      expanded = !expanded;
+      detail.style.display = expanded ? 'block' : 'none';
+    });
+  }
+
+  list.appendChild(pill);
+  scrollIfFollowing();
+}

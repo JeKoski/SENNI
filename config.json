@@ -1,6 +1,6 @@
 {
   "companion_name": "S.E.N.N.I",
-  "companion_folder": "default",
+  "companion_folder": "s.e.n.n.i",
   "model_path": "C:/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
   "mmproj_path": "C:/AI/ComfyUI_Windows_portable/ComfyUI/models/text_encoders/mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
   "gpu_type": "intel",
@@ -119,6 +119,12 @@
     "python_path": "C:/Users/jesse/AppData/Local/Programs/Python/Python311/python.exe",
     "voices_path": "C:\\AI\\Kokoro\\Kokoro-82M\\voices",
     "espeak_path": "C:/Program Files/eSpeak NG/espeak-ng.exe"
+  },
+  "memory": {
+    "enabled": true,
+    "embedding_model": "all-MiniLM-L6-v2",
+    "session_start_k": 6,
+    "mid_convo_k": 4
   },
   "generation": {
     "temperature": 1,

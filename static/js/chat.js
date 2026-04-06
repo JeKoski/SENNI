@@ -133,6 +133,12 @@ function setupToolCallHandler() {
       updateMemoryCounts();
     }
   };
+
+  onMemorySurface = (notesText) => {
+    appendMemoryPill(notesText);
+    _saveCurrentTabState();
+    saveTabs();
+  };
 }
 
 // ── Server boot ───────────────────────────────────────────────────────────────
@@ -691,10 +697,10 @@ mind/ files are your working scratchpad — notes, tasks, anything you want to k
   mind/session_notes.md      — running notes across sessions (or any filename you choose)
 
 HOW TO USE:
-  memory({"action":"read","folder":"soul","filename":"user_profile.md"})
-  memory({"action":"write","folder":"soul","filename":"user_profile.md","content":"<full file>"})
-  memory({"action":"read","folder":"mind","filename":"session_notes.md"})
-  memory({"action":"write","folder":"mind","filename":"session_notes.md","content":"<full file>"})
+  \`memory({"action":"read","folder":"soul","filename":"user_profile.md"})\`
+  \`memory({"action":"write","folder":"soul","filename":"user_profile.md","content":"<full file>"})\`
+  \`memory({"action":"read","folder":"mind","filename":"session_notes.md"})\`
+  \`memory({"action":"write","folder":"mind","filename":"session_notes.md","content":"<full file>"})\`
 
 RULES:
 - ${rule2}
@@ -716,7 +722,7 @@ from files — richer, searchable, and automatically surfaced at session start.
 WRITE MEMORY — use write_memory sparingly (2–5 notes per session, quality over quantity):
 - Something genuinely worth keeping: a significant fact, a felt moment, a real insight
 - Not routine exchanges, small talk, or things already captured in soul/mind files
-Types: Fact (S) · Concept (N) · Vibe (F) · Logic (T) — use whichever fits
+Types: Fact (S) . Concept (N) . Vibe (F) . Logic (T) - use whichever fits
 You have saved a note only when the tool returns a confirmation with a note ID.
 
 RETRIEVE MEMORY — use retrieve_memory for deliberate mid-conversation recall:
@@ -726,7 +732,7 @@ Session-start retrieval is automatic — you only need this for targeted in-conv
 
 RELATIONAL STATE — use update_relational_state only when the relationship itself shifts:
 - A genuine change in closeness, trust, or dynamic — not every session
-- Write the full updated block (~200 tokens), not just what changed`;}
+- Write the full updated block (~200 tokens), not just what changed`;
 
   if (mode === 'heartbeat') {
     // Heartbeat prompt is built entirely in heartbeat.js — this shouldn't be called
