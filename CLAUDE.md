@@ -218,6 +218,35 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ---
 
+## Session notes — 2026-04-06 #8
+
+**Bug fixes: history loading, embedding timeout, role alternation 500, misc.**
+
+### Files written/changed this session
+
+- `static/js/chat.js` — `buildSystemPrompt()` HOW TO USE block rewritten to XML format (session #7 carry-over, already done).
+- `static/js/chat-tabs.js` — Three history bugs fixed:
+  1. `_migrateLegacyLocalStorage()` deleted the old key but never flushed to disk — `await saveTabs()` added after successful migration.
+  2. Active tab history never loaded from disk on page load — `loadTabs()` now explicitly loads the active tab's session from disk after restoring the tab index.
+  3. `switchTab()` early-exit guard fired on ID match alone, bypassing disk load for shell tabs — guard now only exits if tab is active *and* has content loaded.
+- `scripts/memory_server.py` — Added `_prewarm_embedding_model()`: fires a background thread at session init to force `all-MiniLM-L6-v2` to download/load before first tool use.
+- `scripts/memory_store.py` — Added `prewarm_embeddings()` method: does a dummy `query_texts=["warmup"]` call to trigger model load.
+- `tools/write_memory.py`, `tools/retrieve_memory.py`, `tools/update_relational_state.py` — HTTP timeout bumped from 10s → 60s as safety net for cold/slow environments.
+- `static/js/api.js` — Fixed role-alternation 500 error on non-Qwen models (Llama, Mistral, etc.). Paths B, C, D were conditionally pushing an assistant turn only when visible text existed alongside a tool call. Pure tool calls (no text) produced `user → user` sequences that strict chat templates reject. All three paths now always push an assistant turn (using `"…"` placeholder if no real text) before the tool-result user turn. Guard added to avoid doubling up if assistant was already pushed.
+
+### Known outstanding
+
+- Friend's 500 error may also involve stale/incompatible default server args — needs investigation of `DEFAULTS` server args in `config.py` vs current llama.cpp flags.
+- `design/FEATURES.md` — add: detect port-already-in-use at startup and print a clear error (currently fails silently, caused confusing wizard-shows-on-refresh issue during dev).
+
+### Next session priorities
+
+1. Audit default server args in `config.py` against current llama.cpp for any removed/renamed flags
+2. Background embedding queue
+3. Test history save/load end-to-end on a fresh clone
+
+---
+
 ## Session notes — 2026-04-06 #7
 
 **System prompt XML format examples — complete.**
