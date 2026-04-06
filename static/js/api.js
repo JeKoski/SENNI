@@ -150,7 +150,14 @@ async function callModel(system, messages, abortSignal = null) {
         results.push(`[${name}]: ${result}`);
       }
       const cleaned = stripToolCalls(rawText, inlineCalls);
-      if (cleaned) msgs.push({ role: "assistant", content: cleaned });
+      // Always ensure an assistant turn precedes the tool-result user turn.
+      // If the model produced no visible text alongside the call, push a
+      // minimal placeholder so chat templates with strict role-alternation
+      // rules (e.g. Llama, Mistral) don't return a 500.
+      const assistantText = cleaned || "…";
+      if (msgs[msgs.length - 1]?.role !== "assistant") {
+        msgs.push({ role: "assistant", content: assistantText });
+      }
       msgs.push({
         role: "user",
         content: `[Tool results]\n${results.join("\n")}\n\nPlease continue naturally.`
@@ -169,7 +176,10 @@ async function callModel(system, messages, abortSignal = null) {
         results.push(`[${name}]: ${result}`);
       }
       const cleaned = rawText.replace(/<(?:tool_call|tool_use)>[\s\S]*?<\/tool_call>/g, '').trim();
-      if (cleaned) msgs.push({ role: "assistant", content: cleaned });
+      const assistantText = cleaned || "…";
+      if (msgs[msgs.length - 1]?.role !== "assistant") {
+        msgs.push({ role: "assistant", content: assistantText });
+      }
       msgs.push({
         role: "user",
         content: `[Tool results]\n${results.join("\n")}\n\nPlease continue naturally.`
@@ -185,8 +195,11 @@ async function callModel(system, messages, abortSignal = null) {
       const rescuedCalls = parseXmlToolCalls(thinkContent);
       if (rescuedCalls.length > 0) {
         console.log("[api] rescued", rescuedCalls.length, "tool call(s) from thinking block");
-        // If the model also produced text, push it as the assistant turn first
-        if (rawText) msgs.push({ role: "assistant", content: rawText });
+        // Always ensure an assistant turn precedes the tool-result user turn.
+        const assistantText = rawText || "…";
+        if (msgs[msgs.length - 1]?.role !== "assistant") {
+          msgs.push({ role: "assistant", content: assistantText });
+        }
         const results = [];
         for (const { name, args } of rescuedCalls) {
           const result = await _execTool(name, args);

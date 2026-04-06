@@ -142,6 +142,9 @@ async function loadTabs() {
   // 2. Migrate from old localStorage format (full history stored in browser)
   if (!_tabs.length) {
     _migrateLegacyLocalStorage();
+    // Flush migrated history to disk immediately — the old localStorage key
+    // has been deleted, so this is the only chance to persist it.
+    if (_tabs.length) await saveTabs();
   }
 
   // 3. If still nothing, fall back to listing from disk
@@ -154,6 +157,22 @@ async function loadTabs() {
   // Validate activeTabId
   if (!_activeTabId || !_tabs.find(t => t.id === _activeTabId)) {
     _activeTabId = _tabs[0].id;
+  }
+
+  // 4. Load the active tab's session from disk into memory.
+  // Tabs restored from the index are shells (history: [], messages: []).
+  // startSession() checks messages.length to decide whether to replay —
+  // it must be populated before we get there.
+  const activeTab = _tabs.find(t => t.id === _activeTabId);
+  if (activeTab && !activeTab.history?.length && !activeTab.messages?.length) {
+    const session = await _loadSessionFromDisk(_activeTabId);
+    if (session) {
+      activeTab.history  = session.history  || [];
+      activeTab.messages = session.messages || [];
+    }
+  }
+  if (activeTab) {
+    conversationHistory = activeTab.history || [];
   }
 }
 
@@ -262,13 +281,18 @@ function newTab() {
 }
 
 async function switchTab(id) {
-  if (_activeTabId === id) return;
+  const tab = _tabs.find(t => t.id === id);
+  if (!tab) return;
+
+  // Only skip the full switch if already on this tab AND content is loaded.
+  // If the tab is a shell (empty history/messages), fall through to load from disk.
+  const alreadyLoaded = _activeTabId === id && (tab.history?.length || tab.messages?.length);
+  if (alreadyLoaded) return;
+
   _saveCurrentTabState();
   await saveTabs();
 
   _activeTabId = id;
-  const tab = _tabs.find(t => t.id === id);
-  if (!tab) return;
 
   // New session ID for this page visit on this tab
   _currentSessionId = _makeSessionId();
