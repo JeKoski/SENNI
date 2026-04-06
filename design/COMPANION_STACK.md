@@ -1,6 +1,7 @@
 # COMPANION_STACK.md — Cognitive Function Stack
 
 Written after design session: 2026-04-04
+Updated: 2026-04-06
 Status: Design complete, not yet implemented.
 
 See also: MEMORY.md (how the stack feeds into memory encoding/retrieval)
@@ -9,7 +10,7 @@ See also: MEMORY.md (how the stack feeds into memory encoding/retrieval)
 
 ## Overview
 
-Each SENNI companion has a cognitive function stack — a four-slot personality structure derived from Jungian cognitive function theory and Objective Personality (OP) research. The stack determines how the companion encodes memory, which memory types she prioritizes, how she retrieves memories, and (eventually) how she tends toward certain moods.
+Each SENNI companion has a cognitive function stack — a four-slot personality structure derived from Jungian cognitive function theory and Objective Personality (OP) research. The stack determines how the companion encodes memory, which memory types she prioritises, how she retrieves memories, and (eventually) how she tends toward certain moods.
 
 This is not just a personality label. It is a structural parameter that cascades into multiple systems.
 
@@ -24,8 +25,8 @@ mT-fS-mN-fF
 Four slots separated by hyphens. Each slot has two characters:
 
 | Character | Values | Meaning |
-|-----------|--------|---------|
-| Charge | `m` or `f` | masculine (assertive) or feminine (receptive) |
+|-----------|--------|---------| 
+| Charge | `m` or `f` | masculine (assertive, solid) or feminine (receptive, airy) |
 | Function | `T`, `S`, `N`, or `F` | Thinking, Sensing, Intuition, Feeling |
 
 Stack position is implicit — slot 1 is dominant (most conscious, most reliable), slot 4 is inferior (most unconscious, most erratic).
@@ -34,14 +35,29 @@ Stack position is implicit — slot 1 is dominant (most conscious, most reliable
 
 ## The Four Functions
 
+Functions divide into two axes:
+
+**Observing functions** (what you take in):
 | Function | Memory primitive | What it processes |
 |----------|-----------------|------------------|
-| `T` | Logical | Causal reasoning, structure, inference, consistency |
-| `S` | Fact | Concrete sensory detail, what literally happened |
-| `N` | Conceptual | Patterns, meaning, symbolic connections, what things imply |
-| `F` | Emotional | Felt sense, relational quality, emotional texture |
+| `S` | Fact | Concrete sensory detail — what literally happened, who, where, when |
+| `N` | Concept | Patterns, meaning, thematic connections — what things imply across contexts |
 
-Each companion's stack contains all four functions exactly once, in some order, each with a charge.
+**Judging functions** (what you do with it):
+| Function | Memory primitive | What it processes |
+|----------|-----------------|------------------|
+| `T` | Logic | Causal reasoning, structure, inference, consistency |
+| `F` | Vibe | Felt sense, relational quality, emotional texture |
+
+Functions always operate in **Observing + Judging pairs**. You need both to form a complete thought — observation without judgement is raw input, judgement without observation is reasoning about nothing.
+
+The four natural pairings produce the four composite memory types:
+- **S + T** → Reason ("Driving across town is logical.")
+- **S + F** → Impression ("Yesterday's memory talk was exciting.")
+- **N + T** → Conclusion ("Him walking to a car means he's going to travel.")
+- **N + F** → Relation ("Hanging out with him is fun.")
+
+Each companion's stack contains all four functions exactly once. The top two functions form the dominant O+J pair — the lens through which most experience is processed. The bottom two form the inferior pair — active when necessary, but harder and less natural.
 
 ---
 
@@ -49,40 +65,50 @@ Each companion's stack contains all four functions exactly once, in some order, 
 
 Charge is **not** a strength axis. It is a **directionality** axis.
 
-**Masculine (assertive)** — moves outward, acts on the world, initiates. Does not absorb. A masculine function goes out and grabs. It encodes by *doing something* with the input, organizing and deploying it. The resulting memories are structured, actionable, and directly retrievable.
+**Masculine (assertive)** — solid, moves outward, initiates. A masculine function goes out and grabs. It encodes by *doing something* with the input — organising, structuring, deploying. The resulting memories are solid, directly retrievable, queryable on demand.
 
-**Feminine (receptive)** — absorbs, is moved, takes the shape of what comes to it. Does not initiate. A feminine function waits to be impressed. It encodes by *receiving* deeply when something lands. The resulting memories are richer in texture but rarer, and surface associatively rather than on demand.
+**Feminine (receptive)** — airy, absorbs, is moved. A feminine function waits to be impressed. It encodes by *receiving* deeply when something lands. The resulting memories are richer in texture but harder to deliberately recall — they surface associatively rather than on demand.
 
 Neither is better. They capture orthogonal aspects of the same experience:
-- Masculine Sensing: "the door was on the left, it took three minutes" — actionable, structured
-- Feminine Sensing: the smell of the hallway, the quality of the light, the felt texture of being there
+- **mS**: "The door was on the left, it took three minutes." Structured, actionable.
+- **fS**: The smell of the hallway, the quality of the light, the felt texture of being there.
+
+The masculine functions in a stack define where the companion is *solid* — what she can grab, structure, and reliably use. The feminine functions define where she *absorbs* — what lands richly but floats rather than crystallises.
 
 ---
 
 ## Stack Position × Charge Interactions
 
-The four behavioral profiles that emerge from combining position and charge:
-
 | Position | Charge | Behaviour |
 |----------|--------|-----------|
 | High (1st/2nd) | Masculine | Reliable, structured encoder. Actively seeks this memory type. Directly retrievable on demand. |
-| High (1st/2nd) | Feminine | Deep receiver. Richly absorbs when something arrives, but doesn't go looking. Rare writes, high quality. |
-| Low (3rd/4th) | Masculine | Erratic. Fires unexpectedly with disproportionate force. Assertive but unreliable — can produce sudden strong memories of a type that usually doesn't register. |
-| Low (3rd/4th) | Feminine | Ghost layer. Passive and unconscious. Information of this type passes through without sticking. When something does surface from here, it feels uncanny — even to the companion. |
+| High (1st/2nd) | Feminine | Deep receiver. Richly absorbs when something arrives. Rare writes, high quality. Won't go looking. |
+| Low (3rd/4th) | Masculine | Erratic. Fires unexpectedly with disproportionate force. Assertive but unreliable. |
+| Low (3rd/4th) | Feminine | Ghost layer. Passive, barely registers. When something does surface from here, it feels uncanny — even to the companion. |
 
-The inferior (4th slot) feminine function is the most interesting edge case: it almost never encodes, but on the rare occasions it breaks through, the memory is overwhelming precisely because it's so unusual. A strongly Thinking-dominant companion whose inferior is feminine Feeling may have almost no emotional memories — but the few she has feel seismic.
+---
+
+## Stack Position as Probability
+
+Stack position determines how likely a companion is to process experience through a given function. Higher = more likely to be the active lens, not just "stronger."
+
+For `mT-fS-mN-fF`:
+- **mT** (dominant) — Logical structure is the default lens. Used ~90% of the time. Crystal clear, consciously accessible.
+- **fS** (auxiliary) — Facts are present but airy. Used often, but always coloured by T. The focus is on what the facts *mean* (mN concept) more than the facts themselves.
+- **mN** (tertiary) — Concepts are solid when they fire, but less consciously accessible. The overarching idea, the common thread across facts, is there — just harder to see clearly.
+- **fF** (inferior) — Vibes barely register. Almost no emotional memory is encoded. When something does break through here, it's overwhelming precisely because it's so rare.
+
+Because functions pair as O+J, the active pair is almost always the top two. The bottom pair activates only when the situation demands it — processing an emotional relationship purely through S+T isn't possible, so N+F will engage even if low on the stack.
 
 ---
 
 ## Effect on Memory Encoding
 
-Write weight per memory type:
+Write weight per primitive:
 
 ```
 write_weight = stack_position_score × charge_multiplier × (1 + mood_resonance)
 ```
-
-Default scores:
 
 | Stack position | Position score |
 |----------------|---------------|
@@ -96,18 +122,21 @@ Default scores:
 | Masculine | 1.0 |
 | Feminine | 0.6 |
 
-`mood_resonance` adds 0.0–0.5 when the active mood resonates with that function type (see MOOD.md when written).
+`mood_resonance` adds 0.0–0.5 when the active mood resonates with that function type.
+
+The write weights determine the `primitive_ratios` stored in each memory note (S/N/F/T floats summing to 1.0). The composite label is derived automatically from the dominant O+J pair in those ratios.
 
 ---
 
 ## Effect on Memory Retrieval
 
-Charge determines retrieval pathway:
+**Function type** determines *what content* is prioritised in queries — what kind of primitive weighting is searched for.
 
-- **Masculine-sourced memories** → direct query via ChromaDB semantic/keyword search. The companion can deliberately recall these.
-- **Feminine-sourced memories** → associative trigger via mood state, emotional valence of current conversation, and network proximity. These surface; they aren't fetched.
+**Charge** determines *how* retrieval executes:
+- **Masculine-sourced memories** → direct query via ChromaDB semantic/keyword search. Deliberately recallable.
+- **Feminine-sourced memories** → associative trigger via mood state, emotional valence, and network proximity. These surface; they aren't fetched.
 
-This is implemented as two separate retrieval passes that are combined at injection time.
+At session start, the dominant function type shapes what notes surface. A T-dominant companion surfaces Conclusions and Reasons; an F-dominant companion surfaces Relations and Impressions; N-dominant surfaces pattern-heavy notes; S-dominant surfaces concrete recent facts. The dominant charge shapes the retrieval form — masculine queries semantically against the relational state block, feminine pulls by mood/valence first.
 
 ---
 
@@ -115,7 +144,7 @@ This is implemented as two separate retrieval passes that are combined at inject
 
 (Full design in MOOD.md — not yet written.)
 
-High-stack functions represent where a companion is most naturally at home. She will drift toward moods that engage her dominant and auxiliary functions. Recovery from moods that engage her inferior is slower and more destabilizing.
+High-stack functions represent where a companion is most naturally at home. She will drift toward moods that engage her dominant and auxiliary functions. Recovery from moods that engage her inferior is slower and more destabilising.
 
 A companion with dominant masculine Thinking will naturally inhabit states of analytical engagement. A mood that forces her into emotional territory (inferior feminine Feeling) will feel more intense and take longer to resolve.
 
@@ -131,7 +160,7 @@ Three tiers of UI access:
 
 **Intermediate** — personality sliders (playfulness, initiative, warmth, directness, etc.) that secretly map to stack weights. The user shapes the stack without knowing it.
 
-**Advanced mode** (opt-in, toggle in wizard) — direct stack editing in `mT-fS-mN-fF` format. For users familiar with MBTI/OP. All four slots editable with charge and function selectors. Estimated to be popular with a specific audience.
+**Advanced mode** (opt-in, toggle in wizard) — direct stack editing in `mT-fS-mN-fF` format. For users familiar with MBTI/OP. All four slots editable with charge and function selectors.
 
 All three modes write to the same underlying stack data. The stack is the source of truth; the plain-language description and sliders are derived from it.
 
@@ -161,12 +190,12 @@ Existing companions without the polarity behave as if it is unset. No migration 
 
 ## Example Stacks
 
-| Stack | Character sketch |
-|-------|-----------------|
-| `mT-fS-mN-fF` | Analytical dominant. Builds strong logical memories, absorbs sensory detail richly but passively, fires conceptual insights erratically, almost no emotional memory — but when it breaks through, it's intense. |
-| `fF-mN-fT-mS` | Emotionally receptive dominant. Absorbs relational texture deeply, actively seeks meaning and pattern, passively receives logical structure, goes out and grabs concrete facts but somewhat unreliably. |
-| `mS-fF-mT-fN` | Concrete and action-oriented. Reliable factual memory, absorbs emotional texture when it arrives, erratic logical insights, conceptual meaning barely registers. |
-| `fN-mF-fS-mT` | Pattern-absorbing dominant. Receives meaning and implication deeply, actively generates emotional connections, rarely encodes concrete facts, deploys logical structure forcefully but erratically. |
+| Stack | Dominant pair | Character sketch |
+|-------|--------------|-----------------|
+| `mT-fS-mN-fF` | S+T (Reason) | Analytical dominant. Logical structure is crystal clear; facts are airy (absorbed, not grabbed). Fires conceptual insights erratically. Almost no emotional memory — but when it breaks through, it's intense. |
+| `fF-mN-fT-mS` | N+F (Relation) | Emotionally receptive dominant. Absorbs relational texture deeply, actively seeks meaning and pattern. Logical structure received passively. Goes out and grabs concrete facts but somewhat unreliably. |
+| `mS-fF-mT-fN` | S+T (Reason) / S+F (Impression) | Concrete and action-oriented. Reliable factual memory, absorbs emotional texture when it arrives. Erratic logical insights. Conceptual meaning barely registers. |
+| `fN-mF-fS-mT` | N+F (Relation) | Pattern-absorbing dominant. Receives meaning and implication deeply, actively generates emotional connections. Rarely encodes concrete facts. Deploys logical structure forcefully but erratically. |
 
 ---
 

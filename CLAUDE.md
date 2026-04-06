@@ -500,9 +500,11 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
 - Future: Qwen3-TTS option for better tone/emphasis control — current hardware likely limits to Kokoro only for now.
 
 # Multilayered persistent memory
-- Look into best options - What open source options are there already that we could just use instead of reinventing the wheel?
-- Automatic vector/embedding?
-- Memory decay over time when not used?
+- Design complete — see `design/MEMORY.md` and `design/COMPANION_STACK.md`
+- Implementation in progress — `scripts/memory_store.py` and `scripts/memory_server.py` written
+- Remaining: tool files (write_memory, retrieve_memory, update_relational_state), server.py wiring, system prompt changes, config.py updates
+- Stack: ChromaDB + all-MiniLM-L6-v2 (fully local, offline after first install)
+- Layered on top of existing file system — soul/ and mind/ stay, memory/ deprecated
 
 ### Companion Creation Wizard *(design needed — large feature)*
 
@@ -535,40 +537,123 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 
 | File                        | Contents                                                                                                                                                  |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `design/MEMORY.md`          | Full memory architecture — primitives, composite types, note schema, tiered storage, ChromaDB stack, mood integration, write discipline                   |
-| `design/COMPANION_STACK.md` | Cognitive function stack format (`mT-fS-mN-fF`), charge/position interactions, effect on memory encoding and retrieval, UI exposure tiers, storage schema |
+| `design/MEMORY.md`          | Full memory architecture — primitives (Fact/Concept/Vibe/Logic), composite types (Conclusion/Relation/Reason/Impression), primitive_ratios model, session-start retrieval, mid-conversation retrieval, consolidation schedule, note schema, ChromaDB stack, mood integration, write discipline. Updated 2026-04-06. |
+| `design/COMPANION_STACK.md` | Cognitive function stack format (`mT-fS-mN-fF`), O+J axis pairing model, charge as directionality (solid/airy), stack position as probability, effect on memory encoding and retrieval, UI exposure tiers, storage schema. Updated 2026-04-06. |
 | `design/ORB_DESIGN.md`      | Companion Orb<br>Persistent presence indicator in the chat                                                                                                |
 
 When starting a session that touches memory or personality systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
 
 ---
 
-## Session notes — 2026-04-05
+## Session notes — 2026-04-06
 
-**Gemma 4 E4B testing on Windows / SYCL.**
+**Memory system design finalised and implementation begun.**
 
-Diagnosed two issues from llama-server log:
+### Design corrections to MEMORY.md and COMPANION_STACK.md
 
-1. **CPU spike (18 graph splits)** — Gemma 4's alternating SWA/global attention hits SYCL ops not yet fused natively. All 43 layers offload to VRAM correctly, but 18 graph splits = constant GPU↔CPU data shuffling per decode step. Root cause: `shared_kv_layers = 18` — the per-layer projection ops for interleaved global attention. llama.cpp auto-selected `n_batch=2048, n_ubatch=512` optimally on its own. No further config improvement possible — waiting on SYCL kernel implementations. Retest in a few weeks with a fresh build.
+Primitive naming corrected and clarified:
+- Fact (S), Concept (N), Vibe (F), Logic (T) — replaces old Fact/Conceptual/Emotional/Logical naming
+- Composites are always O+J pairs (Observing + Judging): Conclusion (N+T), Relation (N+F), Reason (S+T), Impression (S+F)
+- Three-way/four-way composites not modelled — just two O+J pairs firing simultaneously, not architecturally special
+- Memory stored as **primitive_ratios** (float dict summing to 1.0), not discrete type categories
+- composite_label derived automatically from dominant O+J pair
 
-2. **Tool calls** — Added Path E (Gemma 4 native `<|tool_call>call:name{}<tool_call|>` format) to `api.js` and `tool-parser.js`. Confirmed working — get_time and memory tools both executed correctly when asked directly. Path A (structured tool_calls via peg-gemma4 grammar) also fires correctly.
+Retrieval model corrected:
+- **Function type (T/S/N/F)** determines *what content* is targeted (not charge)
+- **Charge (m/f)** determines *how* retrieval executes — direct/deliberate vs. associative/surfacing
+- These are orthogonal axes. fF retrieves emotional content associatively; mF retrieves emotional content deliberately.
+- Session-start retrieval queries against Tier 1 relational state block; dominant function shapes what surfaces, dominant charge shapes retrieval form
 
-3. **System prompt / proactive tool use** — Gemma 4 doesn't proactively read session notes at session start because the system prompt uses Qwen-style prose-triggered tool calling syntax (`memory({...})`). Gemma 4 follows its chat template more literally. When asked directly it works fine. Fix: revisit system prompt when Gemma 4 becomes primary model.
+Consolidation schedule finalised:
+- Primary: clean session end (shutdown)
+- Fallback: startup check via `last_consolidated_at` timestamp (crash recovery)
+- Idle: 20-minute timer tied to heartbeat idle detection
 
-**Qwen performance regression after llama.cpp update** — new build shows `CPU_Mapped model buffer size` where previous build fully pushed to VRAM. ~8 t/s vs 15-30 t/s previously. Likely a change in `-fit` logic. `--no-mmap` being tested as workaround.
+### Architecture decisions
 
-**TTS sentence buffer rework** (`static/js/tts.js`):
-- Old: segments under `_TTS_MIN_CHARS = 15` were silently dropped — cut "I see.", "Sounds good." etc.
-- New: short segments prepended back onto buffer, join next sentence naturally. "I see. That makes sense." dispatched as one unit.
-- Added `(?<!\d)` negative lookbehind to sentence regex — prevents splitting on decimal points / version numbers ("7.8GB", "v1.4").
-- Lowered `_TTS_MIN_CHARS` to 10. `_ttsFlushBuffer` min reduced to 2 chars.
+**Layering, not replacement** — new ChromaDB memory system layers on top of existing file system:
+- `soul/` stays fully intact — human-editable identity layer, companion can edit in agentic modes
+- `soul/companion_identity.md` synced to Tier 1 identity block at session start
+- `soul/user_profile.md` stays as human-readable relational state face
+- `mind/` stays but narrowed — scratchpad only, not session notes
+- `memory/` deprecated — barely used, ChromaDB does this job properly
+- `mind/session_notes.md` gone — replaced by automatic session-start retrieval
+- `archive` and `move` actions left in `memory` tool code but no longer instructed
 
-**Files changed this session:** `static/js/tool-parser.js`, `static/js/api.js`, `static/js/tts.js`
+**Stack initialisation for existing companions:**
+- No `cognitive_stack` → assign neutral default (`mT-fS-mN-fF`) + set `stack_initialised: false`
+- Stack settings UI added to Companion Settings window
+- `stack_initialised: false` flag prevents treating default as intentional assignment
+- Companion Creation Wizard handles this properly for new companions (future)
 
-**Next session priorities:**
-- Verify `--no-mmap` fixes Qwen performance regression
-- Memory system implementation planning (see MEMORY.md + COMPANION_STACK.md)
-- System prompt rework for Gemma 4 compatibility (when Gemma 4 SYCL performance improves)
+**ChromaDB + all-MiniLM-L6-v2:**
+- Apache 2.0 license — fully compatible with MIT, no issues
+- all-MiniLM-L6-v2 is ~90MB, ~14k sentences/sec on CPU, negligible for our write volumes
+- ChromaDB handles embedding internally — no subprocess needed (unlike TTS)
+- Fully local and offline after first pip install + model download
+
+**Consolidation LLM pass:**
+- Embedding-only pass always runs (no model needed, always safe)
+- LLM pass runs if llama-server is reachable — quality-filters embedding-candidate links
+- If llama-server is down, notes queued in `pending_llm_consolidation` for next session
+- No memories ever lost — quality just improves opportunistically
+
+### Files written this session
+
+- `scripts/memory_store.py` — complete, syntax verified (992 lines)
+  - `MemoryStore` class: write_note, retrieve_session_start, retrieve_direct, retrieve_associative
+  - Primitive ratio computation, composite label derivation, retrieval mode inference
+  - Tier 1 core blocks (get/update identity block, relational state)
+  - Supersede (Zep-style temporal chain)
+  - Consolidation: embedding pass + LLM pass + pending queue
+  - Lazy ChromaDB import — graceful degradation if not installed
+
+- `scripts/memory_server.py` — complete, syntax verified (413 lines)
+  - FastAPI router — mirrors tts_server.py architecture exactly
+  - Store lifecycle: init_memory_store, kill_memory_server
+  - Idle consolidation timer (20 min)
+  - LLM client wrapper (_LlamaClient) for consolidation LLM pass
+  - Session-start context assembly for system prompt injection
+  - Endpoints: /api/memory/status, /write, /retrieve, /supersede, /relational-state, /note/{id}, /consolidate, /init
+
+### server.py changes already applied
+
+```python
+# Lines 82-93 — Memory router mount
+try:
+    from scripts.memory_server import (
+        router as memory_router,
+        kill_memory_server,
+        notify_message_activity,
+    )
+    app.include_router(memory_router)
+except ImportError:
+    kill_memory_server = lambda: None  # noqa: E731
+    notify_message_activity = lambda: None  # noqa: E731
+
+# Line 129 — on_startup atexit
+atexit.register(kill_memory_server)
+
+# Line 144 — on_shutdown
+kill_memory_server()
+```
+
+Still needed in server.py:
+- `notify_message_activity()` call at end of `tools/call` branch in `mcp_handler` (before the return)
+
+### Next session priorities
+
+1. `tools/write_memory.py` — tool file, same pattern as existing tools
+2. `tools/retrieve_memory.py` — tool file
+3. `tools/update_relational_state.py` — tool file
+4. `notify_message_activity()` call in `mcp_handler` tools/call branch in `server.py`
+5. System prompt changes — remove session notes instructions, add write discipline + tool descriptions
+6. `scripts/config.py` — add memory config block to DEFAULTS + `last_consolidated_at` to companion config
+7. Test with Senni — verify ChromaDB install, first write, first retrieval
+
+### Known issue — Qwen3.5 9B tool calls in thinking blocks
+
+Confirmed as a known llama.cpp bug (issue #20837): Qwen3.5 9B often prints tool calls in XML inside thinking blocks when thinking is enabled. Not a SENNI bug. User is experimenting with Gemma 4 as an alternative. Memory write discipline should be designed robust to unreliable self-initiation — associative (feminine) pathway is system-driven, masculine self-retrieval has auto-trigger fallback.
 
 ---
 

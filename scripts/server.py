@@ -79,6 +79,19 @@ STATIC_DIR = PROJECT_ROOT / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+# ── Memory  ─────────────────────────────────────────────────────────────────
+
+try:
+    from scripts.memory_server import (
+        router as memory_router,
+        kill_memory_server,
+        notify_message_activity,
+    )
+    app.include_router(memory_router)
+except ImportError:
+    kill_memory_server = lambda: None  # noqa: E731
+    notify_message_activity = lambda: None  # noqa: E731
+
 # ── Global state ───────────────────────────────────────────────────────────────
 
 _tool_manifest: list[dict] = []
@@ -113,6 +126,7 @@ async def on_startup():
     # Belt-and-suspenders: also kill on abnormal Python exit
     atexit.register(_kill_llama_server)
     atexit.register(kill_tts_server)
+    atexit.register(kill_memory_server)
 
     try:
         from scripts.auto_backup import run_backup
@@ -127,6 +141,7 @@ async def on_shutdown():
     log.info("Shutting down — stopping llama-server…")
     _kill_llama_server()
     kill_tts_server()
+    kill_memory_server()
     _executor.shutdown(wait=False)
 
 
@@ -645,6 +660,8 @@ async def mcp_handler(request: Request):
         except Exception as e:
             log.error("Tool %r raised: %s", tool_name, e, exc_info=True)
             result = f"Tool error: {e}"
+
+        notify_message_activity()
 
         return {
             "jsonrpc": "2.0",

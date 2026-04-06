@@ -92,7 +92,7 @@
     },
     "no_mmap": {
       "flag": "--no-mmap",
-      "enabled": true,
+      "enabled": false,
       "value": null
     },
     "threads": {
