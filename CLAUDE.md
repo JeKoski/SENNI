@@ -218,6 +218,22 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ---
 
+## Session notes — 2026-04-06 #7
+
+**System prompt XML format examples — complete.**
+
+### Files written/changed this session
+
+- `static/js/chat.js` — `buildSystemPrompt()` HOW TO USE section rewritten from inline backtick-style examples to XML `<tool_call>` format. All four `memory` tool examples now shown in XML. Added XML call examples to EPISODIC MEMORY section for `write_memory`, `retrieve_memory`, and `update_relational_state` (none existed before). This completes the tool call fix started in session #6.
+
+### Next session priorities
+
+1. Test end-to-end: write_memory tool call should now execute instead of printing as text
+2. Test history save/load flow
+3. Background embedding queue
+
+---
+
 ## Session notes — 2026-04-06 #6
 
 **Tool call parser fix — Qwen XML format mismatch.**
@@ -235,27 +251,13 @@ A secondary bug: `keywords` array parameters were coming through as raw JSON str
 
 ### Still needed — next session start
 
-- **`static/js/chat.js`** — `buildSystemPrompt()` HOW TO USE section currently shows inline-style examples (`memory({"action":"read",...})`). Should show the XML format that Qwen actually produces naturally. This won't fix failures (parser fix handles that) but should reduce the rate of tool calls ending up in thinking blocks by giving the model a clear format example.
-
-Change needed in the `HOW TO USE:` block (around line 699):
-```
-HOW TO USE — call tools using this XML format:
-<tool_call>
-<function=memory>
-<parameter=action>read</parameter>
-<parameter=folder>soul</parameter>
-<parameter=filename>user_profile.md</parameter>
-</function>
-</tool_call>
-```
-Keep the existing examples but rewrite them in XML format. The EPISODIC MEMORY section examples (`write_memory`, etc.) should also be shown in XML format.
+~~**`static/js/chat.js`** — done in session #7.~~
 
 ### Next session priorities
 
-1. **`chat.js` system prompt XML format examples** — do this first, it's the remaining half of this fix
-2. Test end-to-end: write_memory tool call should now execute instead of printing as text
-3. Test history save/load flow
-4. Background embedding queue
+1. Test end-to-end: write_memory tool call should now execute instead of printing as text
+2. Test history save/load flow
+3. Background embedding queue
 
 ---
 

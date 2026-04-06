@@ -696,11 +696,41 @@ soul/ files are your permanent reference layer — human-readable, editable by t
 mind/ files are your working scratchpad — notes, tasks, anything you want to keep handy:
   mind/session_notes.md      — running notes across sessions (or any filename you choose)
 
-HOW TO USE:
-  \`memory({"action":"read","folder":"soul","filename":"user_profile.md"})\`
-  \`memory({"action":"write","folder":"soul","filename":"user_profile.md","content":"<full file>"})\`
-  \`memory({"action":"read","folder":"mind","filename":"session_notes.md"})\`
-  \`memory({"action":"write","folder":"mind","filename":"session_notes.md","content":"<full file>"})\`
+HOW TO USE — call tools using this XML format:
+
+<tool_call>
+<function=memory>
+<parameter=action>read</parameter>
+<parameter=folder>soul</parameter>
+<parameter=filename>user_profile.md</parameter>
+</function>
+</tool_call>
+
+<tool_call>
+<function=memory>
+<parameter=action>write</parameter>
+<parameter=folder>soul</parameter>
+<parameter=filename>user_profile.md</parameter>
+<parameter=content><full file content here></parameter>
+</function>
+</tool_call>
+
+<tool_call>
+<function=memory>
+<parameter=action>read</parameter>
+<parameter=folder>mind</parameter>
+<parameter=filename>session_notes.md</parameter>
+</function>
+</tool_call>
+
+<tool_call>
+<function=memory>
+<parameter=action>write</parameter>
+<parameter=folder>mind</parameter>
+<parameter=filename>session_notes.md</parameter>
+<parameter=content><full file content here></parameter>
+</function>
+</tool_call>
 
 RULES:
 - ${rule2}
@@ -725,14 +755,35 @@ WRITE MEMORY — use write_memory sparingly (2–5 notes per session, quality ov
 Types: Fact (S) . Concept (N) . Vibe (F) . Logic (T) - use whichever fits
 You have saved a note only when the tool returns a confirmation with a note ID.
 
+<tool_call>
+<function=write_memory>
+<parameter=content>They mentioned they grew up in Helsinki and miss the winters there.</parameter>
+<parameter=type>Fact</parameter>
+<parameter=keywords>["Helsinki", "childhood", "winters"]</parameter>
+</function>
+</tool_call>
+
 RETRIEVE MEMORY — use retrieve_memory for deliberate mid-conversation recall:
 - When the user mentions something you might have a note about
 - When you want to check what you know before making an assumption
 Session-start retrieval is automatic — you only need this for targeted in-conversation lookup.
 
+<tool_call>
+<function=retrieve_memory>
+<parameter=query>what do I know about their hometown or childhood</parameter>
+<parameter=k>4</parameter>
+</function>
+</tool_call>
+
 RELATIONAL STATE — use update_relational_state only when the relationship itself shifts:
 - A genuine change in closeness, trust, or dynamic — not every session
-- Write the full updated block (~200 tokens), not just what changed`;
+- Write the full updated block (~200 tokens), not just what changed
+
+<tool_call>
+<function=update_relational_state>
+<parameter=state>We've moved past small talk. They opened up about their anxiety around work deadlines. Trust feels real now.</parameter>
+</function>
+</tool_call>`;
 
   if (mode === 'heartbeat') {
     // Heartbeat prompt is built entirely in heartbeat.js — this shouldn't be called
