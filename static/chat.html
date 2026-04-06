@@ -253,12 +253,113 @@
     </div>
     <!-- Memory -->
     <div class="cp-tab-body" id="cp-tab-memory">
-      <div class="cp-section" style="display:flex;justify-content:space-between;align-items:center">Soul files <button class="cp-add-btn" onclick="cpNewSoulFile()">+ New file</button></div>
+
+      <!-- ── Episodic memory ── -->
+      <div class="cp-section">Episodic memory</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="sp-tog" id="cp-mem-enabled" onclick="this.classList.toggle('on');cpMarkDirty()"></div>
+        <span style="font-size:13px;color:rgba(221,225,240,0.6)">Enable long-term memory (ChromaDB)</span>
+      </div>
+
+      <!-- Status row -->
+      <div style="display:flex;gap:18px;margin-bottom:14px;font-size:12px;font-family:'DM Mono',monospace;color:rgba(221,225,240,0.45)">
+        <span>Status: <span id="cp-mem-status-text" style="color:rgba(221,225,240,0.4)">—</span></span>
+        <span>Notes: <span id="cp-mem-note-count">—</span></span>
+        <span>Last consolidated: <span id="cp-mem-consolidated">—</span></span>
+      </div>
+      <div id="cp-mem-pending" style="font-size:11px;color:rgba(221,225,240,0.35);margin-bottom:10px;font-family:'DM Mono',monospace"></div>
+
+      <!-- Retrieval knobs -->
+      <div style="display:flex;gap:14px;margin-bottom:6px">
+        <div style="flex:1">
+          <div class="cp-field-label">Session-start recall <span class="cp-note">notes surfaced on open</span></div>
+          <input type="number" class="cp-input" id="cp-mem-session-k"
+            value="6" min="1" max="20" step="1" style="width:70px"
+            oninput="cpMarkDirty()"/>
+        </div>
+        <div style="flex:1">
+          <div class="cp-field-label">Mid-convo recall <span class="cp-note">on retrieve_memory call</span></div>
+          <input type="number" class="cp-input" id="cp-mem-mid-k"
+            value="4" min="1" max="20" step="1" style="width:70px"
+            oninput="cpMarkDirty()"/>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button class="sp-btn-ghost" onclick="cpMemorySaveGlobal()" style="font-size:12px;padding:6px 14px">Save memory settings</button>
+      </div>
+
+      <!-- ── Cognitive stack ── -->
+      <div class="cp-section" style="margin-top:4px">Cognitive stack</div>
+      <div id="cp-stack-uninit-warn" style="display:none;font-size:12px;color:rgba(251,191,36,0.7);margin-bottom:10px;line-height:1.5">
+        ⚠ Using neutral default stack (mT-fS-mN-fF). Set the stack below to reflect this companion's actual character.
+      </div>
+      <div style="font-size:12px;color:rgba(221,225,240,0.4);margin-bottom:10px;line-height:1.5">
+        The stack shapes how memories are encoded and retrieved. Position 1 is dominant, 4 is inferior.
+        Charge: <strong style="color:rgba(221,225,240,0.6)">m</strong> = deliberate/assertive,
+        <strong style="color:rgba(221,225,240,0.6)">f</strong> = associative/receptive.
+        Function: T/S/N/F.
+      </div>
+
+      <!-- Stack slot rows -->
+      <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px">
+        <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(221,225,240,0.35);padding:0 2px">
+          <span style="width:72px">Position</span>
+          <span style="width:72px">Charge</span>
+          <span style="width:72px">Function</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:rgba(221,225,240,0.5);width:72px">1 · dominant</span>
+          <select class="cp-input" id="cp-stack-charge-1" style="width:72px" onchange="_cpMemoryUpdateStackPreview();cpMarkDirty()">
+            <option value="m">m</option><option value="f">f</option>
+          </select>
+          <select class="cp-input" id="cp-stack-func-1" style="width:72px" onchange="_cpMemoryUpdateStackPreview();cpMarkDirty()">
+            <option value="T">T</option><option value="S">S</option><option value="N">N</option><option value="F">F</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:rgba(221,225,240,0.5);width:72px">2 · auxiliary</span>
+          <select class="cp-input" id="cp-stack-charge-2" style="width:72px" onchange="_cpMemoryUpdateStackPreview();cpMarkDirty()">
+            <option value="m">m</option><option value="f">f</option>
+          </select>
+          <select class="cp-input" id="cp-stack-func-2" style="width:72px" onchange="_cpMemoryUpdateStackPreview();cpMarkDirty()">
+            <option value="T">T</option><option value="S">S</option><option value="N">N</option><option value="F">F</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:rgba(221,225,240,0.5);width:72px">3 · tertiary</span>
+          <select class="cp-input" id="cp-stack-charge-3" style="width:72px" onchange="_cpMemoryUpdateStackPreview();cpMarkDirty()">
+            <option value="m">m</option><option value="f">f</option>
+          </select>
+          <select class="cp-input" id="cp-stack-func-3" style="width:72px" onchange="_cpMemoryUpdateStackPreview();cpMarkDirty()">
+            <option value="T">T</option><option value="S">S</option><option value="N">N</option><option value="F">F</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:rgba(221,225,240,0.5);width:72px">4 · inferior</span>
+          <select class="cp-input" id="cp-stack-charge-4" style="width:72px" onchange="_cpMemoryUpdateStackPreview();cpMarkDirty()">
+            <option value="m">m</option><option value="f">f</option>
+          </select>
+          <select class="cp-input" id="cp-stack-func-4" style="width:72px" onchange="_cpMemoryUpdateStackPreview();cpMarkDirty()">
+            <option value="T">T</option><option value="S">S</option><option value="N">N</option><option value="F">F</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:12px;color:rgba(221,225,240,0.35);margin-bottom:16px;font-family:'DM Mono',monospace">
+        Stack: <span id="cp-stack-preview" style="color:rgba(221,225,240,0.55)">mT-fS-mN-fF</span>
+        <span class="cp-note" style="margin-left:6px">saved with Apply / Save</span>
+      </div>
+
+      <!-- ── Soul files ── -->
+      <div class="cp-section" style="display:flex;justify-content:space-between;align-items:center">
+        Soul files
+        <button class="cp-add-btn" onclick="cpNewSoulFile()">+ New file</button>
+      </div>
       <div id="cp-soul-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
-      <textarea class="cp-textarea" id="cp-soul-content" placeholder="Select a file above to edit…" rows="12"></textarea>
+      <textarea class="cp-textarea" id="cp-soul-content" placeholder="Select a file above to edit…" rows="10"></textarea>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
         <button class="sp-btn-ghost" id="cp-soul-save-btn" onclick="cpSaveSoulFile()" style="display:none">Save file</button>
       </div>
+
     </div>
     <!-- Heartbeat -->
     <div class="cp-tab-body" id="cp-tab-heartbeat">
@@ -655,6 +756,7 @@
 <script src="/static/js/companion.js"></script>
 <script src="/static/js/companion-presence.js"></script>
 <script src="/static/js/companion-tts.js"></script>
+<script src="/static/js/companion-memory.js"></script>
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/settings-server.js"></script>
 <script src="/static/js/settings-generation.js"></script>

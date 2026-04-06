@@ -69,6 +69,7 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 | `static/js/companion.js` | Companion settings window coordinator (open/close, load, save, tabs, avatar, soul files, heartbeat, generation, dirty tracking) |
 | `static/js/companion-presence.js` | Presence tab: presets, state editor, preview orb, layout toggle |
 | `static/js/companion-tts.js` | Voice tab: voice blend UI (up to 5 slots), speed/pitch, preview |
+| `static/js/companion-memory.js` | Memory tab: episodic memory toggle/status, cognitive stack editor, `cpMemorySaveGlobal()`, `_cpGetMemoryPayload()` |
 | `static/js/tts.js` | TTS client: sentence buffer, fetch queue, Web Audio playback, stop/abort |
 | `static/js/settings.js` | Settings panel coordinator (open/close, tab switch, load, toast, dirty tracking) |
 | `static/js/settings-server.js` | Settings → Server tab (BUILTIN_ARGS, file browsing, save, restart) |
@@ -94,6 +95,9 @@ The codebase uses small focused modules. New features should be built as separat
 - `static/js/companion-mood.js` — Mood UI tab (new file when Mood UI is built)
 - `static/js/system-prompt.js` — extract `buildSystemPrompt()` from chat.js (low priority)
 
+**Completed this session:**
+- `static/js/companion-memory.js` — Memory tab UI ✓
+
 When creating a new module, it should:
 - Do one thing only
 - Export a clean simple API
@@ -116,6 +120,7 @@ tts.js               ← needs api.js (onTtsToken), no DOM deps at load time
 companion.js         ← coordinator, loads before presence and tts
 companion-presence.js ← needs companion.js (cpSettings, cpMarkDirty), orb.js
 companion-tts.js     ← needs companion.js (cpSettings, cpMarkDirty), tts.js
+companion-memory.js  ← needs companion.js (cpSettings, cpMarkDirty, cpShowToast)
 settings.js          ← coordinator, loads before tab files
 settings-server.js   ← needs settings.js
 settings-generation.js ← needs settings.js
@@ -501,10 +506,31 @@ Grouped by area. Items marked **(design needed)** have open questions that shoul
 
 # Multilayered persistent memory
 - Design complete — see `design/MEMORY.md` and `design/COMPANION_STACK.md`
-- Implementation in progress — `scripts/memory_store.py` and `scripts/memory_server.py` written
-- Remaining: tool files (write_memory, retrieve_memory, update_relational_state), server.py wiring, system prompt changes, config.py updates
+- **Implementation complete** — all backend and frontend wired
 - Stack: ChromaDB + all-MiniLM-L6-v2 (fully local, offline after first install)
 - Layered on top of existing file system — soul/ and mind/ stay, memory/ deprecated
+
+### What's in place
+- `scripts/memory_store.py` — ChromaDB store, primitive ratios, retrieval, consolidation ✓
+- `scripts/memory_server.py` — FastAPI router, session context assembly, idle consolidation timer ✓
+- `tools/write_memory.py`, `tools/retrieve_memory.py`, `tools/update_relational_state.py` ✓
+- `tools/memory.py` — still active for soul/mind file read/write (kept alongside new tools) ✓
+- `scripts/server.py` — router mounted, shutdown hooks, `notify_message_activity()` wired, `cognitive_stack` in companion save, `/api/settings/memory` endpoint ✓
+- `scripts/config.py` — `memory` block in global DEFAULTS, `cognitive_stack` + `last_consolidated_at` in companion config ✓
+- `static/js/chat.js` — `reloadMemoryContext()` at session start, system prompt rewritten with clear file-vs-episodic tool distinction, `session_notes.md` removed from seed templates ✓
+- `static/js/companion-memory.js` — Memory tab UI: enable toggle, status/note count, retrieval knobs, cognitive stack editor ✓
+- `static/js/companion.js` — memory tab wired, TTS cache bug fixed ✓
+- `requirements.txt` — `chromadb>=0.5.0` and `sentence-transformers>=3.0.0` added ✓
+
+### Tool distinction (important for system prompt clarity)
+- `memory` tool → soul/ and mind/ **markdown file** read/write (identity, user profile, scratchpad)
+- `write_memory` / `retrieve_memory` / `update_relational_state` → **ChromaDB** episodic store only
+
+### To enable memory
+Set `"memory": {"enabled": true}` in `config.json` (or use the toggle in Companion Settings → Memory tab) then restart the bridge. ChromaDB will initialise on first `/api/memory/init` call. First run downloads all-MiniLM-L6-v2 (~90MB).
+
+### Known gap
+- `tools/memory.py` still has `archive` and `move` actions — these are not instructed in the system prompt but remain available in chaos mode. Low priority to remove.
 
 ### Companion Creation Wizard *(design needed — large feature)*
 
@@ -544,6 +570,27 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 When starting a session that touches memory or personality systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
 
 ---
+
+## Session notes — 2026-04-06 #3
+
+**Memory system fully wired. TTS cache bug fixed.**
+
+### Files written/changed this session
+
+- `static/js/chat.js` — complete rewrite of memory section: `_memoryContext` state var, `reloadMemoryContext()` (calls `/api/memory/init` at session start), `session_notes.md` removed from `seedTemplates()`, `buildSystemPrompt()` rewritten with two clearly labelled blocks (FILE MEMORY via `memory` tool, EPISODIC MEMORY via the three new tools). `forceRead` flag moved into the file memory block where it belongs.
+- `static/js/companion-memory.js` *(new)* — Memory tab: episodic enable toggle, status row (active/note count/last consolidated/pending LLM pass), session-start-k and mid-convo-k knobs with their own Save button, cognitive stack 4-slot editor (charge + function dropdowns), live stack preview string, uninitialised warning, `_cpGetMemoryPayload()` for cognitive_stack in main companion save.
+- `static/js/companion.js` — wired `cpMemoryPopulate`, `cpMemoryInit`, `cpMemoryReset`, `_cpGetMemoryPayload`; fixed TTS cache bug (missing `cpSettings.active_companion.tts = body.tts` after save — caused voice settings to appear to revert on window reopen without page reload).
+- `static/chat.html` — Memory tab replaced with full new UI; `companion-memory.js` script tag added after `companion-tts.js`.
+- `scripts/server.py` — `cognitive_stack` added to `/api/settings/companion` allowed keys; new `/api/settings/memory` endpoint (enabled, session_start_k, mid_convo_k → global config).
+- `requirements.txt` — `chromadb>=0.5.0` and `sentence-transformers>=3.0.0` added with comments.
+
+### TTS bug root cause
+`cpSave()` updates a local `cpSettings` cache after saving so the window shows correct values on reopen. `tts` was missing from that cache update. After save, closing and reopening the companion window re-read the stale pre-save values from cache. Page reload fixed it because it re-fetched from server. One line fix.
+
+### Next session priorities
+1. Test end-to-end with ChromaDB installed — verify tool calls appear, memories write and retrieve correctly
+2. Mood UI (`companion-mood.js`) — new tab in companion window, builds on existing mood backend
+3. Pill visual rework (bundle with alignment/padding bug fix)
 
 ## Session notes — 2026-04-06 #2
 

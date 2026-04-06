@@ -841,6 +841,22 @@ async def api_save_tts_settings(request: Request):
     return {"ok": True}
 
 
+@app.post("/api/settings/memory")
+async def api_save_memory_settings(request: Request):
+    body   = await request.json()
+    config = load_config()
+    mem    = config.get("memory", {})
+    if "enabled" in body:
+        mem["enabled"] = bool(body["enabled"])
+    if "session_start_k" in body:
+        mem["session_start_k"] = max(1, min(20, int(body["session_start_k"])))
+    if "mid_convo_k" in body:
+        mem["mid_convo_k"] = max(1, min(20, int(body["mid_convo_k"])))
+    config["memory"] = mem
+    save_config(config)
+    return {"ok": True}
+
+
 @app.post("/api/settings/companion")
 async def api_save_companion_settings(request: Request):
     body             = await request.json()
@@ -850,7 +866,8 @@ async def api_save_companion_settings(request: Request):
 
     for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode",
                 "heartbeat", "force_read_before_write", "presence_presets",
-                "active_presence_preset", "moods", "active_mood", "tts"):
+                "active_presence_preset", "moods", "active_mood", "tts",
+                "cognitive_stack"):
         if key in body:
             companion_cfg[key] = body[key]
 

@@ -80,6 +80,7 @@ function closeCompanionWindow() {
   }
   cpPresenceReset();  // allow fresh init on next open (defined in companion-presence.js)
   if (typeof cpTtsReset === 'function') cpTtsReset();
+  if (typeof cpMemoryReset === 'function') cpMemoryReset();
   cpClearDirty();
   document.getElementById('companion-overlay').classList.remove('open');
 }
@@ -154,8 +155,9 @@ function cpPopulate() {
   setGen('cp-g-dry-b',  'dry_base');
   setGen('cp-g-dry-l',  'dry_allowed_length');
 
-  // ── Memory (soul files) ──
+  // ── Memory (soul files + ChromaDB settings) ──
   cpLoadSoulFiles();
+  if (typeof cpMemoryPopulate === 'function') cpMemoryPopulate();
 
   // ── Presence ──
   cpPresenceInit();
@@ -190,7 +192,10 @@ function cpPopulate() {
 function cpSwitchTab(tab) {
   document.querySelectorAll('.cp-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.cp-tab-body').forEach(b => b.classList.toggle('active', b.id === `cp-tab-${tab}`));
-  if (tab === 'memory') cpLoadSoulFiles();
+  if (tab === 'memory') {
+    cpLoadSoulFiles();
+    if (typeof cpMemoryInit === 'function') cpMemoryInit();
+  }
   if (tab === 'presence') {
     // Only do a full init if presence data hasn't been loaded yet this session.
     // If already loaded (user made edits), just re-render so changes are preserved.
@@ -394,6 +399,7 @@ async function cpSave(andClose = false) {
       force_read_before_write: document.getElementById('cp-force-read')?.classList.contains('on') ?? true,
       heartbeat:               hb,
       ..._cpGetPresencePayload(),   // from companion-presence.js
+      ...(typeof _cpGetMemoryPayload === 'function' ? _cpGetMemoryPayload() : {}),
       ...(typeof _cpGetTtsPayload === 'function' ? _cpGetTtsPayload() : {}),
       // ..._cpGetMoodPayload(),    // from companion-mood.js (future)
     };
@@ -415,6 +421,7 @@ async function cpSave(andClose = false) {
       cpSettings.active_companion.heartbeat               = body.heartbeat;
       cpSettings.active_companion.active_presence_preset  = body.active_presence_preset;
       cpSettings.presence_presets                         = body.presence_presets;
+      cpSettings.active_companion.tts                     = body.tts;
     }
 
     // ── Apply the active preset to the live orb right now ──
