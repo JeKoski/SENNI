@@ -184,6 +184,21 @@ class MemoryStore:
         )
         return collection
 
+    def prewarm_embeddings(self) -> None:
+        """
+        Trigger a dummy embed call to force sentence-transformers to download
+        and load the model into memory. Safe to call from a background thread.
+        Called by memory_server._prewarm_embedding_model() at session start.
+        """
+        if not self._collection:
+            return
+        try:
+            # query_texts triggers an embed; empty results are fine
+            self._collection.query(query_texts=["warmup"], n_results=1)
+        except Exception:
+            # Collection might be empty — that's fine, model is still loaded
+            pass
+
     # ── Sidecar meta (Tier 1 + consolidation state) ────────────────────────────
 
     def _load_meta(self) -> dict:

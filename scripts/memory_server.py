@@ -176,6 +176,11 @@ def init_memory_store(companion_folder: str) -> bool:
         _reset_idle_timer()
 
     log.info(f"MemoryStore ready: '{companion_folder}' ({_store.count()} notes)")
+
+    # Pre-warm the embedding model in the background so it's ready before
+    # the first write_memory or retrieve_memory tool call.
+    _prewarm_embedding_model()
+
     return True
 
 
@@ -259,6 +264,33 @@ def _run_consolidation_async(reason: str = "idle") -> None:
             _run_consolidation_sync(reason=reason)
 
     t = threading.Thread(target=_worker, daemon=True, name="senni-consolidation")
+    t.start()
+
+
+def _prewarm_embedding_model() -> None:
+    """
+    Force the sentence-transformers embedding model to download and load
+    in a background thread at session start.
+
+    ChromaDB's DefaultEmbeddingFunction downloads all-MiniLM-L6-v2 lazily
+    on the first actual embed call — which would otherwise happen mid-
+    conversation on the first write_memory or retrieve_memory tool call,
+    causing a 30-60s+ stall that trips the tool's HTTP timeout.
+
+    We trigger a dummy embed here so the download happens quietly in the
+    background while the user is loading the UI, not while they're talking.
+    """
+    def _worker():
+        try:
+            if _store is None or not _store.is_available():
+                return
+            log.info("Pre-warming embedding model (all-MiniLM-L6-v2)...")
+            _store.prewarm_embeddings()
+            log.info("Embedding model warm and ready.")
+        except Exception as e:
+            log.warning(f"Embedding pre-warm failed (non-fatal): {e}")
+
+    t = threading.Thread(target=_worker, daemon=True, name="senni-embed-prewarm")
     t.start()
 
 

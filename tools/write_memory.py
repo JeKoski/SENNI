@@ -133,7 +133,7 @@ def run(args: dict) -> str:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             body = json.loads(resp.read().decode("utf-8"))
 
         if body.get("ok"):

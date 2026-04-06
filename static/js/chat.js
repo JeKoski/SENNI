@@ -26,8 +26,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initInput();
   setupToolCallHandler();
   document.body.classList.toggle('controls-always-visible', _controlsAlwaysVisible);
-  loadTabs();
-  if (!_activeTabId) _activeTabId = _tabs[0].id;
+  await loadTabs();
+  if (!_activeTabId) _activeTabId = _tabs[0]?.id;
   conversationHistory = _tabs.find(t => t.id === _activeTabId)?.history || [];
   // TTS init is non-blocking — silently no-ops if Kokoro isn't installed
   if (typeof ttsInit === 'function') ttsInit();
