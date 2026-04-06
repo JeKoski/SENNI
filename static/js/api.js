@@ -159,7 +159,8 @@ async function callModel(system, messages, abortSignal = null) {
     }
 
     // ── Path C: XML-style tool calls ──────────────────────────────────────
-    // <tool_use><function=name><parameter=key>value</parameter></tool_call>
+    // <tool_call><function=name><parameter=key>value</parameter></tool_call>
+    // Also accepts <tool_use> as the opening tag (older/variant format).
     const xmlCalls = parseXmlToolCalls(rawText);
     if (xmlCalls.length > 0) {
       const results = [];
@@ -167,7 +168,7 @@ async function callModel(system, messages, abortSignal = null) {
         const result = await _execTool(name, args);
         results.push(`[${name}]: ${result}`);
       }
-      const cleaned = rawText.replace(/<tool_use>[\s\S]*?<\/tool_call>/g, '').trim();
+      const cleaned = rawText.replace(/<(?:tool_call|tool_use)>[\s\S]*?<\/tool_call>/g, '').trim();
       if (cleaned) msgs.push({ role: "assistant", content: cleaned });
       msgs.push({
         role: "user",

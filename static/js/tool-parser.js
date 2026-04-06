@@ -246,11 +246,15 @@ function parseInlineToolCalls(text) {
 
 // ── XML tool call parser ──────────────────────────────────────────────────────
 // Handles calls written as:
+//   <tool_call><function=name><parameter=key>value</parameter></tool_call>
 //   <tool_use><function=name><parameter=key>value</parameter></tool_call>
-// Used by Qwen3 and similar models.
+//
+// Qwen3 uses <tool_call>...</tool_call> consistently. Older/variant formats
+// may use <tool_use> as the opening tag. Both are accepted here.
 function parseXmlToolCalls(text) {
   const calls = [];
-  const blockRe = /<tool_use>([\s\S]*?)<\/tool_call>/g;
+  // Accept either <tool_call> or <tool_use> as the opening tag; close is always </tool_call>
+  const blockRe = /<(?:tool_call|tool_use)>([\s\S]*?)<\/tool_call>/g;
   let block;
   while ((block = blockRe.exec(text)) !== null) {
     const inner = block[1];
@@ -262,7 +266,13 @@ function parseXmlToolCalls(text) {
     const paramRe = /<parameter=([^>]+)>([\s\S]*?)<\/parameter>/g;
     let param;
     while ((param = paramRe.exec(inner)) !== null) {
-      args[param[1].trim()] = param[2].trim();
+      const key = param[1].trim();
+      let val   = param[2].trim();
+      // Attempt to parse array/object values (e.g. keywords JSON array)
+      if ((val.startsWith("[") || val.startsWith("{")) ) {
+        try { val = JSON.parse(val); } catch {}
+      }
+      args[key] = val;
     }
     calls.push({ name, args });
   }
