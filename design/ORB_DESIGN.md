@@ -151,6 +151,12 @@ Via a `set_mood` tool call (not yet implemented). Sets `active_mood` in companio
 ### User can configure moods
 In the Presence tab, a new Moods section (below the existing States editor) with the same slider/colour editor interface. **Not yet built.**
 
+### Fine tuning
+Ability to override only the intensity, transparency, brightness and/or saturation of the colors and effects/animations
+
+### Link to Kokoro TTS
+Different blends for different moods
+
 ---
 
 ## Scroll behaviour

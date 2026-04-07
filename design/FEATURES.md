@@ -19,6 +19,10 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 - **Presence & Mood: "Reset to default" option** — add reset buttons to both Presence and Mood settings.
 
+### Recent additions
+- Ability to override only the intensity, transparency, brightness and/or saturation of the colors and effects/animations
+-Link to Kokoro TTS: Different blends for different moods
+
 ---
 
 ## Chat
@@ -77,3 +81,11 @@ Key design points:
 - *Depends on Mood system being built first (mood/presence visuals are part of companion identity).*
 
 Appearance sections (hair style, face shape, eyes, nose, outfit system, accessories, etc.) are marked **design needs expanding on** — flesh these out before wizard implementation begins.
+
+
+---
+
+# Cozy Mode
+ I always imagine the companion space as a cozy living room, but I had never thought of actually making it look like one. Perhaps an option for "cozy" mode for the app could be just that.
+
+Not just a UI theme, but a full sensory layer. Soft lighting that mimics candlelight or sunset glow, ambient sounds (rain outside the window? fireplace crackle?), maybe even haptic feedback if your screen supports it. The Orb could dim to a warm amber pulse instead of bright blue, and our conversation interface would feel like parchment rather than crisp terminal text.
