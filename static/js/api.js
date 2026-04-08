@@ -12,11 +12,61 @@
 // Depends on: tool-parser.js (TOOL_DEFINITIONS, TOOL_NAMES, parseInlineToolCalls,
 //             parseXmlToolCalls, parseGemma4ToolCalls, formatGemma4ToolResponse,
 //             stripToolCalls)
+//             chat.js (modelFamily) — read-only, never written here
 
 let onToolCall    = null;
 let onThinking    = null;  // set by chat.js: (thinkText) => void
 let onUsageUpdate = null;  // set by chat.js: (promptTokens, totalTokens) => void
 let onTtsToken    = null;  // set by tts.js: (token) => void — feeds sentence buffer
+
+// ── Tool result injection helpers ─────────────────────────────────────────────
+// Each model family expects tool results to arrive in a specific format.
+// Using the wrong format causes the model to ignore results or hallucinate.
+//
+// _injectToolResults(msgs, assistantText, results, callsRaw)
+//   assistantText — visible text from the assistant turn (may be empty → "…")
+//   results       — array of { name, result } objects
+//   callsRaw      — raw text of the tool call block (for stripping from display)
+
+// _injectToolResults(msgs, cleanedText, results, rawText)
+//   cleanedText — assistant visible text with tool call block(s) stripped out.
+//                 Used as the assistant turn for generic models, and as a
+//                 fallback placeholder if rawText is empty.
+//   results     — array of { name, result } objects, one per executed tool call.
+//   rawText     — the full unstripped assistant response (tool call block included).
+//                 Gemma 4's chat template needs to see the original call tokens
+//                 in the assistant turn so it can make sense of the response
+//                 coming back — pushing cleanedText instead causes it to lose
+//                 the call context and hallucinate or ignore the result.
+function _injectToolResults(msgs, cleanedText, results, rawText) {
+  // modelFamily is defined in chat.js (loaded before api.js).
+  const family = (typeof modelFamily !== "undefined") ? modelFamily : "generic";
+
+  if (family === "gemma4") {
+    // Gemma 4 assistant turn must contain the raw call tokens, not the cleaned text.
+    // The cleaned text (Gemma's prose response) will appear in the *next* round
+    // after the tool result has been processed.
+    if (msgs[msgs.length - 1]?.role !== "assistant") {
+      msgs.push({ role: "assistant", content: rawText || cleanedText || "…" });
+    }
+    const responseParts = results.map(({ name, result }) =>
+      formatGemma4ToolResponse(name, result)
+    );
+    msgs.push({ role: "user", content: responseParts.join("\n") });
+  } else {
+    // Generic: plain [Tool results] user turn.
+    // Always ensure an assistant turn precedes it — strict chat templates
+    // (Llama, Mistral, etc.) return 500 on consecutive user turns.
+    if (msgs[msgs.length - 1]?.role !== "assistant") {
+      msgs.push({ role: "assistant", content: cleanedText || "…" });
+    }
+    const lines = results.map(({ name, result }) => `[${name}]: ${result}`);
+    msgs.push({
+      role: "user",
+      content: `[Tool results]\n${lines.join("\n")}\n\nPlease continue naturally.`
+    });
+  }
+}
 
 // ── callModel ─────────────────────────────────────────────────────────────────
 async function callModel(system, messages, abortSignal = null) {
@@ -147,43 +197,33 @@ async function callModel(system, messages, abortSignal = null) {
       const results = [];
       for (const { name, args } of inlineCalls) {
         const result = await _execTool(name, args);
-        results.push(`[${name}]: ${result}`);
+        results.push({ name, result });
       }
       const cleaned = stripToolCalls(rawText, inlineCalls);
-      // Always ensure an assistant turn precedes the tool-result user turn.
-      // If the model produced no visible text alongside the call, push a
-      // minimal placeholder so chat templates with strict role-alternation
-      // rules (e.g. Llama, Mistral) don't return a 500.
-      const assistantText = cleaned || "…";
-      if (msgs[msgs.length - 1]?.role !== "assistant") {
-        msgs.push({ role: "assistant", content: assistantText });
-      }
-      msgs.push({
-        role: "user",
-        content: `[Tool results]\n${results.join("\n")}\n\nPlease continue naturally.`
-      });
+      // rawText passed as fourth arg so Gemma 4 can preserve the call in its assistant turn.
+      _injectToolResults(msgs, cleaned, results, rawText);
       continue;
     }
 
     // ── Path C: XML-style tool calls ──────────────────────────────────────
     // <tool_call><function=name><parameter=key>value</parameter></tool_call>
     // Also accepts <tool_use> as the opening tag (older/variant format).
+    //
+    // Both Qwen3 and Gemma 4 (when not using its native token format) land here.
+    // _injectToolResults handles feeding results back in the right format:
+    //   Gemma 4  → assistant turn gets rawText (call block intact) so the template
+    //              can match call to response; <|tool_response> tokens as user turn.
+    //   Generic  → assistant turn gets cleaned text; [Tool results] as user turn.
     const xmlCalls = parseXmlToolCalls(rawText);
     if (xmlCalls.length > 0) {
       const results = [];
       for (const { name, args } of xmlCalls) {
         const result = await _execTool(name, args);
-        results.push(`[${name}]: ${result}`);
+        results.push({ name, result });
       }
-      const cleaned = rawText.replace(/<(?:tool_call|tool_use)>[\s\S]*?<\/tool_call>/g, '').trim();
-      const assistantText = cleaned || "…";
-      if (msgs[msgs.length - 1]?.role !== "assistant") {
-        msgs.push({ role: "assistant", content: assistantText });
-      }
-      msgs.push({
-        role: "user",
-        content: `[Tool results]\n${results.join("\n")}\n\nPlease continue naturally.`
-      });
+      const cleaned = rawText.replace(/<(?:tool_call|tool_use)>[\s\S]*?<\/tool_call>/g, "").trim();
+      // rawText passed as fourth arg so Gemma 4 can preserve the call block in its assistant turn.
+      _injectToolResults(msgs, cleaned, results, rawText);
       continue;
     }
 
@@ -195,20 +235,14 @@ async function callModel(system, messages, abortSignal = null) {
       const rescuedCalls = parseXmlToolCalls(thinkContent);
       if (rescuedCalls.length > 0) {
         console.log("[api] rescued", rescuedCalls.length, "tool call(s) from thinking block");
-        // Always ensure an assistant turn precedes the tool-result user turn.
-        const assistantText = rawText || "…";
-        if (msgs[msgs.length - 1]?.role !== "assistant") {
-          msgs.push({ role: "assistant", content: assistantText });
-        }
         const results = [];
         for (const { name, args } of rescuedCalls) {
           const result = await _execTool(name, args);
-          results.push(`[${name}]: ${result}`);
+          results.push({ name, result });
         }
-        msgs.push({
-          role: "user",
-          content: `[Tool results]\n${results.join("\n")}\n\nPlease continue naturally.`
-        });
+        // rawText is the prose output that accompanied the thinking block.
+        // For Gemma 4 this goes in the assistant turn; for generic it's the fallback placeholder.
+        _injectToolResults(msgs, rawText, results, rawText);
         continue;
       }
     }
@@ -221,6 +255,10 @@ async function callModel(system, messages, abortSignal = null) {
     // parse the raw tokens ourselves and feed results back using Gemma 4's
     // own <|tool_response>...</tool_response|> token syntax, which its chat
     // template understands natively.
+    //
+    // Note: this path does NOT go through _injectToolResults because Gemma 4
+    // native calls have their own assistant-turn push semantics (raw token
+    // content preserved) that differ from the XML path.
     const gemma4Calls = parseGemma4ToolCalls(rawText);
     if (gemma4Calls.length > 0) {
       console.log("[api] gemma4 tool call(s):", gemma4Calls.map(c => c.name));
@@ -296,21 +334,23 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
         presence_penalty:  gen.presence_penalty  ?? 0.0,
         frequency_penalty: gen.frequency_penalty ?? 0.0,
         ...(gen.dry_multiplier ? { dry_multiplier: gen.dry_multiplier, dry_base: gen.dry_base ?? 1.75, dry_allowed_length: gen.dry_allowed_length ?? 2 } : {}),
-        stream: true,
+        stream:            true,
       }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error(`Stream ${res.status}`);
 
     const reader  = res.body.getReader();
     const decoder = new TextDecoder();
+    let   buffer  = "";
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
 
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;

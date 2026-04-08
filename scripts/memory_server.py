@@ -351,9 +351,25 @@ class _LlamaClient:
         import urllib.request
         payload = json.dumps({
             "model": "local",
-            "messages": [{"role": "user", "content": prompt}],
+            # System + user split gives models like Gemma 4 proper conversational
+            # context. A single user message containing "reply with ONLY a JSON
+            # array" causes Gemma 4 to produce empty content (it treats it as a
+            # structured/tool output task). The system message anchors the role;
+            # the user message asks the actual question.
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant. Answer questions concisely and accurately."
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
             "max_tokens": 256,
             "temperature": 0.0,    # deterministic for link evaluation
+            # Suppress Qwen3 thinking blocks — ignored by other models
+            "thinking": {"type": "disabled"},
         }).encode("utf-8")
 
         req = urllib.request.Request(
@@ -365,7 +381,13 @@ class _LlamaClient:
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                return data["choices"][0]["message"]["content"].strip()
+                msg = data["choices"][0]["message"]
+                # Prefer content; fall back to reasoning_content in case a
+                # thinking model puts its answer there instead
+                content = (msg.get("content") or "").strip()
+                if not content:
+                    content = (msg.get("reasoning_content") or "").strip()
+                return content
         except Exception as e:
             raise RuntimeError(f"llama-server request failed: {e}") from e
 
@@ -697,6 +719,66 @@ async def api_consolidate(request: Request):
 
     _run_consolidation_async(reason=reason)
     return {"ok": True, "message": f"Consolidation started (reason: {reason})"}
+
+
+@router.post("/api/memory/reindex")
+async def api_memory_reindex(request: Request):
+    """
+    Re-run embedding + LLM link passes across ALL existing notes.
+
+    Use this to recover from a broken consolidation history — e.g. after
+    fixing the link eval parse bug, existing notes that went through the
+    broken LLM pass will have had their links silently wiped. Reindex
+    re-queues every non-superseded note and runs a fresh consolidation.
+
+    Safe to run multiple times — embedding pass deduplicates links and
+    the pending list is rebuilt from scratch each call.
+
+    Body: {} (no params needed)
+    Returns: { ok, queued, message }
+    """
+    err = _check_available()
+    if err:
+        return err
+
+    def _do_reindex():
+        if _store is None or not _store.is_available():
+            return 0
+
+        # Fetch all non-superseded note IDs from ChromaDB
+        try:
+            result = _store._collection.get(
+                where={"superseded_by": {"$eq": ""}},
+                include=[],   # IDs only — no need to fetch metadata
+            )
+            all_ids = result.get("ids", [])
+        except Exception as e:
+            log.warning(f"reindex: could not fetch note IDs: {e}")
+            return 0
+
+        if not all_ids:
+            log.info("reindex: no notes to reindex")
+            return 0
+
+        # Replace pending list with all note IDs — deduplicated
+        _store._meta["pending_llm_consolidation"] = list(set(all_ids))
+        _store._save_meta()
+
+        log.info(f"reindex: queued {len(all_ids)} notes for consolidation")
+
+        # Run the full consolidation pass (embedding + LLM) synchronously
+        # so this endpoint can report meaningful results
+        _run_consolidation_sync(reason="reindex")
+        return len(all_ids)
+
+    loop = asyncio.get_event_loop()
+    queued = await loop.run_in_executor(None, _do_reindex)
+
+    return {
+        "ok": True,
+        "queued": queued,
+        "message": f"Reindexed {queued} notes. Check logs for link counts.",
+    }
 
 
 @router.post("/api/memory/init")

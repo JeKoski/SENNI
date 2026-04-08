@@ -25,6 +25,25 @@ const BUILTIN_ARGS = [
 // ── State ─────────────────────────────────────────────────────────────────────
 let _spScanResults = [];
 
+// ── Multimodal toggle ─────────────────────────────────────────────────────────
+function spToggleMultimodal() {
+  const tog     = document.getElementById('sp-mm-toggle');
+  const section = document.getElementById('sp-mmproj-section');
+  if (!tog || !section) return;
+
+  const nowOn = !tog.classList.contains('on');
+  tog.classList.toggle('on', nowOn);
+  section.style.display = nowOn ? 'block' : 'none';
+
+  // Toggling off clears the mmproj path so it saves as empty
+  if (!nowOn) {
+    const d = document.getElementById('sp-mmproj-display');
+    if (d) { d.textContent = 'No mmproj'; d.title = ''; d.className = 'sp-file-display'; }
+    document.getElementById('sp-mmproj-path-inp')?.remove();
+  }
+  spMarkServerDirty();
+}
+
 // ── Populate ──────────────────────────────────────────────────────────────────
 function spPopulateServer() {
   const cfg = spSettings.config || {};
@@ -41,12 +60,19 @@ function spPopulateServer() {
   md.title       = mp;
   md.className   = 'sp-file-display' + (mp ? ' set' : '');
 
-  // mmproj path
-  const mm  = cfg.mmproj_path || '';
+  // mmproj path + multimodal toggle
+  const mm      = cfg.mmproj_path || '';
+  const mmOn    = !!mm;
+  const mmTog   = document.getElementById('sp-mm-toggle');
+  const mmSec   = document.getElementById('sp-mmproj-section');
+  if (mmTog) mmTog.classList.toggle('on', mmOn);
+  if (mmSec) mmSec.style.display = mmOn ? 'block' : 'none';
   const mmd = document.getElementById('sp-mmproj-display');
-  mmd.textContent = mm ? mm.split(/[\\\/]/).pop() : 'No mmproj';
-  mmd.title       = mm;
-  mmd.className   = 'sp-file-display' + (mm ? ' set' : '');
+  if (mmd) {
+    mmd.textContent = mm ? mm.split(/[\\\/]/).pop() : 'No mmproj';
+    mmd.title       = mm;
+    mmd.className   = 'sp-file-display' + (mm ? ' set' : '');
+  }
 
   // llama-server binary path
   const bin = cfg.server_binary || '';
@@ -168,6 +194,13 @@ function _spApplyBrowsedPath(type, path) {
     disp.className   = 'sp-file-display set';
   }
   document.getElementById('sp-' + type + '-path-inp')?.remove();
+  // Selecting an mmproj file implicitly enables multimodal
+  if (type === 'mmproj') {
+    const tog = document.getElementById('sp-mm-toggle');
+    const sec = document.getElementById('sp-mmproj-section');
+    if (tog) tog.classList.add('on');
+    if (sec) sec.style.display = 'block';
+  }
   spMarkServerDirty();
 }
 
@@ -234,8 +267,13 @@ function spNativePick(input, type) {
 
 function spClearMmproj() {
   const d = document.getElementById('sp-mmproj-display');
-  d.textContent = 'No mmproj'; d.title = ''; d.className = 'sp-file-display';
+  if (d) { d.textContent = 'No mmproj'; d.title = ''; d.className = 'sp-file-display'; }
   document.getElementById('sp-mmproj-path-inp')?.remove();
+  // Clearing the mmproj file means multimodal is off
+  const tog = document.getElementById('sp-mm-toggle');
+  const sec = document.getElementById('sp-mmproj-section');
+  if (tog) tog.classList.remove('on');
+  if (sec) sec.style.display = 'none';
   spMarkServerDirty();
 }
 

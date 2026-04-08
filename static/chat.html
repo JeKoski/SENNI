@@ -565,10 +565,16 @@
         <div class="sp-file-display" id="sp-model-display">—</div>
         <button class="sp-btn-sm" onclick="spBrowse('model')">Browse</button>
       </div>
-      <div class="sp-file-row" style="margin-top:8px">
-        <div class="sp-file-display" id="sp-mmproj-display">No mmproj</div>
-        <button class="sp-btn-sm" onclick="spBrowse('mmproj')">mmproj</button>
-        <button class="sp-btn-sm sp-btn-ghost" onclick="spClearMmproj()">Clear</button>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer" onclick="spToggleMultimodal()">
+        <div class="sp-tog" id="sp-mm-toggle"></div>
+        <span style="font-size:13px;color:rgba(221,225,240,0.6)">Multimodal — enable image support (requires an mmproj file)</span>
+      </div>
+      <div id="sp-mmproj-section" style="display:none;margin-top:8px">
+        <div class="sp-file-row">
+          <div class="sp-file-display" id="sp-mmproj-display">No mmproj</div>
+          <button class="sp-btn-sm" onclick="spBrowse('mmproj')">mmproj</button>
+          <button class="sp-btn-sm sp-btn-ghost" onclick="spClearMmproj()">Clear</button>
+        </div>
       </div>
       <div class="sp-section-label" style="margin-top:18px">llama-server binary</div>
       <div class="sp-file-row" style="margin-top:8px">

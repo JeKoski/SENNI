@@ -27,7 +27,7 @@ Search for it using project knowledge before doing anything else.
 
 ## Project overview
 
-SENNI is a local AI companion framework. Currently running with Qwen3.5 9B Q4_K_M, Intel Arc GPU.
+SENNI is a local AI companion framework. Currently running with Qwen3.5 9B Q4_K_M, Intel Arc GPU. Also tested with Gemma 4 on Vulkan.
 
 Two servers:
 - **Python bridge** (`scripts/server.py`) — FastAPI, handles UI, tools, config. Needs terminal restart for changes.
@@ -128,6 +128,17 @@ Key companion config fields:
 
 ---
 
+## Companion portability
+
+Copying a companion folder between installs:
+- **Safe to copy:** `soul/`, `mind/`, `config.json` — fully portable
+- **Do NOT copy:** `memory_store/` (ChromaDB, path-dependent and binary), `memory_meta.json` (install-specific consolidation state, collection name tied to folder name)
+- If folder is renamed on the destination, ChromaDB collection name will mismatch and a fresh empty store will be created — episodic memories silently lost
+- After importing without memory: run `/api/memory/reindex` if you later add a compatible store
+- A proper export/import feature is needed eventually: JSON dump of notes → re-embed on import → reindex. Tracked in `design/FEATURES.md`.
+
+---
+
 ## Bugs
 
 Bugs are grouped by area. Where a fix should be bundled with a feature, that is noted.
@@ -164,6 +175,14 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - ~~**Settings/Companion windows populate and shift on open**~~ — **Fixed**
 - ~~**Settings windows don't reflect active tab/state on open**~~ — **Fixed**
 - ~~**Default presence presets have non-hex colors and missing fields**~~ — **Fixed** in `config.py` DEFAULTS — but **existing companion `config.json` files on disk still have the old `rgba(...)` format**. Needs a one-time migration function or factory reset. Low priority until public release.
+- ~~**Settings: Missing multimodal toggle**~~ — **Fixed** (this session)
+- **Settings: Markdown render reverting** — old bug, resurfaced. Toggle stays "on" visually but markdown stops rendering. Needs investigation.
+- **Settings: Server arg defaults outdated** — `--flash-attn` syntax changed (needs `on`/`off`/`auto` value); `--reasoning-format` may be obsolete for jinja-template models. Needs a pass against current llama.cpp.
+- **Settings Kokoro: Wrong file browser title** — browsing for Python executable shows "Select llama-server binary". One-liner fix in `server.py` `/api/browse` endpoint — add `"python"` type with correct title.
+
+### Memory
+
+- ~~**Link eval parse error — 0 links ever confirmed**~~ — **Fixed** (this session). Root causes: `EMBEDDING_LINK_THRESHOLD` too high (0.82→0.70); LLM pass wiped embedding links on parse failure; `_parse_link_eval_response` didn't strip thinking blocks; prompt caused Gemma 4 to return empty content; `_LlamaClient` used single user message causing Gemma 4 to produce empty responses. All fixed. Memory linking now working (49 links confirmed across 15 notes in first successful run).
 
 ### UI / Layout
 
@@ -204,17 +223,19 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 - OS: Linux (primary) + Windows (also supported and tested)
 - GPU: Intel Arc A750
-- Model: Qwen3.5 9B Q4_K_M
+- Models tested: Qwen3.5 9B Q4_K_M (primary), Gemma 4 on Vulkan
 - llama-server: SYCL build on Windows, oneAPI build on Linux
 - Temperature: 0.8 (critical — higher breaks tool call syntax)
-- `--reasoning-format deepseek` enabled
+- `--reasoning-format deepseek` enabled (Qwen3 only — disable for Gemma 4)
 - Flash attention: auto-enabled by llama-server
 
 ---
 
-## Known model quirk
+## Known model quirks
 
 **Qwen3.5 9B tool calls in thinking blocks** — confirmed llama.cpp bug (issue #20837): Qwen3.5 9B often prints tool calls in XML inside thinking blocks when thinking is enabled. Not a SENNI bug. Memory write discipline should be robust to unreliable self-initiation — associative pathway is system-driven, masculine self-retrieval has auto-trigger fallback.
+
+**Gemma 4 tool call format** — Gemma 4 uses XML-style tool calls (`<tool_call><function=name>...`) via its jinja template, not SENNI's custom XML examples. System prompt must NOT include XML tool call examples for Gemma 4 — the jinja template handles it, and showing examples causes it to write XML instead of its native format. Handled via `modelFamily` detection in `chat.js`.
 
 ---
 
@@ -223,6 +244,45 @@ These items are too open-ended to task out. They need a dedicated design convers
 - **CLAUDE.md** — operational instructions + active bugs + design folder index. Update at end of every session.
 - **design/*.md** — system docs and design decisions. Update when the relevant system is touched.
 - Rule: when we touch a system in a session, we document it in that session. Don't defer.
+
+---
+
+## Session notes — 2026-04-08
+
+**Gemma 4 tool calling, memory link pipeline, multimodal toggle.**
+
+### Files written/changed this session
+
+- `static/js/chat.js` — `modelFamily` variable + `_detectModelFamily()` (detects `"gemma4"` vs `"generic"` from model filename). `buildSystemPrompt()` split into Gemma 4 branch (semantics only, no XML syntax examples — jinja template handles that) and generic branch (full XML examples unchanged).
+
+- `static/js/api.js` — `_injectToolResults(msgs, cleanedText, results, rawText)` helper centralises all tool result injection. Paths B/C/D refactored to use it. Gemma 4 gets native `<|tool_response>` tokens with raw call block preserved in assistant turn (critical — template needs to see its own call to match the response). Generic models get `[Tool results]` user turn. `rawText` is passed as 4th arg so Gemma 4's assistant turn contains the call block, not the cleaned prose.
+
+- `scripts/memory_store.py` — Four fixes to the link pipeline:
+  1. `EMBEDDING_LINK_THRESHOLD` 0.82 → 0.70 (all-MiniLM-L6-v2 scores related-but-distinct memories at 0.68–0.78; 0.82 was unreachable)
+  2. `consolidate_llm_pass` no longer wipes embedding links when LLM returns empty — preserves them for re-evaluation next consolidation
+  3. `consolidate_llm_pass` rewritten to evaluate candidates **per-pair** with yes/no questions (one LLM call per pair) instead of one JSON-array prompt for all candidates — robust to any model output style, thinking blocks, prose wrappers
+  4. `_build_link_eval_prompt` and `_parse_link_eval_response` completely replaced — prompt is now a plain yes/no question; parser looks for `\byes\b` / `\bno\b` with word boundaries, strips `<think>` blocks, defaults to keeping the link on unclear responses
+
+- `scripts/memory_server.py` — `_LlamaClient.complete()`: switched to system+user message pair (single user message caused Gemma 4 to return empty content); added `reasoning_content` fallback; kept thinking suppression flag for Qwen3. Added `/api/memory/reindex` endpoint — re-queues all non-superseded notes into `pending_llm_consolidation` and runs a full synchronous consolidation pass. Use to retroactively process notes written before the link pipeline was fixed: `curl -X POST http://localhost:8000/api/memory/reindex`
+
+- `static/chat.html` — multimodal toggle row added to Settings → Server tab (replaces bare mmproj file row). Toggle shows/hides the mmproj file row section.
+
+- `static/js/settings-server.js` — `spToggleMultimodal()` added; `spPopulateServer()` derives toggle state from `mmproj_path` presence in config; `spClearMmproj()` also turns toggle off; `_spApplyBrowsedPath()` auto-enables toggle when mmproj is selected.
+
+### Known outstanding (carry to next session)
+
+- `design/FEATURES.md` — add: detect port-already-in-use at startup and print a clear error.
+- Settings: markdown render reverting — needs investigation.
+- Settings: server arg defaults outdated (`--flash-attn` syntax, `--reasoning-format` relevance).
+- Settings Kokoro: wrong file browser title — one-liner fix.
+- Companion portability / export feature — tracked above in Companion portability section.
+
+### Next session priorities
+
+1. Test multimodal toggle end-to-end (set via Settings, verify `--mmproj` arg passed to llama-server)
+2. Settings: markdown render reverting — investigate
+3. Settings: server arg defaults pass against current llama.cpp
+4. Settings Kokoro: wrong file browser title (quick win)
 
 ---
 
@@ -285,10 +345,6 @@ A secondary bug: `keywords` array parameters were coming through as raw JSON str
 - `static/js/tool-parser.js` — `parseXmlToolCalls` regex now accepts `<(?:tool_call|tool_use)>` as opening tag. Also added JSON parse attempt for array/object-valued parameters (fixes `keywords` field in `write_memory`).
 - `static/js/api.js` — Path C cleanup regex updated to match the same `<(?:tool_call|tool_use)>` pattern so the XML block is properly stripped from the displayed message.
 
-### Still needed — next session start
-
-~~**`static/js/chat.js`** — done in session #7.~~
-
 ### Next session priorities
 
 1. Test end-to-end: write_memory tool call should now execute instead of printing as text
@@ -304,48 +360,17 @@ A secondary bug: `keywords` array parameters were coming through as raw JSON str
 ### Files written/changed this session
 
 - `CLAUDE.md` — stripped to operational core: working rules, file map, bugs, design folder index, session notes. All detailed system docs moved to `design/`.
-- `design/ARCHITECTURE.md` *(new)* — modularity plan, completed refactors, planned modules, load orders.
-- `design/BOOT.md` *(new)* — boot & process lifecycle, TOCTOU, per-OS path resolution, tkinter file browsing.
-- `design/SYSTEMS.md` *(new)* — current state summaries for Orb, Presence, Heartbeat, Companion window, Settings dirty tracking, Chat tabs, Vision mode, memory pill UI.
-- `design/TTS.md` *(new)* — full TTS system doc.
-- `design/FEATURES.md` *(new)* — all planned features and changes.
-
-### Design folder is now
-
-```
-design/
-  ARCHITECTURE.md    ← new
-  BOOT.md            ← new
-  SYSTEMS.md         ← new
-  TTS.md             ← new
-  FEATURES.md        ← new
-  MEMORY.md          ← existing
-  COMPANION_STACK.md ← existing
-  ORB_DESIGN.md      ← existing
-```
-
-### Next session priorities
-
-1. Test the full history save/load flow end-to-end
-2. Test associative retrieval + memory pill appearing in UI
-3. Background embedding queue (startup consolidation of unprocessed sessions)
+- `design/ARCHITECTURE.md` *(new)*
+- `design/BOOT.md` *(new)*
+- `design/SYSTEMS.md` *(new)*
+- `design/TTS.md` *(new)*
+- `design/FEATURES.md` *(new)*
 
 ---
 
 ## Session notes — 2026-04-06 #4
 
 **Disk-backed history, associative memory retrieval, memory pill UI.**
-
-### Files written/changed this session
-
-- `static/js/tool-parser.js` — added `write_memory`, `retrieve_memory`, `update_relational_state` to `TOOL_DEFINITIONS`.
-- `static/js/chat.js` — fixed `Illegal return statement` crash (single-quoted multiline string in `buildSystemPrompt` → template literal). Also wired `onMemorySurface` callback.
-- `static/js/chat-tabs.js` — **full rewrite**. localStorage now holds lightweight tab index only. Full history saved to disk via `/api/history/*`. Legacy migration on first load. Image content stripped from API history before save (saved as separate files). Memory pill replay added to `_replayMessage`.
-- `static/js/api.js` — added `onMemorySurface` callback + `_assocTurnsSinceLast` turn counter. Every 4 user turns, calls `/api/memory/associative` and injects result as hidden system turn + fires `onMemorySurface` for UI pill.
-- `static/js/chat-ui.js` — added `appendMemoryPill(notesText)`. Teal pill with expand-on-click.
-- `static/css/messages.css` — memory pill styles.
-- `scripts/server.py` — added full history API: `/api/history/save`, `/api/history/load`, `/api/history/list`, `/api/history/delete`, `/api/history/media/...`.
-- `scripts/memory_server.py` — added `/api/memory/associative` endpoint.
 
 ### Still to do / known gaps
 
@@ -359,45 +384,17 @@ design/
 
 **Memory system fully wired. TTS cache bug fixed.**
 
-### Files written/changed this session
-
-- `static/js/chat.js` — complete rewrite of memory section: `_memoryContext` state var, `reloadMemoryContext()`, `session_notes.md` removed from `seedTemplates()`, `buildSystemPrompt()` rewritten with two clearly labelled blocks.
-- `static/js/companion-memory.js` *(new)* — Memory tab: episodic enable toggle, status row, k knobs, cognitive stack 4-slot editor, `_cpGetMemoryPayload()`.
-- `static/js/companion.js` — wired memory tab functions; fixed TTS cache bug (missing `cpSettings.active_companion.tts = body.tts` after save).
-- `static/chat.html` — Memory tab replaced with full new UI; `companion-memory.js` script tag added.
-- `scripts/server.py` — `cognitive_stack` added to companion save allowed keys; new `/api/settings/memory` endpoint.
-- `requirements.txt` — `chromadb>=0.5.0` and `sentence-transformers>=3.0.0` added.
-
-### TTS bug root cause
-
-`cpSave()` updates a local `cpSettings` cache after saving. `tts` was missing from that cache update, causing voice settings to appear to revert on window reopen without page reload. One line fix.
-
 ---
 
 ## Session notes — 2026-04-06 #2
 
 **Memory system tool files and config — complete.**
 
-### Files written/changed
-
-- `tools/write_memory.py` — complete.
-- `tools/retrieve_memory.py` — complete.
-- `tools/update_relational_state.py` — complete.
-- `scripts/config.py` — `memory` block added to global DEFAULTS; `cognitive_stack` + `last_consolidated_at` added to companion config.
-
 ---
 
 ## Session notes — 2026-04-06
 
 **Memory system design finalised and implementation begun.**
-
-Full design in `design/MEMORY.md` and `design/COMPANION_STACK.md`.
-
-### Files written this session
-
-- `scripts/memory_store.py` — complete (992 lines). `MemoryStore` class: write_note, retrieve_session_start, retrieve_direct, retrieve_associative, primitive ratio computation, Tier 1 blocks, supersede, consolidation.
-- `scripts/memory_server.py` — complete (413 lines). FastAPI router, store lifecycle, idle consolidation timer, session-start context assembly, all endpoints.
-- `scripts/server.py` — memory router mounted, atexit + shutdown hooks added.
 
 ---
 

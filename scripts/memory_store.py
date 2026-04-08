@@ -81,8 +81,10 @@ COMPOSITE_LABELS = {
     frozenset({"S", "F"}): "impression",
 }
 
-# Similarity threshold for embedding-only link pass (no LLM needed)
-EMBEDDING_LINK_THRESHOLD = 0.82
+# Similarity threshold for embedding-only link pass (no LLM needed).
+# all-MiniLM-L6-v2 cosine similarity: related but distinct memories typically
+# score 0.68-0.78. 0.82 was too high — almost nothing ever linked.
+EMBEDDING_LINK_THRESHOLD = 0.70
 
 # How many candidates to fetch before Python-side mood/valence filtering
 ASSOCIATIVE_OVERSAMPLE = 4
@@ -701,10 +703,12 @@ class MemoryStore:
         llm_client must implement:
             llm_client.complete(prompt: str) -> str
 
-        For each pending note, asks the LLM to evaluate embedding-candidate
-        links and confirm which are genuinely related (not just superficially
-        similar). Confirmed links are added; rejected candidates are removed.
+        For each pending note, evaluates each embedding-candidate link with a
+        simple yes/no question per pair. This is more robust than asking the
+        model to produce a JSON array — any model, any output style, any amount
+        of thinking-block prose before the answer all collapse to a single bit.
 
+        Confirmed pairs keep their bidirectional links; rejected pairs are pruned.
         On completion, clears the pending list and updates last_consolidated_at.
 
         Returns number of links confirmed by LLM.
@@ -725,15 +729,15 @@ class MemoryStore:
                 if not result["ids"]:
                     continue
 
-                note_doc = result["documents"][0]       # context_summary
-                note_meta = result["metadatas"][0]
+                note_doc     = result["documents"][0]   # context_summary
+                note_meta    = result["metadatas"][0]
                 note_content = note_meta.get("content", "")
                 current_links = json.loads(note_meta.get("links", "[]"))
 
                 if not current_links:
                     continue
 
-                # Fetch candidate link content for LLM evaluation
+                # Fetch all candidate notes in one ChromaDB call
                 candidates_result = self._collection.get(
                     ids=current_links,
                     include=["metadatas", "documents"],
@@ -741,34 +745,44 @@ class MemoryStore:
                 if not candidates_result["ids"]:
                     continue
 
-                candidate_summaries = []
+                confirmed_ids = []
+                rejected_ids  = []
+
                 for cid, cdoc, cmeta in zip(
                     candidates_result["ids"],
                     candidates_result["documents"],
                     candidates_result["metadatas"],
                 ):
-                    candidate_summaries.append(
-                        f"ID: {cid}\nSummary: {cdoc}\nContent: {cmeta.get('content', '')[:120]}"
+                    prompt = _build_link_eval_prompt(
+                        note_summary=note_doc,
+                        note_content=note_content,
+                        candidate_summary=cdoc,
+                        candidate_content=cmeta.get("content", ""),
                     )
+                    try:
+                        response = llm_client.complete(prompt)
+                        if _parse_link_eval_response(response):
+                            confirmed_ids.append(cid)
+                        else:
+                            rejected_ids.append(cid)
+                    except Exception as e:
+                        # Single-pair call failed — leave this link intact
+                        log.warning(f"LLM pair eval error ({note_id[:8]} ↔ {cid[:8]}): {e}")
+                        confirmed_ids.append(cid)  # conservative: keep on error
 
-                prompt = _build_link_eval_prompt(
-                    note_summary=note_doc,
-                    note_content=note_content,
-                    candidates=candidate_summaries,
-                )
-
-                response = llm_client.complete(prompt)
-                confirmed_ids = _parse_link_eval_response(response, current_links)
-
-                # Update links to only confirmed ones
+                # Write confirmed links back
                 note_meta["links"] = json.dumps(confirmed_ids)
                 self._collection.update(ids=[note_id], metadatas=[note_meta])
                 links_confirmed += len(confirmed_ids)
 
-                # Remove this note from any candidate that was rejected
-                rejected = [cid for cid in current_links if cid not in confirmed_ids]
-                for rid in rejected:
+                # Prune rejected links bidirectionally
+                for rid in rejected_ids:
                     self._remove_link_from_note(rid, note_id)
+
+                log.debug(
+                    f"LLM pass {note_id[:8]}: "
+                    f"{len(confirmed_ids)} confirmed, {len(rejected_ids)} pruned"
+                )
 
             except Exception as e:
                 log.warning(f"LLM pass error for {note_id}: {e}")
@@ -956,52 +970,55 @@ class MemoryStore:
 def _build_link_eval_prompt(
     note_summary: str,
     note_content: str,
-    candidates: list[str],
+    candidate_summary: str,
+    candidate_content: str,
 ) -> str:
     """
-    Build the prompt for LLM-based link evaluation during consolidation.
-    The LLM returns a JSON list of IDs it considers genuinely related.
+    Build a yes/no question asking whether two memory notes are genuinely related.
+
+    Per-pair questions are far more robust than asking for a JSON array —
+    the model just has to say yes or no, so thinking-block prose, code fences,
+    and varied output styles all collapse to a single extractable bit.
     """
-    candidates_text = "\n\n".join(candidates)
-    return f"""You are evaluating memory connections for a companion AI.
-
-A memory note has been written:
-Summary: {note_summary}
-Content: {note_content}
-
-The following candidate notes have been flagged as potentially related by
-semantic similarity. Evaluate each one and decide if it is GENUINELY related
-to the main note — meaning there is a real conceptual, emotional, or factual
-connection — not just superficial word overlap.
-
-Candidates:
-{candidates_text}
-
-Reply with ONLY a JSON array of the IDs of genuinely related candidates.
-If none are genuinely related, reply with an empty array: []
-Do not include any other text."""
+    return (
+        f"Are these two memory notes genuinely related — meaning a real "
+        f"conceptual, emotional, or factual connection, not just surface-level "
+        f"word overlap?\n\n"
+        f"Note A: {note_summary} — {note_content[:200]}\n\n"
+        f"Note B: {candidate_summary} — {candidate_content[:200]}\n\n"
+        f"Answer with yes or no."
+    )
 
 
-def _parse_link_eval_response(response: str, valid_ids: list[str]) -> list[str]:
+def _parse_link_eval_response(response: str) -> bool:
     """
-    Parse the LLM's JSON array response from link evaluation.
-    Validates that returned IDs are in the valid_ids list.
-    Falls back to empty list on any parse error.
+    Parse a yes/no link evaluation response.
+    Returns True if the response indicates the pair is related.
+    Robust to thinking blocks, prose, code fences — just looks for 'yes'.
     """
-    response = response.strip()
-    # Strip any accidental markdown fences
-    if response.startswith("```"):
-        lines = response.splitlines()
-        response = "\n".join(
-            line for line in lines
-            if not line.startswith("```")
-        ).strip()
-    try:
-        parsed = json.loads(response)
-        if not isinstance(parsed, list):
-            return []
-        # Only return IDs that actually exist in the candidate set
-        return [str(item) for item in parsed if str(item) in valid_ids]
-    except json.JSONDecodeError:
-        log.warning(f"link eval parse error: {response[:100]}")
-        return []
+    import re
+    if not response:
+        log.warning("link eval parse error: empty response")
+        return False
+
+    # Strip thinking blocks (Qwen3)
+    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", response, flags=re.IGNORECASE)
+
+    # Look for yes/no — check for 'yes' first, then 'no', in lowercased text.
+    # Anchored word boundary so "analysis" doesn't match "yes" and
+    # "notable" doesn't match "no".
+    text = cleaned.lower()
+    has_yes = bool(re.search(r"\byes\b", text))
+    has_no  = bool(re.search(r"\bno\b", text))
+
+    if has_yes and not has_no:
+        return True
+    if has_no and not has_yes:
+        return False
+    if has_yes and has_no:
+        # Both present — trust whichever comes first
+        return text.index("yes") < text.index("no")
+
+    # Neither found — conservative default: keep the link
+    log.warning(f"link eval: unclear response, keeping link: {response[:80]!r}")
+    return True
