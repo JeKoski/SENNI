@@ -5,6 +5,14 @@ Search for it using project knowledge before doing anything else.
 
 ---
 
+## Session Flow
+1. Start session with CLAUDE.md
+2. We'll figure out what we're doing this session. Often listed on this doc.
+3. Claude asks for needed files
+4. Surgical work happens
+
+---
+
 ## Critical working rules
 
 - **Always provide complete files** — never code sections, never snippets, never "find X and replace with Y". The user has ADHD and finds partial edits extremely difficult. Full file replacements only.
@@ -236,7 +244,6 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ### Known outstanding
 
-- Friend's 500 error may also involve stale/incompatible default server args — needs investigation of `DEFAULTS` server args in `config.py` vs current llama.cpp flags.
 - `design/FEATURES.md` — add: detect port-already-in-use at startup and print a clear error (currently fails silently, caused confusing wizard-shows-on-refresh issue during dev).
 
 ### Next session priorities
