@@ -1,0 +1,11 @@
+1) Install espeak: https://github.com/espeak-ng/espeak-ng/releases/
+2) Download Kokoro voice files: https://huggingface.co/hexgrad/Kokoro-82M/tree/main/voices
+3) Install Kokoro itself: Clone/Download AURINI https://github.com/JeKoski/AURINI and open terminal in AURINI folder and run `python run_kokoro.py`
+
+Then in Senni, you need to set these paths in Settings/Server/ (below server arguments):
+- Path to Python binary that installed Kokoro, usually it's in `C:\Users\<your username>\AppData\Local\Programs\Python\Python<version number>\python.exe`
+(do `python --version` in cmd to get the version number if you have multiple installed).
+- Path to eSpeak binary (usually in `C:\Program Files\eSpeak NG\espeak-ng.exe`)
+- Path to voice files folder: Wherever you saved them
+
+Toggle "Enable Kokoro TTS" on, save settings and restart Senni.

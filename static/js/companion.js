@@ -162,8 +162,9 @@ function cpPopulate() {
   // ── Presence ──
   cpPresenceInit();
 
-  // ── Voice (TTS) ── populate if tab already initialised
-  if (_cpTtsInitDone && typeof cpTtsPopulate === 'function') {
+  // ── Voice (TTS) ── always populate slots from config so save is safe
+  // even if the user never opens the Voice tab this session.
+  if (typeof cpTtsPopulate === 'function') {
     cpTtsPopulate(c.tts || {});
   }
 
@@ -400,7 +401,9 @@ async function cpSave(andClose = false) {
       heartbeat:               hb,
       ..._cpGetPresencePayload(),   // from companion-presence.js
       ...(typeof _cpGetMemoryPayload === 'function' ? _cpGetMemoryPayload() : {}),
-      ...(typeof _cpGetTtsPayload === 'function' ? _cpGetTtsPayload() : {}),
+      // Only include TTS payload if slots have been populated — guards against
+      // overwriting saved TTS config when the Voice tab was never opened.
+      ...(typeof _cpGetTtsPayload === 'function' && _cpTtsSlots.length > 0 ? _cpGetTtsPayload() : {}),
       // ..._cpGetMoodPayload(),    // from companion-mood.js (future)
     };
 
@@ -421,7 +424,7 @@ async function cpSave(andClose = false) {
       cpSettings.active_companion.heartbeat               = body.heartbeat;
       cpSettings.active_companion.active_presence_preset  = body.active_presence_preset;
       cpSettings.presence_presets                         = body.presence_presets;
-      cpSettings.active_companion.tts                     = body.tts;
+      if (body.tts) cpSettings.active_companion.tts       = body.tts;
     }
 
     // ── Apply the active preset to the live orb right now ──

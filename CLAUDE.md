@@ -37,31 +37,16 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 
 ---
 
-## Key file map
+## File map
 
 ### Python
 | File | Purpose |
 |------|---------|
-| `scripts/server.py` | FastAPI bridge — API endpoints, tool routing, process management |
-| `scripts/config.py` | Config read/write, per-OS path resolution, DEFAULTS |
-| `scripts/tts.py` | Kokoro TTS subprocess worker — stdin JSON → WAV bytes stdout |
-| `scripts/tts_server.py` | FastAPI router for `/api/tts/*`, TTS process lifecycle |
-| `scripts/memory_store.py` | ChromaDB store, primitive ratios, retrieval, consolidation |
-| `scripts/memory_server.py` | FastAPI router for `/api/memory/*`, session context assembly, idle consolidation timer |
-
-### HTML
-| File | Purpose |
-|------|---------|
-| `static/chat.html` | Main chat UI HTML — also defines script/stylesheet load order |
-
-### CSS (load order matters — base first)
-| File | Purpose |
-|------|---------|
-| `static/css/base.css` | CSS variables, reset, layout, sidebar, input bar |
-| `static/css/messages.css` | Message bubbles, thinking blocks, tool indicators, attachments, tabs, context bar |
-| `static/css/orb.css` | Companion orb structure, states, animations, layout modes, presence preview |
-| `static/css/companion-panel.css` | Companion settings window and all its inner components |
-| `static/css/settings.css` | Global settings panel (separate, pre-existing) |
+| `scripts/server.py` | FastAPI bridge — UI, tools, config endpoints |
+| `scripts/config.py` | Config read/write, DEFAULTS, GPU detection, path resolution |
+| `scripts/memory_server.py` | Memory FastAPI router, consolidation scheduler |
+| `scripts/memory_store.py` | ChromaDB wrapper, embedding, link pipeline |
+| `scripts/tts_server.py` | Kokoro TTS router |
 
 ### JavaScript (load order matters — deps listed)
 | File | Purpose |
@@ -135,7 +120,7 @@ Copying a companion folder between installs:
 - **Do NOT copy:** `memory_store/` (ChromaDB, path-dependent and binary), `memory_meta.json` (install-specific consolidation state, collection name tied to folder name)
 - If folder is renamed on the destination, ChromaDB collection name will mismatch and a fresh empty store will be created — episodic memories silently lost
 - After importing without memory: run `/api/memory/reindex` if you later add a compatible store
-- A proper export/import feature is needed eventually: JSON dump of notes → re-embed on import → reindex. Tracked in `design/FEATURES.md`.
+- A proper export/import feature is needed eventually: needs its own popup UI with checkboxes (soul files, mind files, ChromaDB episodic memory, config). Tracked in `design/FEATURES.md`.
 
 ---
 
@@ -151,7 +136,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 ### Chat
 
 - **Streaming text visual (token-by-token appearance) regressed** — secondary priority. Needs investigation.
-- **Message loss on restart/refresh suspected** — non-heartbeat messages may also be getting lost on refresh, possibly related to DOM/history drift or tab switching edge cases. Needs a focused investigation session reading `chat.js` `sendMessage()`, `_saveCurrentTabState()`, and `startSession()` together.
+- **Message loss on restart/refresh suspected** — likely improved by history system rework. Keep open until confirmed stable over several sessions.
 - ~~**Streaming cursor stuck at bottom of message bubble**~~ — **Fixed**
 - ~~**Closing a tab during generation bleeds response into new active tab**~~ — **Fixed**
 - ~~**Active tab not remembered on restart/refresh**~~ — **Fixed**
@@ -175,14 +160,16 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - ~~**Settings/Companion windows populate and shift on open**~~ — **Fixed**
 - ~~**Settings windows don't reflect active tab/state on open**~~ — **Fixed**
 - ~~**Default presence presets have non-hex colors and missing fields**~~ — **Fixed** in `config.py` DEFAULTS — but **existing companion `config.json` files on disk still have the old `rgba(...)` format**. Needs a one-time migration function or factory reset. Low priority until public release.
-- ~~**Settings: Missing multimodal toggle**~~ — **Fixed** (this session)
-- **Settings: Markdown render reverting** — old bug, resurfaced. Toggle stays "on" visually but markdown stops rendering. Needs investigation.
+- ~~**Settings: Missing multimodal toggle**~~ — **Fixed**
+- ~~**Settings: Markdown render reverting on boot/refresh/settings open**~~ — **Fixed** (this session). Root causes: (1) `markdown_enabled` defaulted to `False` in `config.py` DEFAULTS; (2) `load_config()` shallow-merged `generation` so new sub-keys didn't fill in for existing installs; (3) `spPopulateGeneration()` updated the toggle visually but never called `setMarkdownEnabled()`, leaving the renderer stale.
+- ~~**Settings Kokoro: Wrong file browser title**~~ — **Fixed** (this session). `server.py` `/api/browse` now handles `type: "python"` with correct title; `settings-server.js` now passes `"python"` instead of hardcoded `"binary"` for the Python executable browse.
+- ~~**Companion Settings TTS: Saving resets TTS config**~~ — **Fixed** (this session). `companion.js` `cpSave()` was always including a TTS payload even when the Voice tab was never opened, sending `af_heart: 1.0` default and overwriting saved config. Fix: payload only included when `_cpTtsSlots.length > 0`; `cpTtsPopulate()` now called eagerly from `cpPopulate()` so slots are always ready.
+- ~~**Dropdown menus (e.g. Kokoro voice select) white background / unreadable**~~ — **Fixed** (this session). Added `option` background/color rules in `companion-panel.css` for `select.cp-input` and `.cp-tts-voice-select`.
 - **Settings: Server arg defaults outdated** — `--flash-attn` syntax changed (needs `on`/`off`/`auto` value); `--reasoning-format` may be obsolete for jinja-template models. Needs a pass against current llama.cpp.
-- **Settings Kokoro: Wrong file browser title** — browsing for Python executable shows "Select llama-server binary". One-liner fix in `server.py` `/api/browse` endpoint — add `"python"` type with correct title.
 
 ### Memory
 
-- ~~**Link eval parse error — 0 links ever confirmed**~~ — **Fixed** (this session). Root causes: `EMBEDDING_LINK_THRESHOLD` too high (0.82→0.70); LLM pass wiped embedding links on parse failure; `_parse_link_eval_response` didn't strip thinking blocks; prompt caused Gemma 4 to return empty content; `_LlamaClient` used single user message causing Gemma 4 to produce empty responses. All fixed. Memory linking now working (49 links confirmed across 15 notes in first successful run).
+- ~~**Link eval parse error — 0 links ever confirmed**~~ — **Fixed**
 
 ### UI / Layout
 
@@ -247,6 +234,41 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ---
 
+## Session notes — 2026-04-10
+
+**Bug fixes: TTS settings reset, dropdown colors, Kokoro file browser title, markdown render reverting.**
+
+### Root causes found and fixed
+
+- **TTS reset** — `cpSave()` always called `_cpGetTtsPayload()` even when Voice tab was never opened, sending a default `af_heart: 1.0` blend and overwriting disk. Fixed by gating payload on `_cpTtsSlots.length > 0` and eagerly populating slots from config in `cpPopulate()`.
+- **Dropdown colors** — native `<select>` / `<option>` elements ignored CSS `rgba()` background. Fixed with solid `#21232e` background on `select.cp-input` and `.cp-tts-voice-select` and their `option` children.
+- **Kokoro file browser title** — `spBrowseTts()` hardcoded `browseType = 'binary'` for all non-voices types including Python. `server.py` had no `"python"` case in `/api/browse`. Both fixed.
+- **Markdown reverting** — three root causes: (1) `markdown_enabled` defaulted to `False` in DEFAULTS; (2) `load_config()` shallow-merged `generation`, so new sub-keys didn't fill in for existing installs; (3) `spPopulateGeneration()` updated the toggle class but never called `setMarkdownEnabled()`, leaving `_markdownEnabled` stale in the renderer.
+
+### Files written/changed this session
+
+- `static/js/companion.js` — `cpPopulate()` now always calls `cpTtsPopulate(c.tts || {})` unconditionally (no `_cpTtsInitDone` guard). `cpSave()` TTS payload gated on `_cpTtsSlots.length > 0`; `cpSettings` cache update for `tts` now conditional on `body.tts` being present.
+- `static/js/companion-tts.js` — `cpTtsPopulate()` no longer requires tab init; populates `_cpTtsSlots` immediately and only re-renders DOM if `_cpTtsInitDone`. `_cpTtsRenderAll()` renders from existing slots if populated, falls back to `cpSettings` only if empty.
+- `static/css/companion-panel.css` — Added `select.cp-input`, `.cp-tts-voice-select`, and their `option` rules with solid dark background and correct text color.
+- `scripts/server.py` — `/api/browse` endpoint: added `"python"` type case with title "Select Python executable".
+- `static/js/settings-server.js` — `spBrowseTts()`: `browseType` now `'python'` when `type === 'python'`, not hardcoded `'binary'`.
+- `scripts/config.py` — `markdown_enabled` default changed `False` → `True`. `load_config()` now deep-merges `generation` after shallow merge so DEFAULTS sub-keys fill in for existing installs.
+- `static/js/settings-generation.js` — `spPopulateGeneration()` now calls `setMarkdownEnabled(mdEnabled)` alongside setting the toggle class.
+
+### New bugs/features noted this session (not yet worked)
+
+- **STT: microphone input** — browser MediaRecorder API to capture audio; send to multimodal model (Gemma 4 E2B/E4B supports up to 30s). Long clips need splitting strategy — research Gemma's multi-segment audio handling before implementing. Design so a Whisper/STT fallback layer could slot in later without restructuring.
+- **Export/Import redesign** — needs its own popup UI with checkboxes: soul files, mind files, ChromaDB episodic memory dump, config. ChromaDB export = JSON dump of notes → re-embed on import. Needs design session before implementation.
+
+### Next session priorities
+
+1. Test all fixes from this session (TTS save, markdown on boot, dropdown colors, Kokoro title)
+2. Settings: Server arg defaults audit against current llama.cpp (`--flash-attn`, `--reasoning-format`)
+3. Streaming text visual regression — investigation
+4. Background embedding queue
+
+---
+
 ## Session notes — 2026-04-08
 
 **Gemma 4 tool calling, memory link pipeline, multimodal toggle.**
@@ -254,35 +276,15 @@ These items are too open-ended to task out. They need a dedicated design convers
 ### Files written/changed this session
 
 - `static/js/chat.js` — `modelFamily` variable + `_detectModelFamily()` (detects `"gemma4"` vs `"generic"` from model filename). `buildSystemPrompt()` split into Gemma 4 branch (semantics only, no XML syntax examples — jinja template handles that) and generic branch (full XML examples unchanged).
+- `static/js/api.js` — `_injectToolResults(msgs, cleanedText, results, rawText)` helper centralises all tool result injection. Paths B/C/D refactored to use it. Gemma 4 gets native `<|tool_response>` tokens with raw call block preserved in assistant turn. Generic models get `[Tool results]` user turn.
+- `scripts/memory_store.py` — Four fixes to the link pipeline: threshold 0.82→0.70; LLM pass no longer wipes embedding links on empty return; per-pair yes/no evaluation replaces JSON-array prompt; `_parse_link_eval_response` strips `<think>` blocks and defaults to keeping link on unclear response.
+- `scripts/memory_server.py` — `_LlamaClient.complete()` switched to system+user message pair; added `reasoning_content` fallback. Added `/api/memory/reindex` endpoint.
+- `static/chat.html` — multimodal toggle row added to Settings → Server tab.
+- `static/js/settings-server.js` — `spToggleMultimodal()` added; populate/clear/browse logic updated.
 
-- `static/js/api.js` — `_injectToolResults(msgs, cleanedText, results, rawText)` helper centralises all tool result injection. Paths B/C/D refactored to use it. Gemma 4 gets native `<|tool_response>` tokens with raw call block preserved in assistant turn (critical — template needs to see its own call to match the response). Generic models get `[Tool results]` user turn. `rawText` is passed as 4th arg so Gemma 4's assistant turn contains the call block, not the cleaned prose.
-
-- `scripts/memory_store.py` — Four fixes to the link pipeline:
-  1. `EMBEDDING_LINK_THRESHOLD` 0.82 → 0.70 (all-MiniLM-L6-v2 scores related-but-distinct memories at 0.68–0.78; 0.82 was unreachable)
-  2. `consolidate_llm_pass` no longer wipes embedding links when LLM returns empty — preserves them for re-evaluation next consolidation
-  3. `consolidate_llm_pass` rewritten to evaluate candidates **per-pair** with yes/no questions (one LLM call per pair) instead of one JSON-array prompt for all candidates — robust to any model output style, thinking blocks, prose wrappers
-  4. `_build_link_eval_prompt` and `_parse_link_eval_response` completely replaced — prompt is now a plain yes/no question; parser looks for `\byes\b` / `\bno\b` with word boundaries, strips `<think>` blocks, defaults to keeping the link on unclear responses
-
-- `scripts/memory_server.py` — `_LlamaClient.complete()`: switched to system+user message pair (single user message caused Gemma 4 to return empty content); added `reasoning_content` fallback; kept thinking suppression flag for Qwen3. Added `/api/memory/reindex` endpoint — re-queues all non-superseded notes into `pending_llm_consolidation` and runs a full synchronous consolidation pass. Use to retroactively process notes written before the link pipeline was fixed: `curl -X POST http://localhost:8000/api/memory/reindex`
-
-- `static/chat.html` — multimodal toggle row added to Settings → Server tab (replaces bare mmproj file row). Toggle shows/hides the mmproj file row section.
-
-- `static/js/settings-server.js` — `spToggleMultimodal()` added; `spPopulateServer()` derives toggle state from `mmproj_path` presence in config; `spClearMmproj()` also turns toggle off; `_spApplyBrowsedPath()` auto-enables toggle when mmproj is selected.
-
-### Known outstanding (carry to next session)
+### Known outstanding
 
 - `design/FEATURES.md` — add: detect port-already-in-use at startup and print a clear error.
-- Settings: markdown render reverting — needs investigation.
-- Settings: server arg defaults outdated (`--flash-attn` syntax, `--reasoning-format` relevance).
-- Settings Kokoro: wrong file browser title — one-liner fix.
-- Companion portability / export feature — tracked above in Companion portability section.
-
-### Next session priorities
-
-1. Test multimodal toggle end-to-end (set via Settings, verify `--mmproj` arg passed to llama-server)
-2. Settings: markdown render reverting — investigate
-3. Settings: server arg defaults pass against current llama.cpp
-4. Settings Kokoro: wrong file browser title (quick win)
 
 ---
 
@@ -292,25 +294,11 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ### Files written/changed this session
 
-- `static/js/chat.js` — `buildSystemPrompt()` HOW TO USE block rewritten to XML format (session #7 carry-over, already done).
-- `static/js/chat-tabs.js` — Three history bugs fixed:
-  1. `_migrateLegacyLocalStorage()` deleted the old key but never flushed to disk — `await saveTabs()` added after successful migration.
-  2. Active tab history never loaded from disk on page load — `loadTabs()` now explicitly loads the active tab's session from disk after restoring the tab index.
-  3. `switchTab()` early-exit guard fired on ID match alone, bypassing disk load for shell tabs — guard now only exits if tab is active *and* has content loaded.
-- `scripts/memory_server.py` — Added `_prewarm_embedding_model()`: fires a background thread at session init to force `all-MiniLM-L6-v2` to download/load before first tool use.
-- `scripts/memory_store.py` — Added `prewarm_embeddings()` method: does a dummy `query_texts=["warmup"]` call to trigger model load.
-- `tools/write_memory.py`, `tools/retrieve_memory.py`, `tools/update_relational_state.py` — HTTP timeout bumped from 10s → 60s as safety net for cold/slow environments.
-- `static/js/api.js` — Fixed role-alternation 500 error on non-Qwen models (Llama, Mistral, etc.). Paths B, C, D were conditionally pushing an assistant turn only when visible text existed alongside a tool call. Pure tool calls (no text) produced `user → user` sequences that strict chat templates reject. All three paths now always push an assistant turn (using `"…"` placeholder if no real text) before the tool-result user turn. Guard added to avoid doubling up if assistant was already pushed.
-
-### Known outstanding
-
-- `design/FEATURES.md` — add: detect port-already-in-use at startup and print a clear error (currently fails silently, caused confusing wizard-shows-on-refresh issue during dev).
-
-### Next session priorities
-
-1. Audit default server args in `config.py` against current llama.cpp for any removed/renamed flags
-2. Background embedding queue
-3. Test history save/load end-to-end on a fresh clone
+- `static/js/chat-tabs.js` — Three history bugs fixed: migration flush, active tab load on page load, switchTab shell tab guard.
+- `scripts/memory_server.py` — embedding model prewarm on session init.
+- `scripts/memory_store.py` — `prewarm_embeddings()` method added.
+- `tools/write_memory.py`, `tools/retrieve_memory.py`, `tools/update_relational_state.py` — HTTP timeout 10s → 60s.
+- `static/js/api.js` — role-alternation 500 fix for non-Qwen models.
 
 ---
 
@@ -318,53 +306,17 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 **System prompt XML format examples — complete.**
 
-### Files written/changed this session
-
-- `static/js/chat.js` — `buildSystemPrompt()` HOW TO USE section rewritten from inline backtick-style examples to XML `<tool_call>` format. All four `memory` tool examples now shown in XML. Added XML call examples to EPISODIC MEMORY section for `write_memory`, `retrieve_memory`, and `update_relational_state` (none existed before). This completes the tool call fix started in session #6.
-
-### Next session priorities
-
-1. Test end-to-end: write_memory tool call should now execute instead of printing as text
-2. Test history save/load flow
-3. Background embedding queue
-
 ---
 
 ## Session notes — 2026-04-06 #6
 
 **Tool call parser fix — Qwen XML format mismatch.**
 
-### Root cause
-
-Qwen3.5 9B consistently writes `<tool_call>...<\/tool_call>` for both opening and closing tags. The parser regex was `/<tool_use>([\s\S]*?)<\/tool_call>/g` — mismatched opening tag meant **every XML tool call silently fell through all parsing paths** and rendered as visible text instead of executing. This affected both Path C (tool call in response body) and Path D (tool call rescued from thinking block), since Path D uses the same parser.
-
-A secondary bug: `keywords` array parameters were coming through as raw JSON strings (e.g. `'["Cortana", "Halo 1"]'`) instead of parsed arrays, because `parseXmlToolCalls` was doing a plain string assignment from `<parameter>` content without attempting JSON parse.
-
-### Files written/changed this session
-
-- `static/js/tool-parser.js` — `parseXmlToolCalls` regex now accepts `<(?:tool_call|tool_use)>` as opening tag. Also added JSON parse attempt for array/object-valued parameters (fixes `keywords` field in `write_memory`).
-- `static/js/api.js` — Path C cleanup regex updated to match the same `<(?:tool_call|tool_use)>` pattern so the XML block is properly stripped from the displayed message.
-
-### Next session priorities
-
-1. Test end-to-end: write_memory tool call should now execute instead of printing as text
-2. Test history save/load flow
-3. Background embedding queue
-
 ---
 
 ## Session notes — 2026-04-06 #5
 
 **CLAUDE.md refactor — split into design/ modules.**
-
-### Files written/changed this session
-
-- `CLAUDE.md` — stripped to operational core: working rules, file map, bugs, design folder index, session notes. All detailed system docs moved to `design/`.
-- `design/ARCHITECTURE.md` *(new)*
-- `design/BOOT.md` *(new)*
-- `design/SYSTEMS.md` *(new)*
-- `design/TTS.md` *(new)*
-- `design/FEATURES.md` *(new)*
 
 ---
 
@@ -376,30 +328,9 @@ A secondary bug: `keywords` array parameters were coming through as raw JSON str
 
 - Background embedding queue — `consolidated: false` flag is in place, pipeline not yet built.
 - Embed soul/mind markdown files into ChromaDB.
-- Export/import update for new session folder format.
-
----
-
-## Session notes — 2026-04-06 #3
-
-**Memory system fully wired. TTS cache bug fixed.**
-
----
-
-## Session notes — 2026-04-06 #2
-
-**Memory system tool files and config — complete.**
 
 ---
 
 ## Session notes — 2026-04-06
 
-**Memory system design finalised and implementation begun.**
-
----
-
-## Session notes — 2026-04-04
-
-**TTS confirmed working** — Kokoro live via Aurini. Senni is talking. Stdin bug in `tts.py` fixed.
-
-**Major design session** — memory architecture + companion personality. Full design in `design/MEMORY.md` and `design/COMPANION_STACK.md`.
+**Memory system design finalised and implementation begun. TTS confirmed working.**

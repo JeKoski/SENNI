@@ -106,6 +106,20 @@
 }
 .cp-input:focus { outline: none; border-color: rgba(129,140,248,0.4); }
 
+/* Ensure native <select> dropdowns respect the dark theme.
+   The option background must be set on the element itself — rgba() is not
+   supported by most browsers for <option>, so we use a solid fallback. */
+select.cp-input,
+.cp-tts-voice-select {
+  background-color: #21232e;
+  color: #dde1f0;
+}
+select.cp-input option,
+.cp-tts-voice-select option {
+  background-color: #21232e;
+  color: #dde1f0;
+}
+
 .cp-textarea {
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(140,145,220,0.12);

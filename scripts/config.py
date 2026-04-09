@@ -128,7 +128,7 @@ DEFAULTS = {
         "max_tokens":         1024,
         "max_tool_rounds":    8,
         "vision_mode":        "always",
-        "markdown_enabled":   False,
+        "markdown_enabled":   True,
     },
 }
 
@@ -346,6 +346,9 @@ def load_config() -> dict:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             saved = json.load(f)
         merged = {**DEFAULTS, **saved}
+        # Deep-merge generation so sub-keys added to DEFAULTS after first
+        # install (e.g. markdown_enabled) are filled in for existing configs.
+        merged["generation"] = {**DEFAULTS["generation"], **saved.get("generation", {})}
         return resolve_platform_paths(merged)
     except (json.JSONDecodeError, OSError):
         return dict(DEFAULTS)

@@ -21,7 +21,11 @@ function spPopulateGeneration() {
   const vmode = gen.vision_mode || 'always';
   document.querySelectorAll('#sp-vision-mode input[name="vision-mode"]').forEach(r => { r.checked = r.value === vmode; });
   const togMd = document.getElementById('tog-markdown');
-  if (togMd) togMd.classList.toggle('on', gen.markdown_enabled !== false);
+  const mdEnabled = gen.markdown_enabled !== false;
+  if (togMd) togMd.classList.toggle('on', mdEnabled);
+  // Keep the renderer in sync — without this, opening Settings would leave
+  // _markdownEnabled stale even though the toggle visually looks correct.
+  if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(mdEnabled);
   const togCtrl = document.getElementById('tog-controls-visible');
   if (togCtrl) togCtrl.classList.toggle('on', localStorage.getItem('controls_always_visible') === 'true');
 }

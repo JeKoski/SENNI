@@ -279,6 +279,9 @@ async def api_browse(request: Request):
     if file_type == "binary":
         title     = "Select llama-server binary"
         filetypes = [("Executable", "*.exe")] if IS_WIN else [("All files", "*")]
+    elif file_type == "python":
+        title     = "Select Python executable"
+        filetypes = [("Executable", "*.exe")] if IS_WIN else [("All files", "*")]
     elif file_type == "mmproj":
         title     = "Select mmproj file"
         filetypes = [("GGUF files", "*.gguf"), ("All files", "*.*")]

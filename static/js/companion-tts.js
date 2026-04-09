@@ -6,6 +6,11 @@
 //   cpTtsReset()             — called on companion window close (allows fresh init)
 //   _cpGetTtsPayload()       — called by cpSave() to include TTS in save body
 //
+// cpTtsPopulate() is called eagerly from cpPopulate() on every window open so
+// that _cpTtsSlots is always populated before cpSave() runs, even if the user
+// never opens the Voice tab. The voice <select> dropdowns are only rendered
+// when the tab is actually opened (cpTtsInit → _cpTtsRenderAll).
+//
 // Max 5 voice blend slots. Weights are displayed as percentages and normalised
 // on save. The server handles the actual normalisation too, but we show it live.
 
@@ -33,6 +38,8 @@ async function cpTtsInit() {
     _cpTtsVoiceList = ttsGetVoices() || [];
   }
 
+  // Re-render slots now that we have the real voice list.
+  // _cpTtsSlots was already populated by cpTtsPopulate() on window open.
   _cpTtsRenderAll();
 }
 
@@ -42,6 +49,8 @@ function cpTtsReset() {
 }
 
 // ── Populate from settings ─────────────────────────────────────────────────────
+// Called eagerly from cpPopulate() on every window open so _cpTtsSlots is
+// always ready for cpSave(), regardless of whether the Voice tab is opened.
 
 function cpTtsPopulate(ttsCfg) {
   // ttsCfg = active_companion.tts from /api/settings
@@ -64,8 +73,12 @@ function cpTtsPopulate(ttsCfg) {
   if (speedEl) speedEl.value = ttsCfg?.speed ?? 1.0;
   if (pitchEl) pitchEl.value = ttsCfg?.pitch ?? 1.0;
 
-  _cpTtsRenderSlots();
-  _cpTtsUpdateWeightDisplay();
+  // Only re-render the tab UI if the tab has already been opened.
+  // If not, _cpTtsRenderAll() will pick up _cpTtsSlots when the tab opens.
+  if (_cpTtsInitDone) {
+    _cpTtsRenderSlots();
+    _cpTtsUpdateWeightDisplay();
+  }
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────────
@@ -84,9 +97,16 @@ function _cpTtsRenderAll() {
   unavailEl.style.display = 'none';
   contentEl.style.display = 'block';
 
-  // Populate from current companion settings if already loaded
-  const tts = cpSettings?.active_companion?.tts;
-  if (tts) cpTtsPopulate(tts);
+  // If cpTtsPopulate() was already called (from cpPopulate on window open),
+  // _cpTtsSlots already has the right data — just render them.
+  // Otherwise fall back to reading from cpSettings directly.
+  if (_cpTtsSlots.length === 0) {
+    const tts = cpSettings?.active_companion?.tts;
+    if (tts) cpTtsPopulate(tts);
+  } else {
+    _cpTtsRenderSlots();
+    _cpTtsUpdateWeightDisplay();
+  }
 }
 
 function _cpTtsRenderSlots() {

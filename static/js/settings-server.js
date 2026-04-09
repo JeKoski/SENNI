@@ -314,7 +314,7 @@ async function spBrowseTts(type) {
 
   // For voices dir we want a folder picker — but tkinter only supports files.
   // Use a text fallback for the voices dir path; file picker for executables.
-  const browseType = (type === 'voices') ? null : 'binary';
+  const browseType = (type === 'voices') ? null : type === 'python' ? 'python' : 'binary';
 
   if (browseType) {
     try {
