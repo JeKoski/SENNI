@@ -148,6 +148,55 @@ const TOOL_DEFINITIONS = [
   {
     type: "function",
     function: {
+      name: "supersede_memory",
+      description:
+        "Replace an existing memory note whose content has become outdated. " +
+        "Use when a fact has genuinely changed — not to add detail, but when " +
+        "the old note would be wrong or misleading if retrieved. " +
+        "The old note is preserved as history but excluded from future retrieval. " +
+        "The note ID appears at the bottom of each retrieve_memory result as 'id: xxxxxxxx…'.",
+      parameters: {
+        type: "object",
+        properties: {
+          old_id: {
+            type: "string",
+            description:
+              "The ID of the note to supersede, as shown in retrieve_memory output " +
+              "(the 8-character prefix is enough, e.g. 'a1b2c3d4')."
+          },
+          content: {
+            type: "string",
+            description:
+              "The updated memory, written in your own voice. " +
+              "Be specific — write what is now true, not just what changed."
+          },
+          keywords: {
+            type: "array",
+            items: { type: "string" },
+            description: "2–6 keywords for the updated note."
+          },
+          emotional_valence: {
+            type: "number",
+            description: "How this feels now: -1.0 (negative) to 1.0 (positive)."
+          },
+          intensity: {
+            type: "number",
+            description: "How strongly this registers: 0.0 to 1.0."
+          },
+          context_summary: {
+            type: "string",
+            description:
+              "A short phrase (under 120 chars) describing why this is being updated. " +
+              "E.g. 'user mentioned they moved from Helsinki to Tampere'."
+          }
+        },
+        required: ["old_id", "content"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "update_relational_state",
       description:
         "Update the relational state block — a compact summary of where the relationship " +

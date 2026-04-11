@@ -47,6 +47,19 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 | `scripts/memory_server.py` | Memory FastAPI router, consolidation scheduler |
 | `scripts/memory_store.py` | ChromaDB wrapper, embedding, link pipeline |
 | `scripts/tts_server.py` | Kokoro TTS router |
+| `scripts/tool_loader.py` | Auto-discovery tool loader — scans `tools/`, no config needed |
+
+### Tools (auto-loaded from `tools/` — drop a file in, it registers itself)
+| File | Purpose |
+|------|---------|
+| `tools/memory.py` | soul/ and mind/ markdown file read/write |
+| `tools/web_search.py` | Web search |
+| `tools/web_scrape.py` | URL fetch |
+| `tools/get_time.py` | Current date/time |
+| `tools/write_memory.py` | Write episodic memory note to ChromaDB |
+| `tools/retrieve_memory.py` | Deliberate (masculine-pathway) memory retrieval |
+| `tools/supersede_memory.py` | Replace an outdated note with a new one, preserving history |
+| `tools/update_relational_state.py` | Update Tier 1 relational state block |
 
 ### JavaScript (load order matters — deps listed)
 | File | Purpose |
@@ -57,37 +70,17 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 | `static/js/orb.js` | All orb logic (state, avatar, presets, layout mode) |
 | `static/js/message-renderer.js` | Markdown rendering, message/thinking/tool DOM builders |
 | `static/js/chat-ui.js` | DOM helpers, sidebar UI, input handling, orb delegation, scroll tracking |
-| `static/js/chat-tabs.js` | Tab management, message serialization/replay, disk-backed history |
-| `static/js/chat-controls.js` | Message controls, edit, regenerate, stop generation |
-| `static/js/chat.js` | Core chat logic, session management, system prompt, boot |
+| `static/js/chat.js` | Core: state, startup, session management, send, system prompt |
+| `static/js/chat-tabs.js` | Tab state, persistence, switching |
+| `static/js/chat-controls.js` | Input controls, stop button, vision mode picker |
 | `static/js/heartbeat.js` | Heartbeat system |
-| `static/js/companion.js` | Companion settings window coordinator (open/close, load, save, tabs, avatar, soul files, heartbeat, generation, dirty tracking) |
-| `static/js/companion-presence.js` | Presence tab: presets, state editor, preview orb, layout toggle |
-| `static/js/companion-tts.js` | Voice tab: voice blend UI (up to 5 slots), speed/pitch, preview |
-| `static/js/companion-memory.js` | Memory tab: episodic memory toggle/status, cognitive stack editor, `cpMemorySaveGlobal()`, `_cpGetMemoryPayload()` |
-| `static/js/tts.js` | TTS client: sentence buffer, fetch queue, Web Audio playback, stop/abort |
-| `static/js/settings.js` | Settings panel coordinator (open/close, tab switch, load, toast, dirty tracking) |
-| `static/js/settings-server.js` | Settings → Server tab (BUILTIN_ARGS, file browsing, save, restart) |
-| `static/js/settings-generation.js` | Settings → Generation tab |
-| `static/js/settings-companion.js` | Settings → Companion tab + About tab (companion list only — all other fields are in the Companion Window) |
-| `static/js/settings_os_paths.js` | Per-OS path cards in Settings → Server tab |
-
-### Tools
-| File | Purpose |
-|------|---------|
-| `tools/memory.py` | soul/ and mind/ file read/write (identity, user profile, scratchpad) |
-| `tools/write_memory.py` | Write episodic note to ChromaDB |
-| `tools/retrieve_memory.py` | Direct retrieval from ChromaDB |
-| `tools/update_relational_state.py` | Update Tier 1 relational state block |
-| `tools/get_time.py` | Current time |
-| `tools/web_search.py` | Web search |
-| `tools/web_scrape.py` | Web scraping |
+| `static/js/tts.js` | TTS playback (Kokoro) |
 
 ---
 
-## Auto-backup system
+## Backups
 
-On every Python bridge startup, `scripts/server.py` copies tracked files to `backups/YYYY-MM-DD_HH-MM-SS/`.
+Auto-backup runs on server startup. Saved to `backups/YYYY-MM-DD_HHMMSS/`.
 The `backups/` folder is in `.gitignore`.
 
 If something breaks, copy files from the latest backup folder.
@@ -107,9 +100,17 @@ Key companion config fields:
 - `cognitive_stack` — four-slot stack string e.g. `mT-fS-mN-fF`
 - `last_consolidated_at` — timestamp for crash-recovery consolidation
 
+Key global config fields:
+- `memory.enabled` — master switch for the ChromaDB memory system (default: `True`)
+- `memory.mid_convo_k` — how many notes the associative trigger surfaces (default: `4`)
+- `memory.session_start_k` — how many notes to surface at session start (default: `6`)
+
 ### Tool distinction (important for system prompt clarity)
 - `memory` tool → soul/ and mind/ **markdown file** read/write
-- `write_memory` / `retrieve_memory` / `update_relational_state` → **ChromaDB** episodic store only
+- `write_memory` / `retrieve_memory` / `supersede_memory` / `update_relational_state` → **ChromaDB** episodic store only
+
+### Zep-style temporal chaining
+When a fact changes, the companion calls `supersede_memory` with the old note's ID (shown in `retrieve_memory` output as `id: xxxxxxxx…`). The old note is marked `superseded_by` and excluded from future retrieval. The new note carries a `supersedes` back-reference. Both notes remain in the store so the companion can reason about how things changed over time.
 
 ---
 
@@ -161,15 +162,17 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - ~~**Settings windows don't reflect active tab/state on open**~~ — **Fixed**
 - ~~**Default presence presets have non-hex colors and missing fields**~~ — **Fixed** in `config.py` DEFAULTS — but **existing companion `config.json` files on disk still have the old `rgba(...)` format**. Needs a one-time migration function or factory reset. Low priority until public release.
 - ~~**Settings: Missing multimodal toggle**~~ — **Fixed**
-- ~~**Settings: Markdown render reverting on boot/refresh/settings open**~~ — **Fixed** (this session). Root causes: (1) `markdown_enabled` defaulted to `False` in `config.py` DEFAULTS; (2) `load_config()` shallow-merged `generation` so new sub-keys didn't fill in for existing installs; (3) `spPopulateGeneration()` updated the toggle visually but never called `setMarkdownEnabled()`, leaving the renderer stale.
-- ~~**Settings Kokoro: Wrong file browser title**~~ — **Fixed** (this session). `server.py` `/api/browse` now handles `type: "python"` with correct title; `settings-server.js` now passes `"python"` instead of hardcoded `"binary"` for the Python executable browse.
-- ~~**Companion Settings TTS: Saving resets TTS config**~~ — **Fixed** (this session). `companion.js` `cpSave()` was always including a TTS payload even when the Voice tab was never opened, sending `af_heart: 1.0` default and overwriting saved config. Fix: payload only included when `_cpTtsSlots.length > 0`; `cpTtsPopulate()` now called eagerly from `cpPopulate()` so slots are always ready.
-- ~~**Dropdown menus (e.g. Kokoro voice select) white background / unreadable**~~ — **Fixed** (this session). Added `option` background/color rules in `companion-panel.css` for `select.cp-input` and `.cp-tts-voice-select`.
+- ~~**Settings: Markdown render reverting on boot/refresh/settings open**~~ — **Fixed**
+- ~~**Settings Kokoro: Wrong file browser title**~~ — **Fixed**
+- ~~**Companion Settings TTS: Saving resets TTS config**~~ — **Fixed**
+- ~~**Dropdown menus (e.g. Kokoro voice select) white background / unreadable**~~ — **Fixed**
 - **Settings: Server arg defaults outdated** — `--flash-attn` syntax changed (needs `on`/`off`/`auto` value); `--reasoning-format` may be obsolete for jinja-template models. Needs a pass against current llama.cpp.
 
 ### Memory
 
 - ~~**Link eval parse error — 0 links ever confirmed**~~ — **Fixed**
+- ~~**Associative retrieval never firing**~~ — **Fixed** (this session). The trigger code was never written into `api.js`. Added `_triggerAssociativeRetrieval()` to `chat.js`, firing after every successful reply, every `mid_convo_k` turns.
+- ~~**Memory system silently disabled**~~ — **Fixed** (this session). `memory.enabled` defaulted to `False` in `config.py` DEFAULTS; flipped to `True`.
 
 ### UI / Layout
 
@@ -234,38 +237,52 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ---
 
+## Session notes — 2026-04-11
+
+**Memory system foundation pass — review, diagnostics, and fixes.**
+
+### What we found in the review
+
+Conducted a full design-vs-implementation review of the memory system. Overall the architecture was sound and well-wired. Key gaps found:
+
+- **Associative retrieval trigger never written** — documented in `design/SYSTEMS.md` as if implemented, but the counter and fetch logic were absent from `api.js` entirely. Silent because there was nothing to fail.
+- **`memory.enabled` defaulted to `False`** — meant the entire memory system (ChromaDB init, session-start retrieval, all endpoints) was disabled by default for any install that hadn't explicitly toggled it on in settings.
+- **`load_config()` didn't deep-merge `memory`** — new sub-keys like `mid_convo_k` wouldn't fill in for existing installs.
+- **`supersede_memory` tool missing** — the `/api/memory/supersede` endpoint existed and worked, but no tool file exposed it to the companion, so the Zep-style temporal chain was inert.
+- **Background embedding queue** — flagged as unbuilt; confirmed not aspirational, needs building next session.
+- **Mind file indexing** — `companion_identity.md` syncs to Tier 1 at session start, but `mind/` files aren't indexed into ChromaDB at all. Soul files may not need it (Tier 1 covers identity), but mind definitely does.
+
+### Files written/changed this session
+
+- `static/js/chat.js` — Added `_assocTurnsSinceLast` counter, `_assocInterval()` (reads `config.memory.mid_convo_k`), and `_triggerAssociativeRetrieval()`. Fires after every successful reply, every N turns. Injects surfaced notes as hidden system turns, fires `onMemorySurface` for the pill. Counter resets on `newChat()`.
+- `scripts/config.py` — `memory.enabled` default flipped `False` → `True`. `load_config()` now deep-merges `memory` block the same way it does `generation`.
+- `tools/supersede_memory.py` — New tool. Mirrors `write_memory.py` structure. Hits `/api/memory/supersede`. Returns confirmation with both old and new truncated IDs. Auto-registered by `tool_loader.py` — no other backend changes needed.
+- `static/js/tool-parser.js` — `supersede_memory` added to `TOOL_DEFINITIONS` (between `retrieve_memory` and `update_relational_state`). `TOOL_NAMES` derives automatically.
+- `static/js/chat.js` (system prompt) — `SUPERSEDE MEMORY` block added to both Gemma 4 and generic branches. Positioned after `RETRIEVE MEMORY`. Generic branch includes XML example with Helsinki→Tampere scenario.
+
+### Next session priorities
+
+1. **Session-start context UI signal** — when `_memoryContext` is non-empty after `reloadMemoryContext()`, fire `onMemorySurface` with a brief "memories loaded" indicator. Currently invisible to the user. (`chat.js` only)
+2. **Background embedding queue** — `consolidated: false` flag is written on each session save. Need to build the startup pipeline that reads unconsolidated sessions and processes them into ChromaDB. (`memory_server.py`, `memory_store.py`)
+3. **Mind file indexing into ChromaDB** — at session init, scan `mind/` for `.md` files, hash content, compare against a stored index in `memory_meta.json`. New/changed files get chunked and written as `function_source: "system"` notes. Makes mind content searchable via `retrieve_direct` and session-start retrieval. (`memory_server.py`, `memory_store.py`)
+4. **Tool self-registration refactor** — each tool file should own its full definition: Python `run()`, JS schema, and system prompt instructions. `tool-parser.js` and `chat.js` should consume these from the API rather than having them hardcoded. Eliminates the three-place update requirement when adding tools. Dedicate a full session to this — it touches every tool file and both JS files.
+5. **Token budget empirical test** — once items 1–3 are working, run a session with a companion that has 20+ notes and measure actual system prompt sizes from session-start retrieval (`k=6`). Adjust if needed.
+
+---
+
 ## Session notes — 2026-04-10
 
 **Bug fixes: TTS settings reset, dropdown colors, Kokoro file browser title, markdown render reverting.**
 
-### Root causes found and fixed
-
-- **TTS reset** — `cpSave()` always called `_cpGetTtsPayload()` even when Voice tab was never opened, sending a default `af_heart: 1.0` blend and overwriting disk. Fixed by gating payload on `_cpTtsSlots.length > 0` and eagerly populating slots from config in `cpPopulate()`.
-- **Dropdown colors** — native `<select>` / `<option>` elements ignored CSS `rgba()` background. Fixed with solid `#21232e` background on `select.cp-input` and `.cp-tts-voice-select` and their `option` children.
-- **Kokoro file browser title** — `spBrowseTts()` hardcoded `browseType = 'binary'` for all non-voices types including Python. `server.py` had no `"python"` case in `/api/browse`. Both fixed.
-- **Markdown reverting** — three root causes: (1) `markdown_enabled` defaulted to `False` in DEFAULTS; (2) `load_config()` shallow-merged `generation`, so new sub-keys didn't fill in for existing installs; (3) `spPopulateGeneration()` updated the toggle class but never called `setMarkdownEnabled()`, leaving `_markdownEnabled` stale in the renderer.
-
 ### Files written/changed this session
 
-- `static/js/companion.js` — `cpPopulate()` now always calls `cpTtsPopulate(c.tts || {})` unconditionally (no `_cpTtsInitDone` guard). `cpSave()` TTS payload gated on `_cpTtsSlots.length > 0`; `cpSettings` cache update for `tts` now conditional on `body.tts` being present.
-- `static/js/companion-tts.js` — `cpTtsPopulate()` no longer requires tab init; populates `_cpTtsSlots` immediately and only re-renders DOM if `_cpTtsInitDone`. `_cpTtsRenderAll()` renders from existing slots if populated, falls back to `cpSettings` only if empty.
-- `static/css/companion-panel.css` — Added `select.cp-input`, `.cp-tts-voice-select`, and their `option` rules with solid dark background and correct text color.
-- `scripts/server.py` — `/api/browse` endpoint: added `"python"` type case with title "Select Python executable".
-- `static/js/settings-server.js` — `spBrowseTts()`: `browseType` now `'python'` when `type === 'python'`, not hardcoded `'binary'`.
-- `scripts/config.py` — `markdown_enabled` default changed `False` → `True`. `load_config()` now deep-merges `generation` after shallow merge so DEFAULTS sub-keys fill in for existing installs.
-- `static/js/settings-generation.js` — `spPopulateGeneration()` now calls `setMarkdownEnabled(mdEnabled)` alongside setting the toggle class.
-
-### New bugs/features noted this session (not yet worked)
-
-- **STT: microphone input** — browser MediaRecorder API to capture audio; send to multimodal model (Gemma 4 E2B/E4B supports up to 30s). Long clips need splitting strategy — research Gemma's multi-segment audio handling before implementing. Design so a Whisper/STT fallback layer could slot in later without restructuring.
-- **Export/Import redesign** — needs its own popup UI with checkboxes: soul files, mind files, ChromaDB episodic memory dump, config. ChromaDB export = JSON dump of notes → re-embed on import. Needs design session before implementation.
-
-### Next session priorities
-
-1. Test all fixes from this session (TTS save, markdown on boot, dropdown colors, Kokoro title)
-2. Settings: Server arg defaults audit against current llama.cpp (`--flash-attn`, `--reasoning-format`)
-3. Streaming text visual regression — investigation
-4. Background embedding queue
+- `static/js/companion.js` — `cpPopulate()` now always calls `cpTtsPopulate(c.tts || {})` unconditionally. `cpSave()` TTS payload gated on `_cpTtsSlots.length > 0`.
+- `static/js/companion-tts.js` — `cpTtsPopulate()` populates `_cpTtsSlots` immediately; only re-renders DOM if `_cpTtsInitDone`.
+- `static/css/companion-panel.css` — Added solid dark background + correct text color for `select.cp-input`, `.cp-tts-voice-select`, and their `option` children.
+- `scripts/server.py` — `/api/browse`: added `"python"` type case.
+- `static/js/settings-server.js` — `spBrowseTts()`: `browseType` now `'python'` for Python executable.
+- `scripts/config.py` — `markdown_enabled` default `False` → `True`. `load_config()` deep-merges `generation`.
+- `static/js/settings-generation.js` — `spPopulateGeneration()` now calls `setMarkdownEnabled()`.
 
 ---
 
@@ -275,16 +292,12 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ### Files written/changed this session
 
-- `static/js/chat.js` — `modelFamily` variable + `_detectModelFamily()` (detects `"gemma4"` vs `"generic"` from model filename). `buildSystemPrompt()` split into Gemma 4 branch (semantics only, no XML syntax examples — jinja template handles that) and generic branch (full XML examples unchanged).
-- `static/js/api.js` — `_injectToolResults(msgs, cleanedText, results, rawText)` helper centralises all tool result injection. Paths B/C/D refactored to use it. Gemma 4 gets native `<|tool_response>` tokens with raw call block preserved in assistant turn. Generic models get `[Tool results]` user turn.
-- `scripts/memory_store.py` — Four fixes to the link pipeline: threshold 0.82→0.70; LLM pass no longer wipes embedding links on empty return; per-pair yes/no evaluation replaces JSON-array prompt; `_parse_link_eval_response` strips `<think>` blocks and defaults to keeping link on unclear response.
-- `scripts/memory_server.py` — `_LlamaClient.complete()` switched to system+user message pair; added `reasoning_content` fallback. Added `/api/memory/reindex` endpoint.
-- `static/chat.html` — multimodal toggle row added to Settings → Server tab.
-- `static/js/settings-server.js` — `spToggleMultimodal()` added; populate/clear/browse logic updated.
-
-### Known outstanding
-
-- `design/FEATURES.md` — add: detect port-already-in-use at startup and print a clear error.
+- `static/js/chat.js` — `modelFamily` + `_detectModelFamily()`. `buildSystemPrompt()` split into Gemma 4 / generic branches.
+- `static/js/api.js` — `_injectToolResults()` helper. Paths B/C/D refactored. Gemma 4 native tool response format.
+- `scripts/memory_store.py` — Link pipeline: threshold 0.82→0.70; LLM pass no longer wipes embedding links; per-pair yes/no evaluation; `_parse_link_eval_response` strips `<think>` blocks.
+- `scripts/memory_server.py` — `_LlamaClient.complete()` system+user pair; `reasoning_content` fallback; `/api/memory/reindex` endpoint.
+- `static/chat.html` — Multimodal toggle row added to Settings → Server tab.
+- `static/js/settings-server.js` — `spToggleMultimodal()` added.
 
 ---
 
@@ -295,10 +308,10 @@ These items are too open-ended to task out. They need a dedicated design convers
 ### Files written/changed this session
 
 - `static/js/chat-tabs.js` — Three history bugs fixed: migration flush, active tab load on page load, switchTab shell tab guard.
-- `scripts/memory_server.py` — embedding model prewarm on session init.
+- `scripts/memory_server.py` — Embedding model prewarm on session init.
 - `scripts/memory_store.py` — `prewarm_embeddings()` method added.
 - `tools/write_memory.py`, `tools/retrieve_memory.py`, `tools/update_relational_state.py` — HTTP timeout 10s → 60s.
-- `static/js/api.js` — role-alternation 500 fix for non-Qwen models.
+- `static/js/api.js` — Role-alternation 500 fix for non-Qwen models.
 
 ---
 
@@ -323,11 +336,6 @@ These items are too open-ended to task out. They need a dedicated design convers
 ## Session notes — 2026-04-06 #4
 
 **Disk-backed history, associative memory retrieval, memory pill UI.**
-
-### Still to do / known gaps
-
-- Background embedding queue — `consolidated: false` flag is in place, pipeline not yet built.
-- Embed soul/mind markdown files into ChromaDB.
 
 ---
 

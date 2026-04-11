@@ -20,6 +20,47 @@ let _abortCtrl   = null;
 let _contextSize   = 16384;
 let _contextTokens = 0;
 
+// ── Associative memory retrieval counter ──────────────────────────────────────
+// System-driven feminine-pathway retrieval. Fires every ASSOC_INTERVAL turns
+// after a successful reply, injecting surfaced notes as a hidden system turn
+// and showing a memory pill in the UI.
+// ASSOC_INTERVAL reads from config.memory.mid_convo_k (set after loadStatus).
+// The const below is the fallback used before config loads.
+let _assocTurnsSinceLast = 0;
+const ASSOC_INTERVAL_DEFAULT = 4;
+
+function _assocInterval() {
+  return config.memory?.mid_convo_k ?? ASSOC_INTERVAL_DEFAULT;
+}
+
+async function _triggerAssociativeRetrieval() {
+  _assocTurnsSinceLast++;
+  const interval = _assocInterval();
+  console.log(`[memory] assoc check: turn ${_assocTurnsSinceLast}/${interval}`);
+  if (_assocTurnsSinceLast < interval) return;
+  _assocTurnsSinceLast = 0;
+
+  const mood = config.active_mood || null;
+  try {
+    const res  = await fetch('/api/memory/associative', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ mood, valence: null, k: 3 }),
+    });
+    const data = await res.json();
+    console.log(`[memory] associative surfaced: ${data.count ?? 0} note(s)`);
+    if (data.ok && data.notes_text && data.notes_text.trim()) {
+      // Inject as a hidden system turn so the model sees the surfaced memories
+      // on its next response, without it being visible as a user message.
+      conversationHistory.push({ role: 'user',      content: `[Surfaced memories]\n${data.notes_text}` });
+      conversationHistory.push({ role: 'assistant', content: '(noted)' });
+      if (typeof onMemorySurface === 'function') onMemorySurface(data.notes_text);
+    }
+  } catch (e) {
+    console.warn('[memory] associative retrieval failed (non-fatal):', e.message);
+  }
+}
+
 // ── Model family detection ────────────────────────────────────────────────────
 // Derived once from config.model_path after loadStatus(). Read by api.js.
 // Drives system prompt format and tool result injection style.
@@ -475,6 +516,7 @@ function clearHistory() {
 function newChat(keepVisible) {
   conversationHistory = [];
   _contextTokens = 0;
+  _assocTurnsSinceLast = 0;
   updateContextBar(0);
 
   if (typeof heartbeatOnConversationEnd === 'function') heartbeatOnConversationEnd();
@@ -666,6 +708,7 @@ async function sendMessage() {
     _saveCurrentTabState();
     saveTabs();
     updateMemoryCounts();
+    await _triggerAssociativeRetrieval();
   } catch (e) {
     removeTyping(typingId);
     if (e.name !== 'AbortError') {
@@ -758,6 +801,11 @@ RETRIEVE MEMORY — use retrieve_memory for deliberate mid-conversation recall:
 - When the user mentions something you might have a note about
 - When you want to check what you know before making an assumption
 Session-start retrieval is automatic — you only need this for targeted in-conversation lookup.
+
+SUPERSEDE MEMORY — use supersede_memory when a fact you encoded has changed:
+- The user corrects something, updates a situation, or something is no longer true
+- Retrieve the old note first to get its ID, then supersede it with what is now true
+- The old note is kept as history — use this for genuine changes, not edits or additions
 
 RELATIONAL STATE — use update_relational_state only when the relationship itself shifts:
 - A genuine change in closeness, trust, or dynamic — not every session
@@ -854,6 +902,20 @@ Session-start retrieval is automatic — you only need this for targeted in-conv
 <function=retrieve_memory>
 <parameter=query>what do I know about their hometown or childhood</parameter>
 <parameter=k>4</parameter>
+</function>
+</tool_call>
+
+SUPERSEDE MEMORY — use supersede_memory when a fact you encoded has changed:
+- The user corrects something, updates a situation, or something is no longer true
+- Retrieve the old note first to get its ID, then supersede it with what is now true
+- The old note is kept as history — use this for genuine changes, not edits or additions
+
+<tool_call>
+<function=supersede_memory>
+<parameter=old_id>a1b2c3d4</parameter>
+<parameter=content>They moved from Helsinki to Tampere recently. Helsinki still comes up warmly — they miss it.</parameter>
+<parameter=keywords>["Tampere", "Helsinki", "home", "moved"]</parameter>
+<parameter=context_summary>user mentioned they relocated from Helsinki to Tampere</parameter>
 </function>
 </tool_call>
 

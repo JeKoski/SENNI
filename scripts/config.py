@@ -107,7 +107,7 @@ DEFAULTS = {
     # session_start_k: how many notes to surface at session start.
     # mid_convo_k: how many notes to surface on associative mid-convo trigger.
     "memory": {
-        "enabled":         False,
+        "enabled":         True,
         "embedding_model": "all-MiniLM-L6-v2",
         "session_start_k": 6,
         "mid_convo_k":     4,
@@ -349,6 +349,9 @@ def load_config() -> dict:
         # Deep-merge generation so sub-keys added to DEFAULTS after first
         # install (e.g. markdown_enabled) are filled in for existing configs.
         merged["generation"] = {**DEFAULTS["generation"], **saved.get("generation", {})}
+        # Deep-merge memory so sub-keys added later (e.g. mid_convo_k) fill
+        # in for existing installs that have an older memory block on disk.
+        merged["memory"] = {**DEFAULTS["memory"], **saved.get("memory", {})}
         return resolve_platform_paths(merged)
     except (json.JSONDecodeError, OSError):
         return dict(DEFAULTS)
