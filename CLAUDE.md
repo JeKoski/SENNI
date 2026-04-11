@@ -158,7 +158,6 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - ~~**"Ask each time" image processing not working**~~ — **Fixed**
 - ~~**Dirty tracking missing for several fields**~~ — **Fixed**
 - ~~**Companion Settings exiting with dirty edits without confirmation**~~ — **Fixed**
-- ~~**Settings/Companion windows populate and shift on open**~~ — **Fixed**
 - ~~**Settings windows don't reflect active tab/state on open**~~ — **Fixed**
 - ~~**Default presence presets have non-hex colors and missing fields**~~ — **Fixed** in `config.py` DEFAULTS — but **existing companion `config.json` files on disk still have the old `rgba(...)` format**. Needs a one-time migration function or factory reset. Low priority until public release.
 - ~~**Settings: Missing multimodal toggle**~~ — **Fixed**
@@ -166,21 +165,21 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - ~~**Settings Kokoro: Wrong file browser title**~~ — **Fixed**
 - ~~**Companion Settings TTS: Saving resets TTS config**~~ — **Fixed**
 - ~~**Dropdown menus (e.g. Kokoro voice select) white background / unreadable**~~ — **Fixed**
+- ~~**Companion Settings: Ghost bar appears under tabs on open**~~ — **Fixed**
+- ~~**Settings → TTS: espeak file browser title read "llama-server binary"**~~ — **Fixed**
+- ~~**Settings → TTS: Voices directory had no folder picker**~~ — **Fixed**
+- ~~**Settings → TTS: No default path detection for Python/espeak**~~ — **Fixed**
 - **Settings: Server arg defaults outdated** — `--flash-attn` syntax changed (needs `on`/`off`/`auto` value); `--reasoning-format` may be obsolete for jinja-template models. Needs a pass against current llama.cpp.
 
 ### Memory
 
 - ~~**Link eval parse error — 0 links ever confirmed**~~ — **Fixed**
-- ~~**Associative retrieval never firing**~~ — **Fixed** (this session). The trigger code was never written into `api.js`. Added `_triggerAssociativeRetrieval()` to `chat.js`, firing after every successful reply, every `mid_convo_k` turns.
-- ~~**Memory system silently disabled**~~ — **Fixed** (this session). `memory.enabled` defaulted to `False` in `config.py` DEFAULTS; flipped to `True`.
+- ~~**Associative retrieval never firing**~~ — **Fixed**
+- ~~**Memory system silently disabled**~~ — **Fixed**
 
 ### UI / Layout
 
 - **Tool and thinking pills have alignment/padding issues** — pills are misaligned relative to each other and the orb. **Bundle this fix with the pill visual rework** — don't fix in isolation.
-- ~~**Companion Settings: Ghost bar appears under tabs on open**~~ — **Fixed** (this session). `_cpShowLoadingState` used `visibility:hidden` which still painted the tab strip's `border-bottom`. Switched to `display:none`/restore with correct per-element display values.
-- ~~**Settings → TTS: espeak file browser title read "llama-server binary"**~~ — **Fixed** (this session). Missing `espeak` case in `/api/browse` — added with correct title "Select espeak-ng binary".
-- ~~**Settings → TTS: Voices directory had no folder picker**~~ — **Fixed** (this session). Added `folder` browse type to `/api/browse` using `askdirectory`. JS now sends `type: 'folder'` for voices.
-- ~~**Settings → TTS: No default path detection for Python/espeak**~~ — **Fixed** (this session). Added `/api/tts/python-default` and `/api/tts/espeak-default` endpoints + "Default" buttons in the UI.
 
 ---
 
@@ -210,6 +209,7 @@ These items are too open-ended to task out. They need a dedicated design convers
 - **Main Chat UI redesign** — overall feel should be "smoother, fuller, cozier". Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
 - **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked "design needs expanding on". These need fleshing out before wizard implementation begins.
 - **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard's closeness step is finalized.
+- **Companion Templates rework** — templates need redesigning to fit the new memory system and future features. Goals: don't clash with ChromaDB/soul/mind architecture; future-proof for Wizard and Mood system; keep token totals reasonable (balance context efficiency vs detail). Needs a design conversation before touching template files.
 
 ---
 
@@ -241,32 +241,43 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ---
 
-## Session notes — 2026-04-12
+## Session notes — 2026-04-12 #2
 
-**Bug fixes: companion settings ghost bar, TTS browse/defaults. Memory pipeline item 1.**
+**Memory pipeline items 1–3 complete. New feature entries added to FEATURES.md.**
+
+### What we actually found vs CLAUDE.md claims
+
+Previous session ended mid-run (context/tool-call limit). Actual file state differed from what CLAUDE.md recorded:
+
+- Item 1 (`onMemorySurface` deferred call) — claimed done, **not present** in uploaded `chat.js`. Fixed this session.
+- `mind_file_index` / `session_history_index` in `_load_meta()` — claimed done, **confirmed present**. That one landed.
+- `write_system_note()`, `_process_unconsolidated_sessions()`, `_index_mind_files()` — all absent, built this session.
 
 ### Files written/changed this session
 
-- `static/js/companion.js` — `_cpShowLoadingState`: `visibility:hidden` → `display:none` during load. On reveal, restores correct `display` per element type (`flex` for strip/footer, `block`/`none` for tab bodies based on `.active`).
-- `scripts/server.py` — `/api/browse`: added `espeak` type (title "Select espeak-ng binary"); added `folder` type using `askdirectory` for voices dir. Added `/api/tts/python-default` (scans `%LOCALAPPDATA%\Programs\Python\*` on Windows + PATH fallback, returns path + version string) and `/api/tts/espeak-default` (checks platform default install locations).
-- `static/js/settings-server.js` — `spBrowseTts('voices')` now uses `type: 'folder'` browse; `spBrowseTts('espeak')` now passes `type: 'espeak'`. Added `spFillTtsDefault(type)` — hits the two new endpoints and fills the display + shows Python version hint.
-- `static/chat.html` — Added "Default" buttons to Python and espeak TTS rows (calls `spFillTtsDefault`). Voices row intentionally unchanged (no standard default location).
-- `static/js/chat.js` — `reloadMemoryContext()`: when `_memoryContext` is non-empty, fires `onMemorySurface('')` after a 120ms defer so the session-start memory pill appears after any replayed messages.
-- `scripts/memory_store.py` — `_load_meta()` default dict extended with `mind_file_index: {}` and `session_history_index: []` keys (groundwork for items 2 & 3, not yet fully wired).
+- `static/js/chat.js` — `reloadMemoryContext()`: added 120ms deferred `onMemorySurface('')` call in the success branch so the session-start memory pill fires after replayed messages settle.
+- `scripts/memory_store.py` — Added `write_system_note(content, source_label)`: fixed neutral ratios (0.25 each), no stack/mood computation, `function_source` = caller-provided label, `retrieval_mode` = `"associative"`, `decay_weight` = 0.5. Skips LLM consolidation queue intentionally — embedding-only linking is sufficient for system-ingested content and keeps startup fast.
+- `scripts/memory_server.py` — Added `_process_unconsolidated_sessions()`: scans `history/` recursively, finds unprocessed `session.json` files, extracts and cleans assistant text (strips `<think>` and `<tool_call>` blocks), chunks at 800 chars, writes via `write_system_note`, marks `consolidated: true` in the file, updates `session_history_index` in meta. Added `_index_mind_files()`: scans `mind/*.md`, sha256-hashes each, compares to `mind_file_index`, writes new/changed files as chunked system notes, updates index. Both called from `init_memory_store()` as daemon threads via `_run_session_ingestion_async()` / `_run_mind_indexing_async()`.
 
 ### Memory pipeline status
 
-1. ~~**Session-start context UI signal**~~ — **Done**. Memory pill now fires at session start when context is loaded.
-2. **Background embedding queue** — schema groundwork done (`session_history_index` added to meta). `write_system_note()` and the session scanner in `memory_server.py` still need writing. **Start here next session.**
-3. **Mind file indexing** — schema groundwork done (`mind_file_index` added to meta). Indexer in `memory_server.py` and `write_system_note()` still need writing. **Do alongside item 2 next session** (same files).
-4. **Tool self-registration refactor** — unchanged, full session needed.
-5. **Token budget empirical test** — after 2 & 3 complete.
+1. ~~**Session-start context UI signal**~~ — **Done.**
+2. ~~**Background embedding queue (session history ingestion)**~~ — **Done.**
+3. ~~**Mind file indexing into ChromaDB**~~ — **Done.**
+4. **Tool self-registration refactor** — full session needed. Each tool file should own its Python `run()`, JS schema, and system prompt instructions. Eliminates the three-place update requirement.
+5. **Token budget empirical test** — run a session with 20+ notes and measure actual system prompt sizes from session-start retrieval (`k=6`). Adjust if needed.
 
-### Next session: upload `memory_server.py` and `memory_store.py`
+---
 
-Items 2 & 3 are pure Python, two files. The approach is clear:
-- `memory_store.py`: add `write_system_note(content, source_label)` — fixed neutral ratios, skips stack computation, `function_source` = caller-provided label (`"session_history"` or `"system"`).
-- `memory_server.py`: add `_process_unconsolidated_sessions(companion_folder)` — scans history/, finds `consolidated: false` sessions, extracts assistant message text, calls `write_system_note`, marks session `consolidated: true`. Add `_index_mind_files(companion_folder)` — scans `mind/*.md`, sha256 hashes, compares to `mind_file_index`, writes changed files as chunked system notes, updates index. Both called from `init_memory_store()` in background threads.
+## Session notes — 2026-04-12
+
+**Bug fixes: companion settings ghost bar, TTS browse/defaults. Memory pipeline item 1 (partially — context limit hit before save).**
+
+- `static/js/companion.js` — `_cpShowLoadingState`: `visibility:hidden` → `display:none`.
+- `scripts/server.py` — `/api/browse`: espeak + folder types. `/api/tts/python-default` and `/api/tts/espeak-default` endpoints.
+- `static/js/settings-server.js` — folder/espeak browse types, `spFillTtsDefault()`.
+- `static/chat.html` — "Default" buttons for Python and espeak TTS rows.
+- `scripts/memory_store.py` — `_load_meta()` extended with `mind_file_index: {}` and `session_history_index: []`.
 
 ---
 
@@ -274,32 +285,9 @@ Items 2 & 3 are pure Python, two files. The approach is clear:
 
 **Memory system foundation pass — review, diagnostics, and fixes.**
 
-### What we found in the review
-
-Conducted a full design-vs-implementation review of the memory system. Overall the architecture was sound and well-wired. Key gaps found:
-
-- **Associative retrieval trigger never written** — documented in `design/SYSTEMS.md` as if implemented, but the counter and fetch logic were absent from `api.js` entirely. Silent because there was nothing to fail.
-- **`memory.enabled` defaulted to `False`** — meant the entire memory system (ChromaDB init, session-start retrieval, all endpoints) was disabled by default for any install that hadn't explicitly toggled it on in settings.
-- **`load_config()` didn't deep-merge `memory`** — new sub-keys like `mid_convo_k` wouldn't fill in for existing installs.
-- **`supersede_memory` tool missing** — the `/api/memory/supersede` endpoint existed and worked, but no tool file exposed it to the companion, so the Zep-style temporal chain was inert.
-- **Background embedding queue** — flagged as unbuilt; confirmed not aspirational, needs building next session.
-- **Mind file indexing** — `companion_identity.md` syncs to Tier 1 at session start, but `mind/` files aren't indexed into ChromaDB at all. Soul files may not need it (Tier 1 covers identity), but mind definitely does.
-
-### Files written/changed this session
-
-- `static/js/chat.js` — Added `_assocTurnsSinceLast` counter, `_assocInterval()` (reads `config.memory.mid_convo_k`), and `_triggerAssociativeRetrieval()`. Fires after every successful reply, every N turns. Injects surfaced notes as hidden system turns, fires `onMemorySurface` for the pill. Counter resets on `newChat()`.
-- `scripts/config.py` — `memory.enabled` default flipped `False` → `True`. `load_config()` now deep-merges `memory` block the same way it does `generation`.
-- `tools/supersede_memory.py` — New tool. Mirrors `write_memory.py` structure. Hits `/api/memory/supersede`. Returns confirmation with both old and new truncated IDs. Auto-registered by `tool_loader.py` — no other backend changes needed.
-- `static/js/tool-parser.js` — `supersede_memory` added to `TOOL_DEFINITIONS` (between `retrieve_memory` and `update_relational_state`). `TOOL_NAMES` derives automatically.
-- `static/js/chat.js` (system prompt) — `SUPERSEDE MEMORY` block added to both Gemma 4 and generic branches. Positioned after `RETRIEVE MEMORY`. Generic branch includes XML example with Helsinki→Tampere scenario.
-
-### Next session priorities
-
-1. **Session-start context UI signal** — when `_memoryContext` is non-empty after `reloadMemoryContext()`, fire `onMemorySurface` with a brief "memories loaded" indicator. Currently invisible to the user. (`chat.js` only)
-2. **Background embedding queue** — `consolidated: false` flag is written on each session save. Need to build the startup pipeline that reads unconsolidated sessions and processes them into ChromaDB. (`memory_server.py`, `memory_store.py`)
-3. **Mind file indexing into ChromaDB** — at session init, scan `mind/` for `.md` files, hash content, compare against a stored index in `memory_meta.json`. New/changed files get chunked and written as `function_source: "system"` notes. Makes mind content searchable via `retrieve_direct` and session-start retrieval. (`memory_server.py`, `memory_store.py`)
-4. **Tool self-registration refactor** — each tool file should own its full definition: Python `run()`, JS schema, and system prompt instructions. `tool-parser.js` and `chat.js` should consume these from the API rather than having them hardcoded. Eliminates the three-place update requirement when adding tools. Dedicate a full session to this — it touches every tool file and both JS files.
-5. **Token budget empirical test** — once items 1–3 are working, run a session with a companion that has 20+ notes and measure actual system prompt sizes from session-start retrieval (`k=6`). Adjust if needed.
+- `static/js/chat.js` — Added `_assocTurnsSinceLast`, `_assocInterval()`, `_triggerAssociativeRetrieval()`.
+- `scripts/config.py` — `memory.enabled` default `False` → `True`. Deep-merge for `memory` block.
+- `tools/supersede_memory.py` — New tool.
 
 ---
 
@@ -307,44 +295,17 @@ Conducted a full design-vs-implementation review of the memory system. Overall t
 
 **Bug fixes: TTS settings reset, dropdown colors, Kokoro file browser title, markdown render reverting.**
 
-### Files written/changed this session
-
-- `static/js/companion.js` — `cpPopulate()` now always calls `cpTtsPopulate(c.tts || {})` unconditionally. `cpSave()` TTS payload gated on `_cpTtsSlots.length > 0`.
-- `static/js/companion-tts.js` — `cpTtsPopulate()` populates `_cpTtsSlots` immediately; only re-renders DOM if `_cpTtsInitDone`.
-- `static/css/companion-panel.css` — Added solid dark background + correct text color for `select.cp-input`, `.cp-tts-voice-select`, and their `option` children.
-- `scripts/server.py` — `/api/browse`: added `"python"` type case.
-- `static/js/settings-server.js` — `spBrowseTts()`: `browseType` now `'python'` for Python executable.
-- `scripts/config.py` — `markdown_enabled` default `False` → `True`. `load_config()` deep-merges `generation`.
-- `static/js/settings-generation.js` — `spPopulateGeneration()` now calls `setMarkdownEnabled()`.
-
 ---
 
 ## Session notes — 2026-04-08
 
 **Gemma 4 tool calling, memory link pipeline, multimodal toggle.**
 
-### Files written/changed this session
-
-- `static/js/chat.js` — `modelFamily` + `_detectModelFamily()`. `buildSystemPrompt()` split into Gemma 4 / generic branches.
-- `static/js/api.js` — `_injectToolResults()` helper. Paths B/C/D refactored. Gemma 4 native tool response format.
-- `scripts/memory_store.py` — Link pipeline: threshold 0.82→0.70; LLM pass no longer wipes embedding links; per-pair yes/no evaluation; `_parse_link_eval_response` strips `<think>` blocks.
-- `scripts/memory_server.py` — `_LlamaClient.complete()` system+user pair; `reasoning_content` fallback; `/api/memory/reindex` endpoint.
-- `static/chat.html` — Multimodal toggle row added to Settings → Server tab.
-- `static/js/settings-server.js` — `spToggleMultimodal()` added.
-
 ---
 
 ## Session notes — 2026-04-06 #8
 
 **Bug fixes: history loading, embedding timeout, role alternation 500, misc.**
-
-### Files written/changed this session
-
-- `static/js/chat-tabs.js` — Three history bugs fixed: migration flush, active tab load on page load, switchTab shell tab guard.
-- `scripts/memory_server.py` — Embedding model prewarm on session init.
-- `scripts/memory_store.py` — `prewarm_embeddings()` method added.
-- `tools/write_memory.py`, `tools/retrieve_memory.py`, `tools/update_relational_state.py` — HTTP timeout 10s → 60s.
-- `static/js/api.js` — Role-alternation 500 fix for non-Qwen models.
 
 ---
 

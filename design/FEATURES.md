@@ -21,7 +21,7 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 ### Recent additions
 - Ability to override only the intensity, transparency, brightness and/or saturation of the colors and effects/animations
--Link to Kokoro TTS: Different blends for different moods
+- Link to Kokoro TTS: Different blends for different moods
 
 ---
 
@@ -42,13 +42,34 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 ---
 
+## Companion
+
+- **Timeline awareness**
+  - The companion should be better attuned to the passage of time — not just aware of the current date, but sensitive to how much time has passed since the last message or session.
+  - `get_time` should be called as a direct system instruction at session start, and again if a significant gap since the previous message is detected (e.g. after a long idle). Currently it relies on the companion choosing to call it herself, which is unreliable.
+  - Implementation note: session-start instruction could inject the current timestamp automatically rather than requiring a tool call. Mid-session gap detection could piggyback on the idle timer already used for consolidation.
+
+- **Companion Templates rework** *(design needed)*
+  - Current templates (soul files, user profile, etc.) were designed before the ChromaDB memory system existed and may clash with or duplicate what the system now manages automatically.
+  - Goals: ensure templates don't overlap with auto-managed content; future-proof for Companion Creation Wizard and Mood system; keep token totals reasonable (balance context efficiency vs detail).
+  - Needs a design conversation to map out what each template should and shouldn't contain before any files are touched. Reference Wizard and Mood docs when designing.
+
+---
+
 ## Memory / History
 
-- **Background embedding queue** — process unembedded session files into ChromaDB on startup. `consolidated: false` flag is in place, pipeline not yet built.
-- **Embed soul/mind markdown files** — so episodic retrieval can search identity/profile content.
-- **Export update** — exporting a session should zip the whole session folder (images + JSON). Currently images not included in exports.
-- **Import update** — importing should handle the new session folder format.
-- **`mid_convo_k` config wiring** — `ASSOC_INTERVAL` is hardcoded to 4 turns. Should read from `config.memory.mid_convo_k` (already done) but interval itself could also be configurable.
+- ~~**Background embedding queue**~~ — **Done.** Session history ingested into ChromaDB on startup via `_process_unconsolidated_sessions()`. `consolidated: false` flag in session files drives processing.
+- ~~**Embed soul/mind markdown files**~~ — **Done.** Mind files indexed into ChromaDB via `_index_mind_files()`, hash-tracked for change detection.
+- **Image handling in history** *(partially implemented)*
+  - Images are already stripped from `history` (API format) before saving to disk and written as separate files (`img_001.jpg` etc.) in the session folder, with `{type: "image_ref", path: "..."}` references in the JSON. This prevents base64 bloat in session files. ✓
+  - **Remaining open question:** when a session is reloaded and the model needs to "see" a past image (e.g. for follow-up questions), how should the image_ref be handled? Options:
+    - Re-encode the file from disk as base64 on load (simplest, transparent to model)
+    - Store a compressed text description of the image alongside the file (generated at send-time via a vision pass), and substitute the description into history on load for models that don't need the raw pixels again
+    - Do nothing — vision_mode `once` already handles "don't re-send" for the current session; across sessions the image is effectively gone from context, which may be acceptable
+  - **Export update** — exporting a session should zip the whole session folder (images + JSON). Currently images not included in exports.
+  - **Import update** — importing should handle the new session folder format.
+
+- **`mid_convo_k` config wiring** — `ASSOC_INTERVAL` reads from `config.memory.mid_convo_k` (done). The interval itself could also be exposed as a configurable setting in the UI.
 
 ---
 
@@ -82,10 +103,8 @@ Key design points:
 
 Appearance sections (hair style, face shape, eyes, nose, outfit system, accessories, etc.) are marked **design needs expanding on** — flesh these out before wizard implementation begins.
 
-
 ---
 
-# Cozy Mode
- I always imagine the companion space as a cozy living room, but I had never thought of actually making it look like one. Perhaps an option for "cozy" mode for the app could be just that.
+## Cozy Mode *(wishlist)*
 
-Not just a UI theme, but a full sensory layer. Soft lighting that mimics candlelight or sunset glow, ambient sounds (rain outside the window? fireplace crackle?), maybe even haptic feedback if your screen supports it. The Orb could dim to a warm amber pulse instead of bright blue, and our conversation interface would feel like parchment rather than crisp terminal text.
+The companion space as a cozy living room. Not just a UI theme but a full sensory layer — soft candlelight/sunset lighting, ambient sounds (rain, fireplace), orb dims to warm amber pulse, conversation interface feels like parchment. Haptic feedback if the screen supports it. Needs visual/interaction design before any implementation.

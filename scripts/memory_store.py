@@ -359,6 +359,70 @@ class MemoryStore:
         log.debug(f"wrote note {note_id[:8]} [{composite}] retrieval={retrieval_mode}")
         return note_id
 
+    def write_system_note(self, content: str, source_label: str) -> str:
+        """
+        Write a memory note originating from the system pipeline rather than
+        the companion herself. Used for:
+          - Session history ingestion  (source_label = "session_history")
+          - Mind file indexing         (source_label = "system")
+
+        Differences from write_note():
+          - Fixed neutral primitive ratios (0.25 each) — no stack computation,
+            no mood bias. These notes aren't coloured by the companion's current
+            cognitive state; they're raw ingested content.
+          - function_source  = source_label
+          - retrieval_mode   = "associative" (surfaces passively, never via
+            deliberate masculine-pathway lookup)
+          - decay_weight     = 0.5 (lighter default — system notes are
+            supplementary context, not deeply felt memories)
+          - emotional_valence / intensity = 0.0 / 0.5 (neutral defaults)
+          - context_summary  = first 120 chars of content (no separate field
+            needed; system notes don't need hand-crafted summaries)
+          - NOT queued for LLM link evaluation — system notes skip that pass
+            to keep startup fast. Embedding-only linking still runs at
+            consolidation time.
+
+        Returns the note_id (uuid).
+        """
+        if not self._collection:
+            return "error: memory system not available"
+
+        note_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        context_summary = content[:120]
+
+        metadata = {
+            "ratio_S":           0.25,
+            "ratio_N":           0.25,
+            "ratio_F":           0.25,
+            "ratio_T":           0.25,
+            "composite_label":   "impression",   # neutral fallback composite
+            "content":           content,
+            "keywords":          json.dumps([]),
+            "emotional_valence": 0.0,
+            "intensity":         0.5,
+            "mood_at_write":     "",
+            "function_source":   source_label,
+            "retrieval_mode":    "associative",
+            "decay_weight":      0.5,
+            "created_at":        now,
+            "last_recalled_at":  now,
+            "superseded_by":     "",
+            "supersedes":        "",
+            "links":             json.dumps([]),
+        }
+
+        self._collection.add(
+            ids=[note_id],
+            documents=[context_summary],
+            metadatas=[metadata],
+        )
+
+        # Deliberately NOT queued for LLM consolidation — embedding-only links
+        # are sufficient and keep startup fast.
+        log.debug(f"wrote system note {note_id[:8]} [source={source_label}]")
+        return note_id
+
     # ── Retrieve ───────────────────────────────────────────────────────────────
 
     def retrieve_session_start(

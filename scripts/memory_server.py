@@ -181,6 +181,11 @@ def init_memory_store(companion_folder: str) -> bool:
     # the first write_memory or retrieve_memory tool call.
     _prewarm_embedding_model()
 
+    # Background pipeline: ingest unconsolidated session history + index mind files.
+    # Both run in daemon threads so they never block session start.
+    _run_session_ingestion_async(companion_folder)
+    _run_mind_indexing_async(companion_folder)
+
     return True
 
 
@@ -199,6 +204,218 @@ def _sync_identity_block(companion_folder: str) -> None:
             _store.update_identity_block(content)
     except Exception as e:
         log.warning(f"Could not sync identity block: {e}")
+
+
+def _run_session_ingestion_async(companion_folder: str) -> None:
+    """Launch _process_unconsolidated_sessions in a background daemon thread."""
+    def _worker():
+        try:
+            _process_unconsolidated_sessions(companion_folder)
+        except Exception as e:
+            log.warning(f"Session ingestion thread error: {e}")
+    t = threading.Thread(target=_worker, daemon=True, name="senni-session-ingest")
+    t.start()
+
+
+def _run_mind_indexing_async(companion_folder: str) -> None:
+    """Launch _index_mind_files in a background daemon thread."""
+    def _worker():
+        try:
+            _index_mind_files(companion_folder)
+        except Exception as e:
+            log.warning(f"Mind indexing thread error: {e}")
+    t = threading.Thread(target=_worker, daemon=True, name="senni-mind-index")
+    t.start()
+
+
+def _process_unconsolidated_sessions(companion_folder: str) -> None:
+    """
+    Scan history/ for sessions with consolidated=false and ingest their
+    assistant message text into ChromaDB as system notes.
+
+    Session folder structure:
+        companions/<folder>/history/<tab-id>/<YYYY-MM-DD_HHMMSS>/session.json
+
+    session.json shape (relevant fields):
+        {
+            "consolidated": false,
+            "history": [
+                {"role": "user",      "content": "..."},
+                {"role": "assistant", "content": "..."},
+                ...
+            ]
+        }
+
+    assistant content may be a string or a list of content blocks. We extract
+    only plain text, stripping tool call XML and thinking blocks — those are
+    plumbing, not memories.
+
+    Each assistant turn is written as a single system note. Sessions already in
+    session_history_index are skipped. On completion the session.json is updated
+    with consolidated=true and the path is added to the index.
+    """
+    import re
+
+    if _store is None or not _store.is_available():
+        return
+
+    history_root = _companions_dir() / companion_folder / "history"
+    if not history_root.exists():
+        return
+
+    already_done: list = _store._meta.get("session_history_index", [])
+
+    # Collect all session.json paths we haven't processed yet
+    candidates = []
+    for session_file in sorted(history_root.rglob("session.json")):
+        rel = str(session_file)
+        if rel not in already_done:
+            candidates.append(session_file)
+
+    if not candidates:
+        log.debug("session ingestion: nothing new to process")
+        return
+
+    log.info(f"session ingestion: processing {len(candidates)} unprocessed session(s)")
+
+    def _extract_assistant_text(content) -> str:
+        """
+        Extract clean reply text from an assistant message's content field.
+        content may be a plain string or a list of blocks (OpenAI-style).
+        Strips <think>...</think> blocks and <tool_call>...</tool_call> blocks.
+        """
+        if isinstance(content, str):
+            raw = content
+        elif isinstance(content, list):
+            # Concatenate text-type blocks; ignore image/tool blocks
+            parts = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    parts.append(block.get("text", ""))
+                elif isinstance(block, str):
+                    parts.append(block)
+            raw = "\n".join(parts)
+        else:
+            return ""
+
+        # Strip thinking blocks (Qwen3 / DeepSeek style)
+        raw = re.sub(r"<think>[\s\S]*?</think>", "", raw, flags=re.IGNORECASE)
+        # Strip tool call blocks
+        raw = re.sub(r"<tool_call>[\s\S]*?</tool_call>", "", raw, flags=re.IGNORECASE)
+        raw = re.sub(r"<tool_response>[\s\S]*?</tool_response>", "", raw, flags=re.IGNORECASE)
+        # Collapse whitespace
+        raw = re.sub(r"\n{3,}", "\n\n", raw).strip()
+        return raw
+
+    newly_done = []
+    for session_file in candidates:
+        try:
+            data = json.loads(session_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            log.warning(f"session ingestion: could not read {session_file}: {e}")
+            continue
+
+        history = data.get("history", [])
+        ingested = 0
+        for msg in history:
+            if msg.get("role") != "assistant":
+                continue
+            text = _extract_assistant_text(msg.get("content", ""))
+            # Skip very short turns — unlikely to be meaningful memories
+            if len(text) < 60:
+                continue
+            # Chunk long turns so no single note is bloated
+            # (~800 chars ≈ ~200 tokens — comfortable note size)
+            chunks = [text[i:i+800] for i in range(0, len(text), 800)]
+            for chunk in chunks:
+                _store.write_system_note(chunk, source_label="session_history")
+                ingested += 1
+
+        # Mark consolidated in the session file
+        try:
+            data["consolidated"] = True
+            session_file.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2),
+                encoding="utf-8"
+            )
+        except Exception as e:
+            log.warning(f"session ingestion: could not mark consolidated on {session_file}: {e}")
+
+        newly_done.append(str(session_file))
+        log.debug(f"session ingestion: {session_file.parent.name} → {ingested} note(s)")
+
+    if newly_done:
+        _store._meta["session_history_index"] = already_done + newly_done
+        _store._save_meta()
+        log.info(f"session ingestion: done — {len(newly_done)} session(s), meta saved")
+
+
+def _index_mind_files(companion_folder: str) -> None:
+    """
+    Scan mind/ for .md files and write new or changed ones into ChromaDB as
+    system notes, so mind content is searchable via episodic retrieval.
+
+    Change detection uses sha256 hashes stored in memory_meta.json under
+    mind_file_index: { "filename.md": "sha256hex", ... }.
+
+    Files are chunked at ~800 chars so no note is bloated.
+    If a file has changed since last index, the old notes are NOT superseded
+    (we don't track which notes came from which file at that granularity) —
+    instead the new content is written fresh. This is acceptable: mind files
+    are scratchpads and the old notes will decay naturally.
+    """
+    import hashlib
+
+    if _store is None or not _store.is_available():
+        return
+
+    mind_dir = _companions_dir() / companion_folder / "mind"
+    if not mind_dir.exists():
+        log.debug("mind indexing: no mind/ directory found, skipping")
+        return
+
+    mind_files = sorted(mind_dir.glob("*.md"))
+    if not mind_files:
+        log.debug("mind indexing: no .md files in mind/")
+        return
+
+    current_index: dict = _store._meta.get("mind_file_index", {})
+    updated_index = dict(current_index)
+    any_changes = False
+
+    for md_file in mind_files:
+        try:
+            content = md_file.read_text(encoding="utf-8").strip()
+        except Exception as e:
+            log.warning(f"mind indexing: could not read {md_file.name}: {e}")
+            continue
+
+        if not content:
+            continue
+
+        file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+        if current_index.get(md_file.name) == file_hash:
+            log.debug(f"mind indexing: {md_file.name} unchanged, skipping")
+            continue
+
+        # New or changed — write chunked notes
+        chunks = [content[i:i+800] for i in range(0, len(content), 800)]
+        written = 0
+        for chunk in chunks:
+            _store.write_system_note(chunk, source_label="system")
+            written += 1
+
+        updated_index[md_file.name] = file_hash
+        any_changes = True
+        log.debug(f"mind indexing: {md_file.name} → {written} note(s) written")
+
+    if any_changes:
+        _store._meta["mind_file_index"] = updated_index
+        _store._save_meta()
+        log.info(f"mind indexing: done — {sum(1 for k in updated_index if current_index.get(k) != updated_index[k])} file(s) updated")
+    else:
+        log.debug("mind indexing: all files up to date")
 
 
 def kill_memory_server() -> None:

@@ -406,6 +406,10 @@ async function reloadMemoryContext() {
     if (data.ok && data.session_context) {
       _memoryContext = data.session_context;
       console.log('[memory] session context loaded,', data.note_count, 'notes in store');
+      // Fire memory pill after a short defer so it appears after replayed messages
+      setTimeout(() => {
+        if (typeof onMemorySurface === 'function') onMemorySurface('');
+      }, 120);
     } else {
       _memoryContext = '';
       if (data.reason && data.reason !== 'memory_disabled') {
