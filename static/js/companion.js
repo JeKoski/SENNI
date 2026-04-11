@@ -62,11 +62,15 @@ function _cpShowLoadingState(isLoading) {
 
   if (isLoading) {
     spinner.style.display = 'flex';
-    toggleEls.forEach(el => { el.style.visibility = 'hidden'; el.style.opacity = '0'; });
+    toggleEls.forEach(el => { el.style.display = 'none'; el.style.opacity = '0'; });
   } else {
     spinner.style.display = 'none';
     toggleEls.forEach(el => {
-      el.style.visibility = '';
+      // Restore the correct display value for each element type
+      const tag = el.tagName.toLowerCase();
+      el.style.display = el.classList.contains('cp-tab-body')
+        ? (el.classList.contains('active') ? 'block' : 'none')
+        : 'flex';
       el.style.transition = 'opacity 0.18s ease';
       el.style.opacity = '0';
       requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = ''; }));

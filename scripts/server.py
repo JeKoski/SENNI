@@ -267,20 +267,54 @@ def _run_file_dialog(title: str, filetypes: list) -> str | None:
         return None
 
 
+def _run_folder_dialog(title: str) -> str | None:
+    """
+    Open a native OS folder-picker dialog via tkinter.
+    Must run in a worker thread — NOT the asyncio event loop thread.
+    """
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        root.lift()
+        root.update()
+        path = filedialog.askdirectory(title=title)
+        root.destroy()
+        return path or None
+    except Exception:
+        return None
+
+
 @app.post("/api/browse")
 async def api_browse(request: Request):
     """
-    Open the OS native file picker on the server machine.
-    Supported types: "model" | "mmproj" | "binary"
+    Open the OS native file/folder picker on the server machine.
+    Supported types: "model" | "mmproj" | "binary" | "python" | "espeak" | "folder"
     """
     body      = await request.json()
     file_type = body.get("type", "model")
+
+    loop = asyncio.get_event_loop()
+
+    if file_type == "folder":
+        # Generic folder picker — used for voices directory etc.
+        title = body.get("title", "Select folder")
+        try:
+            path = await loop.run_in_executor(_executor, lambda: _run_folder_dialog(title))
+        except Exception as e:
+            return {"ok": False, "reason": str(e)}
+        return {"ok": True, "path": path} if path else {"ok": False, "reason": "cancelled"}
 
     if file_type == "binary":
         title     = "Select llama-server binary"
         filetypes = [("Executable", "*.exe")] if IS_WIN else [("All files", "*")]
     elif file_type == "python":
         title     = "Select Python executable"
+        filetypes = [("Executable", "*.exe")] if IS_WIN else [("All files", "*")]
+    elif file_type == "espeak":
+        title     = "Select espeak-ng binary"
         filetypes = [("Executable", "*.exe")] if IS_WIN else [("All files", "*")]
     elif file_type == "mmproj":
         title     = "Select mmproj file"
@@ -289,7 +323,6 @@ async def api_browse(request: Request):
         title     = "Select model file (.gguf)"
         filetypes = [("GGUF files", "*.gguf"), ("All files", "*.*")]
 
-    loop = asyncio.get_event_loop()
     try:
         path = await loop.run_in_executor(
             _executor,
@@ -299,6 +332,90 @@ async def api_browse(request: Request):
         return {"ok": False, "reason": str(e)}
 
     return {"ok": True, "path": path} if path else {"ok": False, "reason": "cancelled"}
+
+
+@app.get("/api/tts/python-default")
+async def api_tts_python_default():
+    """
+    Attempt to auto-detect the Python executable path for TTS setup.
+    Returns the best candidate path and version string, or ok:false if not found.
+    """
+    import re as _re
+
+    # Try to get the version string from the running Python first
+    import sys
+    candidates = []
+
+    if IS_WIN:
+        # Check %LOCALAPPDATA%\Programs\Python\PythonXXX\python.exe
+        local_app = os.environ.get("LOCALAPPDATA", "")
+        py_base   = Path(local_app) / "Programs" / "Python"
+        if py_base.exists():
+            # Sort descending so we prefer newer versions
+            for d in sorted(py_base.iterdir(), reverse=True):
+                exe = d / "python.exe"
+                if exe.exists():
+                    candidates.append(str(exe))
+        # Also try the running interpreter itself
+        candidates.append(sys.executable)
+    else:
+        # Linux / macOS — common locations
+        candidates += [
+            sys.executable,
+            shutil.which("python3") or "",
+            shutil.which("python") or "",
+            "/usr/bin/python3",
+            "/usr/local/bin/python3",
+        ]
+
+    for cand in candidates:
+        if not cand:
+            continue
+        p = Path(cand)
+        if not p.exists():
+            continue
+        try:
+            result = subprocess.run(
+                [str(p), "--version"], capture_output=True, text=True, timeout=5
+            )
+            version_str = (result.stdout or result.stderr).strip()
+            if "Python" in version_str:
+                return {"ok": True, "path": str(p), "version": version_str}
+        except Exception:
+            continue
+
+    return {"ok": False, "reason": "not_found"}
+
+
+@app.get("/api/tts/espeak-default")
+async def api_tts_espeak_default():
+    """
+    Return the platform default path for espeak-ng if it exists.
+    """
+    if IS_WIN:
+        candidates = [
+            Path(r"C:\Program Files\eSpeak NG\espeak-ng.exe"),
+            Path(r"C:\Program Files (x86)\eSpeak NG\espeak-ng.exe"),
+        ]
+    elif platform.system() == "Darwin":
+        candidates = [
+            Path("/opt/homebrew/bin/espeak-ng"),
+            Path("/usr/local/bin/espeak-ng"),
+        ]
+    else:  # Linux
+        candidates = [
+            Path("/usr/bin/espeak-ng"),
+            Path("/usr/local/bin/espeak-ng"),
+        ]
+        found_on_path = shutil.which("espeak-ng")
+        if found_on_path:
+            candidates.insert(0, Path(found_on_path))
+
+    for p in candidates:
+        if p.exists():
+            return {"ok": True, "path": str(p)}
+
+    return {"ok": False, "reason": "not_found"}
 
 
 # ── API: status ────────────────────────────────────────────────────────────────

@@ -312,29 +312,32 @@ async function spBrowseTts(type) {
   const original = { text: disp.textContent, cls: disp.className };
   disp.textContent = '…';
 
-  // For voices dir we want a folder picker — but tkinter only supports files.
-  // Use a text fallback for the voices dir path; file picker for executables.
-  const browseType = (type === 'voices') ? null : type === 'python' ? 'python' : 'binary';
+  // voices → folder picker; espeak → espeak binary picker; python → python picker
+  const browseType = type === 'voices' ? 'folder'
+                   : type === 'python' ? 'python'
+                   :                     'espeak';
 
-  if (browseType) {
-    try {
-      const res  = await fetch('/api/browse', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: browseType }),
-      });
-      const data = await res.json();
-      if (data.ok && data.path) {
-        disp.textContent = data.path.split(/[\\/]/).pop();
-        disp.title       = data.path;
-        disp.className   = 'sp-file-display set';
-        spMarkServerDirty();
-        return;
-      } else if (data.reason === 'cancelled') {
-        disp.textContent = original.text; disp.className = original.cls;
-        return;
-      }
-    } catch {}
-  }
+  const browseBody = browseType === 'folder'
+    ? { type: 'folder', title: 'Select Kokoro voices folder' }
+    : { type: browseType };
+
+  try {
+    const res  = await fetch('/api/browse', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(browseBody),
+    });
+    const data = await res.json();
+    if (data.ok && data.path) {
+      disp.textContent = data.path.split(/[\\/]/).pop();
+      disp.title       = data.path;
+      disp.className   = 'sp-file-display set';
+      spMarkServerDirty();
+      return;
+    } else if (data.reason === 'cancelled') {
+      disp.textContent = original.text; disp.className = original.cls;
+      return;
+    }
+  } catch {}
 
   // Fallback: inline text input
   disp.textContent = original.text; disp.className = original.cls;
@@ -388,6 +391,49 @@ function spClearTtsPath(type) {
   if (disp) { disp.textContent = 'Auto-detect'; disp.title = ''; disp.className = 'sp-file-display'; }
   document.getElementById(inputId)?.remove();
   spMarkServerDirty();
+}
+
+// ── TTS default path fill ──────────────────────────────────────────────────────
+async function spFillTtsDefault(type) {
+  const dispId = type === 'python' ? 'sp-tts-python-display'
+               : type === 'voices' ? 'sp-tts-voices-display'
+               :                     'sp-tts-espeak-display';
+  const disp = document.getElementById(dispId);
+  if (!disp) return;
+
+  const original = { text: disp.textContent, cls: disp.className };
+  disp.textContent = '…';
+
+  try {
+    const endpoint = type === 'python' ? '/api/tts/python-default' : '/api/tts/espeak-default';
+    const res  = await fetch(endpoint);
+    const data = await res.json();
+    if (data.ok && data.path) {
+      disp.textContent = data.path.split(/[\\/]/).pop();
+      disp.title       = data.path;
+      disp.className   = 'sp-file-display set';
+      spMarkServerDirty();
+      // Show the version string if we got one (python only)
+      if (data.version) {
+        const row = disp.closest('.sp-file-row');
+        let hint = row?.parentElement?.querySelector('.sp-tts-version-hint');
+        if (!hint) {
+          hint = document.createElement('div');
+          hint.className = 'sp-tts-version-hint';
+          hint.style.cssText = 'font-size:11px;color:rgba(221,225,240,0.3);margin-top:3px;font-family:"DM Mono",monospace';
+          row?.insertAdjacentElement('afterend', hint);
+        }
+        hint.textContent = data.version;
+      }
+    } else {
+      disp.textContent = original.text; disp.className = original.cls;
+      const row = disp.closest('.sp-file-row');
+      let hint = row?.parentElement?.querySelector('.sp-tts-version-hint');
+      if (hint) hint.textContent = 'Not found in default locations';
+    }
+  } catch {
+    disp.textContent = original.text; disp.className = original.cls;
+  }
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────────

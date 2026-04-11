@@ -177,6 +177,10 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 ### UI / Layout
 
 - **Tool and thinking pills have alignment/padding issues** — pills are misaligned relative to each other and the orb. **Bundle this fix with the pill visual rework** — don't fix in isolation.
+- ~~**Companion Settings: Ghost bar appears under tabs on open**~~ — **Fixed** (this session). `_cpShowLoadingState` used `visibility:hidden` which still painted the tab strip's `border-bottom`. Switched to `display:none`/restore with correct per-element display values.
+- ~~**Settings → TTS: espeak file browser title read "llama-server binary"**~~ — **Fixed** (this session). Missing `espeak` case in `/api/browse` — added with correct title "Select espeak-ng binary".
+- ~~**Settings → TTS: Voices directory had no folder picker**~~ — **Fixed** (this session). Added `folder` browse type to `/api/browse` using `askdirectory`. JS now sends `type: 'folder'` for voices.
+- ~~**Settings → TTS: No default path detection for Python/espeak**~~ — **Fixed** (this session). Added `/api/tts/python-default` and `/api/tts/espeak-default` endpoints + "Default" buttons in the UI.
 
 ---
 
@@ -234,6 +238,35 @@ These items are too open-ended to task out. They need a dedicated design convers
 - **CLAUDE.md** — operational instructions + active bugs + design folder index. Update at end of every session.
 - **design/*.md** — system docs and design decisions. Update when the relevant system is touched.
 - Rule: when we touch a system in a session, we document it in that session. Don't defer.
+
+---
+
+## Session notes — 2026-04-12
+
+**Bug fixes: companion settings ghost bar, TTS browse/defaults. Memory pipeline item 1.**
+
+### Files written/changed this session
+
+- `static/js/companion.js` — `_cpShowLoadingState`: `visibility:hidden` → `display:none` during load. On reveal, restores correct `display` per element type (`flex` for strip/footer, `block`/`none` for tab bodies based on `.active`).
+- `scripts/server.py` — `/api/browse`: added `espeak` type (title "Select espeak-ng binary"); added `folder` type using `askdirectory` for voices dir. Added `/api/tts/python-default` (scans `%LOCALAPPDATA%\Programs\Python\*` on Windows + PATH fallback, returns path + version string) and `/api/tts/espeak-default` (checks platform default install locations).
+- `static/js/settings-server.js` — `spBrowseTts('voices')` now uses `type: 'folder'` browse; `spBrowseTts('espeak')` now passes `type: 'espeak'`. Added `spFillTtsDefault(type)` — hits the two new endpoints and fills the display + shows Python version hint.
+- `static/chat.html` — Added "Default" buttons to Python and espeak TTS rows (calls `spFillTtsDefault`). Voices row intentionally unchanged (no standard default location).
+- `static/js/chat.js` — `reloadMemoryContext()`: when `_memoryContext` is non-empty, fires `onMemorySurface('')` after a 120ms defer so the session-start memory pill appears after any replayed messages.
+- `scripts/memory_store.py` — `_load_meta()` default dict extended with `mind_file_index: {}` and `session_history_index: []` keys (groundwork for items 2 & 3, not yet fully wired).
+
+### Memory pipeline status
+
+1. ~~**Session-start context UI signal**~~ — **Done**. Memory pill now fires at session start when context is loaded.
+2. **Background embedding queue** — schema groundwork done (`session_history_index` added to meta). `write_system_note()` and the session scanner in `memory_server.py` still need writing. **Start here next session.**
+3. **Mind file indexing** — schema groundwork done (`mind_file_index` added to meta). Indexer in `memory_server.py` and `write_system_note()` still need writing. **Do alongside item 2 next session** (same files).
+4. **Tool self-registration refactor** — unchanged, full session needed.
+5. **Token budget empirical test** — after 2 & 3 complete.
+
+### Next session: upload `memory_server.py` and `memory_store.py`
+
+Items 2 & 3 are pure Python, two files. The approach is clear:
+- `memory_store.py`: add `write_system_note(content, source_label)` — fixed neutral ratios, skips stack computation, `function_source` = caller-provided label (`"session_history"` or `"system"`).
+- `memory_server.py`: add `_process_unconsolidated_sessions(companion_folder)` — scans history/, finds `consolidated: false` sessions, extracts assistant message text, calls `write_system_note`, marks session `consolidated: true`. Add `_index_mind_files(companion_folder)` — scans `mind/*.md`, sha256 hashes, compares to `mind_file_index`, writes changed files as chunked system notes, updates index. Both called from `init_memory_store()` in background threads.
 
 ---
 

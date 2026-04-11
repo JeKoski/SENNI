@@ -216,6 +216,8 @@ class MemoryStore:
             "stack_initialised": False,
             "last_consolidated_at": None,
             "pending_llm_consolidation": [],  # list of note_ids awaiting LLM link eval
+            "mind_file_index": {},            # {filename: sha256_hex} for mind/ change detection
+            "session_history_index": [],      # list of session paths already processed
         }
 
     def _save_meta(self) -> None:
