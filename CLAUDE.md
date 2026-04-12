@@ -75,6 +75,11 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 | `static/js/chat-controls.js` | Input controls, stop button, vision mode picker |
 | `static/js/heartbeat.js` | Heartbeat system |
 | `static/js/tts.js` | TTS playback (Kokoro) |
+| `static/js/companion.js` | Companion window coordinator |
+| `static/js/companion-presence.js` | Presence tab UI |
+| `static/js/companion-tts.js` | TTS tab UI |
+| `static/js/companion-memory.js` | Memory tab UI |
+| `static/js/companion-mood.js` | **Mood tab UI — not yet built** |
 
 ---
 
@@ -95,8 +100,8 @@ Global config in `config.json` at project root.
 Key companion config fields:
 - `presence_presets` — dict of preset name → per-state dict `{ thinking:{...}, idle:{...}, ... }`
 - `active_presence_preset` — which preset is active
-- `moods` — dict of mood name → override dict (backend ready, UI pending)
-- `active_mood` — currently active mood or null
+- `moods` — dict of mood name → mood definition (see `design/MOOD.md` for full schema)
+- `active_mood` — currently active mood name or null
 - `cognitive_stack` — four-slot stack string e.g. `mT-fS-mN-fF`
 - `last_consolidated_at` — timestamp for crash-recovery consolidation
 
@@ -110,7 +115,7 @@ Key global config fields:
 - `write_memory` / `retrieve_memory` / `supersede_memory` / `update_relational_state` → **ChromaDB** episodic store only
 
 ### Zep-style temporal chaining
-When a fact changes, the companion calls `supersede_memory` with the old note's ID (shown in `retrieve_memory` output as `id: xxxxxxxx…`). The old note is marked `superseded_by` and excluded from future retrieval. The new note carries a `supersedes` back-reference. Both notes remain in the store so the companion can reason about how things changed over time.
+When a fact changes, the companion calls `supersede_memory` with the old note's ID. The old note is marked `superseded_by` and excluded from future retrieval. The new note carries a `supersedes` back-reference.
 
 ---
 
@@ -118,10 +123,8 @@ When a fact changes, the companion calls `supersede_memory` with the old note's 
 
 Copying a companion folder between installs:
 - **Safe to copy:** `soul/`, `mind/`, `config.json` — fully portable
-- **Do NOT copy:** `memory_store/` (ChromaDB, path-dependent and binary), `memory_meta.json` (install-specific consolidation state, collection name tied to folder name)
-- If folder is renamed on the destination, ChromaDB collection name will mismatch and a fresh empty store will be created — episodic memories silently lost
-- After importing without memory: run `/api/memory/reindex` if you later add a compatible store
-- A proper export/import feature is needed eventually: needs its own popup UI with checkboxes (soul files, mind files, ChromaDB episodic memory, config). Tracked in `design/FEATURES.md`.
+- **Do NOT copy:** `memory_store/` (ChromaDB, path-dependent and binary), `memory_meta.json` (install-specific consolidation state)
+- A proper export/import feature is needed eventually — tracked in `design/FEATURES.md`.
 
 ---
 
@@ -138,38 +141,10 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 - **Streaming text visual (token-by-token appearance) regressed** — secondary priority. Needs investigation.
 - **Message loss on restart/refresh suspected** — likely improved by history system rework. Keep open until confirmed stable over several sessions.
-- ~~**Streaming cursor stuck at bottom of message bubble**~~ — **Fixed**
-- ~~**Closing a tab during generation bleeds response into new active tab**~~ — **Fixed**
-- ~~**Active tab not remembered on restart/refresh**~~ — **Fixed**
-- ~~**Scroll fighting during streaming**~~ — **Fixed**
 
-### Heartbeat
+### llama-server / model
 
-- ~~**Duplicate heartbeat bubble**~~ — **Fixed**
-- ~~**Heartbeat settings not applying until refresh**~~ — **Fixed**
-- ~~**Heartbeat chat log deleted on refresh**~~ — **Fixed**
-- ~~**No way to stop heartbeat processing**~~ — **Fixed**
-- ~~**Heartbeat events give no user feedback**~~ — **Fixed**
-
-### Settings
-
-- ~~**Settings TypeError on open**~~ — **Fixed**
-- ~~**Markdown render toggle breaks on restart/companion switch**~~ — **Fixed**
-- ~~**"Ask each time" image processing not working**~~ — **Fixed**
-- ~~**Dirty tracking missing for several fields**~~ — **Fixed**
-- ~~**Companion Settings exiting with dirty edits without confirmation**~~ — **Fixed**
-- ~~**Settings windows don't reflect active tab/state on open**~~ — **Fixed**
-- ~~**Default presence presets have non-hex colors and missing fields**~~ — **Fixed** in `config.py` DEFAULTS — but **existing companion `config.json` files on disk still have the old `rgba(...)` format**. Needs a one-time migration function or factory reset. Low priority until public release.
-- ~~**Settings: Missing multimodal toggle**~~ — **Fixed**
-- ~~**Settings: Markdown render reverting on boot/refresh/settings open**~~ — **Fixed**
-- ~~**Settings Kokoro: Wrong file browser title**~~ — **Fixed**
-- ~~**Companion Settings TTS: Saving resets TTS config**~~ — **Fixed**
-- ~~**Dropdown menus (e.g. Kokoro voice select) white background / unreadable**~~ — **Fixed**
-- ~~**Companion Settings: Ghost bar appears under tabs on open**~~ — **Fixed**
-- ~~**Settings → TTS: espeak file browser title read "llama-server binary"**~~ — **Fixed**
-- ~~**Settings → TTS: Voices directory had no folder picker**~~ — **Fixed**
-- ~~**Settings → TTS: No default path detection for Python/espeak**~~ — **Fixed**
-- **Settings: Server arg defaults outdated** — `--flash-attn` syntax changed (needs `on`/`off`/`auto` value); `--reasoning-format` may be obsolete for jinja-template models. Needs a pass against current llama.cpp.
+- **llama-server version drift** — server.py launch args may have drifted from current llama.cpp API. Needs a pass against current llama.cpp.
 
 ### Memory
 
@@ -197,6 +172,7 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 | `design/MEMORY.md` | Full memory architecture — primitives, composites, primitive_ratios, retrieval, consolidation, ChromaDB stack. Updated 2026-04-06. |
 | `design/COMPANION_STACK.md` | Cognitive function stack format, O+J axis pairing, charge as directionality, stack position as probability. Updated 2026-04-06. |
 | `design/ORB_DESIGN.md` | Orb positioning, layout modes, CSS variable documentation |
+| `design/MOOD.md` | **Mood system — full design. Config schema, default moods, speed scale, TTS override, UI architecture, system prompt injection format. Updated 2026-04-13.** |
 
 When starting a session that touches any of these systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
 
@@ -207,9 +183,10 @@ When starting a session that touches any of these systems, search project knowle
 These items are too open-ended to task out. They need a dedicated design conversation before any implementation.
 
 - **Main Chat UI redesign** — overall feel should be "smoother, fuller, cozier". Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
+- **Mood pill (chat UI)** — small pill near the orb showing current mood name. Deferred from mood design session. Needs a design pass before implementation. Pill background = mood dot colour, border = orb edge colour. Toggleable, hidden by default.
 - **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked "design needs expanding on". These need fleshing out before wizard implementation begins.
 - **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard's closeness step is finalized.
-- **Companion Templates rework** — templates need redesigning to fit the new memory system and future features. Goals: don't clash with ChromaDB/soul/mind architecture; future-proof for Wizard and Mood system; keep token totals reasonable (balance context efficiency vs detail). Needs a design conversation before touching template files.
+- **Companion Templates rework** — templates need redesigning to fit the new memory system and future features. Goals: don't clash with ChromaDB/soul/mind architecture; future-proof for Wizard and Mood system; keep token totals reasonable. Needs a design conversation before touching template files.
 
 ---
 
@@ -241,37 +218,68 @@ These items are too open-ended to task out. They need a dedicated design convers
 
 ---
 
+## Session notes — 2026-04-13
+
+**Mood system design complete. MOOD.md written. No code changes this session.**
+
+### What was designed
+
+Full Mood tab UI design, iterated through 5 mockup versions. Key decisions:
+
+- **Tab structure** — own tab in Companion window (not a section within Presence), mirroring Presence architecture. New file: `companion-mood.js`.
+- **Panel width** — bumped from 540px → 720px. Single CSS change to `.companion-panel` (and `.settings-panel` to match).
+- **Mood cards** — stacked accordion cards, one per mood. Collapsed shows dot, name, preview, rotation toggle, copy button. Expanded shows description, orb mini-preview, element groups, Voice section, copy-to-companion.
+- **Element groups** — Orb / Glow / Ring / Dots / Voice. Each group has a **master toggle** (right of count label, left of chevron) that suspends/restores all overrides in that group without clearing values.
+- **Per-property toggles** — every property inside a group has its own enable toggle. Disabled rows grey out and their controls go inert.
+- **Property set** — Orb: edge colour, breathing, size. Glow: colour, opacity, speed, intensity. Ring: colour, opacity, speed, intensity. Dots: colour, speed. (Intensity = renamed from "max size".)
+- **Speed scale** — unified 1–100 abstract scale across all animations. Same value = same relative speed, preserving ratios (e.g. ring at 60, breath at 30 = 2:1). Left = slow, right = fast.
+- **Opacity** — own property row per element (not bundled with colour), 0–100%.
+- **Colour picker** — centred overlay modal within the panel. HSB canvas, hue bar, eyedropper, swatch grid, hex input, opacity slider (where applicable). OK/Cancel. Never anchored/floating.
+- **TTS override** — whole-section on/off (group master toggle). No per-property toggles inside. Voice blend rows (up to 5, dropdown + weight slider), Speed (0.5–2.0×), Pitch (0.5–2.0×). "Reset to companion default" fetches companion TTS settings into this mood's block.
+- **Default moods** — Neutral, Playful, Focused, Melancholy, Annoyed, Flustered, Affectionate, Curious. Each has `in_rotation` toggle. Neutral carries no overrides by design.
+- **Rotation** — `in_rotation: true/false` controls whether the mood is offered to Qwenny via system prompt. Off-rotation moods are preserved and editable but Qwenny won't use them.
+- **Copy/portability** — copy button on each card + copy-to-companion row inside expanded card. Import/Export all at top of tab (JSON).
+- **`set_mood` tool** — `set_mood(mood_name: str | null)`. Null clears mood. No intensity/duration params — those are handled via distinct mood names.
+- **System prompt injection** — `<moods>` block listing in-rotation moods with one-line descriptions + current active mood. See MOOD.md for format.
+- **Mood × Memory** — encoding bias (mood_at_write stored on notes) and retrieval bias already designed in MEMORY.md. No changes needed there.
+
+### Future items noted this session
+
+- Animation on/off toggles (enable/disable glow, ring, etc.) — not in scope now, noted for future Presence + Mood pass.
+- Mood pill in chat UI — deferred, needs design next session before implementation.
+
+### Implementation order (next sessions)
+
+1. Audit Presence property completeness — confirm Presence exposes all properties Mood will override
+2. Bump panel width to 720px — CSS only, trivial
+3. Build `companion-mood.js` + Mood tab HTML
+4. `tools/set_mood.py`
+5. System prompt injection in `chat.js` `buildSystemPrompt()`
+6. Mood pill design + implementation
+
+---
+
 ## Session notes — 2026-04-12 #2
 
 **Memory pipeline items 1–3 complete. New feature entries added to FEATURES.md.**
 
-### What we actually found vs CLAUDE.md claims
-
-Previous session ended mid-run (context/tool-call limit). Actual file state differed from what CLAUDE.md recorded:
-
-- Item 1 (`onMemorySurface` deferred call) — claimed done, **not present** in uploaded `chat.js`. Fixed this session.
-- `mind_file_index` / `session_history_index` in `_load_meta()` — claimed done, **confirmed present**. That one landed.
-- `write_system_note()`, `_process_unconsolidated_sessions()`, `_index_mind_files()` — all absent, built this session.
-
-### Files written/changed this session
-
-- `static/js/chat.js` — `reloadMemoryContext()`: added 120ms deferred `onMemorySurface('')` call in the success branch so the session-start memory pill fires after replayed messages settle.
-- `scripts/memory_store.py` — Added `write_system_note(content, source_label)`: fixed neutral ratios (0.25 each), no stack/mood computation, `function_source` = caller-provided label, `retrieval_mode` = `"associative"`, `decay_weight` = 0.5. Skips LLM consolidation queue intentionally — embedding-only linking is sufficient for system-ingested content and keeps startup fast.
-- `scripts/memory_server.py` — Added `_process_unconsolidated_sessions()`: scans `history/` recursively, finds unprocessed `session.json` files, extracts and cleans assistant text (strips `<think>` and `<tool_call>` blocks), chunks at 800 chars, writes via `write_system_note`, marks `consolidated: true` in the file, updates `session_history_index` in meta. Added `_index_mind_files()`: scans `mind/*.md`, sha256-hashes each, compares to `mind_file_index`, writes new/changed files as chunked system notes, updates index. Both called from `init_memory_store()` as daemon threads via `_run_session_ingestion_async()` / `_run_mind_indexing_async()`.
+- `static/js/chat.js` — `reloadMemoryContext()`: added 120ms deferred `onMemorySurface('')` call.
+- `scripts/memory_store.py` — Added `write_system_note()`.
+- `scripts/memory_server.py` — Added `_process_unconsolidated_sessions()`, `_index_mind_files()`.
 
 ### Memory pipeline status
 
-1. ~~**Session-start context UI signal**~~ — **Done.**
-2. ~~**Background embedding queue (session history ingestion)**~~ — **Done.**
-3. ~~**Mind file indexing into ChromaDB**~~ — **Done.**
-4. **Tool self-registration refactor** — full session needed. Each tool file should own its Python `run()`, JS schema, and system prompt instructions. Eliminates the three-place update requirement.
-5. **Token budget empirical test** — run a session with 20+ notes and measure actual system prompt sizes from session-start retrieval (`k=6`). Adjust if needed.
+1. ~~Session-start context UI signal~~ — Done.
+2. ~~Background embedding queue (session history ingestion)~~ — Done.
+3. ~~Mind file indexing into ChromaDB~~ — Done.
+4. **Tool self-registration refactor** — full session needed.
+5. **Token budget empirical test** — run a session with 20+ notes, measure system prompt sizes.
 
 ---
 
 ## Session notes — 2026-04-12
 
-**Bug fixes: companion settings ghost bar, TTS browse/defaults. Memory pipeline item 1 (partially — context limit hit before save).**
+**Bug fixes: companion settings ghost bar, TTS browse/defaults.**
 
 - `static/js/companion.js` — `_cpShowLoadingState`: `visibility:hidden` → `display:none`.
 - `scripts/server.py` — `/api/browse`: espeak + folder types. `/api/tts/python-default` and `/api/tts/espeak-default` endpoints.
