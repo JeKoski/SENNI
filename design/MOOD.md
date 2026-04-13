@@ -1,7 +1,8 @@
 # MOOD.md — Mood System Design
 
 Written after design session: 2026-04-13
-Status: Design complete, not yet implemented.
+Updated after implementation session: 2026-04-13 #2
+Status: Design complete. Presence rework complete. Mood tab not yet built.
 
 ---
 
@@ -27,7 +28,9 @@ Mood overrides are applied on top of whatever Presence says. Only properties exp
 
 ### Config schema
 
-Stored in `companions/<folder>/config.json`:
+Stored in `companions/<folder>/config.json`.
+
+**Important:** Mood config values use the same units as Presence config — real CSS values (seconds, pixels, 0–1 floats). The 0–100 slider scale used in the UI is a display-layer conversion only, handled by `companion-mood.js`. Do not store 0–100 integers in config.
 
 ```json
 "moods": {
@@ -37,24 +40,24 @@ Stored in `companions/<folder>/config.json`:
     "description": "Playful, teasing, excited, joking around — light and warm energy.",
     "orb": {
       "edgeColor":   { "enabled": true,  "value": "#6dd4a8" },
-      "breathing":   { "enabled": true,  "value": 38 },
-      "size":        { "enabled": false, "value": 50 }
+      "breathing":   { "enabled": true,  "value": 2.1 },
+      "size":        { "enabled": false, "value": 52 }
     },
     "glow": {
       "color":       { "enabled": true,  "value": "#6dd4a8" },
-      "opacity":     { "enabled": true,  "value": 40 },
-      "speed":       { "enabled": true,  "value": 72 },
-      "intensity":   { "enabled": false, "value": 50 }
+      "opacity":     { "enabled": true,  "value": 0.40 },
+      "speed":       { "enabled": true,  "value": 1.6 },
+      "intensity":   { "enabled": false, "value": 16 }
     },
     "ring": {
       "color":       { "enabled": true,  "value": "#6dd4a8" },
-      "opacity":     { "enabled": true,  "value": 30 },
-      "speed":       { "enabled": true,  "value": 76 },
-      "intensity":   { "enabled": false, "value": 50 }
+      "opacity":     { "enabled": true,  "value": 0.30 },
+      "speed":       { "enabled": true,  "value": 1.5 },
+      "intensity":   { "enabled": false, "value": 16 }
     },
     "dots": {
       "color":       { "enabled": true,  "value": "#6dd4a8" },
-      "speed":       { "enabled": false, "value": 50 }
+      "speed":       { "enabled": false, "value": 1.2 }
     },
     "tts": {
       "enabled": true,
@@ -67,13 +70,34 @@ Stored in `companions/<folder>/config.json`:
 "active_mood": "Playful"
 ```
 
-Each element group (`orb`, `glow`, `ring`, `dots`) has a group-level enabled state implied by whether any of its properties are enabled. The `tts` block is all-or-nothing: either the whole TTS override is active or it falls through to the companion default.
+Units per property:
+- Colours: hex string
+- Speeds (breathing, glow speed, ring speed, dot speed): seconds (float) — same ranges as Presence
+- Opacity (glow, ring): 0.0–1.0 float
+- Intensity (glow max size): pixels (integer, 4–36)
+- Size (orb): pixels (integer, 32–80)
+- TTS speed/pitch: multiplier float (0.5–2.0)
 
-### Speed scale
+Each element group (`orb`, `glow`, `ring`, `dots`) has a group-level master toggle. The `tts` block is all-or-nothing.
 
-All animation speeds (breathing, glow speed, ring speed, dot speed) use a **unified 1–100 abstract scale**, not raw CSS durations. This ensures ratios are preserved: ring at 60 and breathing at 30 always gives a 2:1 relationship. Each animation converts internally from the unified scale to its appropriate CSS duration range — so the "same number" means "same relative speed" across all animations.
+### Speed ranges (for UI conversion in companion-mood.js)
 
-Left = slowest, right = fastest. 50 is the neutral midpoint.
+Use the same ranges as Presence for consistency:
+
+| Property | Min (s) | Max (s) |
+|----------|---------|---------|
+| breathSpeed | 0.4 | 7.0 |
+| dotSpeed | 0.3 | 3.0 |
+| glowSpeed | 0.4 | 6.0 |
+| ringSpeed | 0.4 | 5.0 |
+
+Size: 32–80px. Intensity: 4–36px. Opacity: 0.0–1.0.
+
+These conversion helpers already exist in `companion-presence.js` and should be reused by `companion-mood.js`:
+- `_cpSecsToSlider(secs, minS, maxS)` / `_cpSliderToSecs(val, minS, maxS)`
+- `_cpSizeToSlider(px)` / `_cpSliderToSize(val)`
+- `_cpIntensityToSlider(px)` / `_cpSliderToIntensity(val)`
+- `_cpAlphaToSlider(a)` / `_cpSliderToAlpha(val)`
 
 ### TTS override
 
@@ -100,7 +124,7 @@ Eight defaults ship with every companion. All are toggleable — `in_rotation: f
 
 Neutral carries no overrides by design — it is a named way for Qwenny to clear mood without calling `set_mood(null)`.
 
-Intensity escalation (e.g. Annoyed → Angry → Furious) is handled as separate mood definitions rather than a numeric intensity parameter. This keeps moods explicit, auditable, and easily described in the system prompt.
+Intensity escalation (e.g. Annoyed → Angry → Furious) is handled as separate mood definitions rather than a numeric intensity parameter.
 
 ---
 
@@ -159,7 +183,7 @@ Only `in_rotation: true` moods appear. Token cost is proportional to the number 
 
 New tab in the Companion settings panel: **Mood**, between Presence and Voice.
 
-Panel width bumped from 540px to **720px** (both `.companion-panel` and `.settings-panel`).
+Panel width bumped from 540px to **720px** (both `.companion-panel` and `.settings-panel`). **This CSS change has not been made yet** — do it as part of Mood tab implementation.
 
 **Top bar:**
 - Left: active mood badge (green pill showing current mood name + "clear" link)
@@ -170,19 +194,21 @@ Panel width bumped from 540px to **720px** (both `.companion-panel` and `.settin
 - Expanded: description textarea, live orb mini-preview, element groups, Voice section, copy-to-companion row
 
 **Element groups** (Orb / Glow / Ring / Dots):
-- Group header: name, active-property count, **group master toggle** (right of count, left of chevron) — disabling the group suspends all its overrides without clearing values; re-enabling restores them
+- Group header: name left — active-property count + **group master toggle** + chevron right
 - Each property row: per-property toggle → property name → control (colour pip or slider)
-- Colour pip opens the **centred overlay colour picker** (see below)
-- Disabled rows dim and their sliders go inert
+- Colour pip opens the **centred overlay colour picker** (reuse the same overlay pattern from Presence)
+- Disabled rows dim and their controls go inert
 
 **Property list per group:**
 
 | Group | Properties |
 |-------|-----------|
-| Orb | Edge colour, Breathing (speed), Size |
+| Orb | Edge colour (hex), Breathing (speed slider), Size (slider) |
 | Glow | Colour, Opacity, Speed, Intensity |
-| Ring | Colour, Opacity, Speed, Intensity |
+| Ring | Colour, Opacity, Speed |
 | Dots | Colour, Speed |
+
+Note: Ring has no Intensity (no property to map it to).
 
 **Voice section** — same group-toggle pattern, but no per-property toggles inside. Either the whole TTS override is on or off:
 - Voice blend rows (dropdown + weight slider, up to 5, weights normalised)
@@ -197,15 +223,15 @@ Panel width bumped from 540px to **720px** (both `.companion-panel` and `.settin
 
 ### Colour picker overlay
 
-Triggered by clicking any colour pip. Opens as a **centred overlay** within the panel (dimmed backdrop, click-outside dismisses). Never anchored/floating — always centred.
+Reuse the `.cp-color-overlay` modal already implemented in `companion-panel.css` and `companion-presence.js`. The overlay is a shared singleton within the companion panel — Mood should use the same HTML element, driven by its own JS open/close logic.
 
-Contents: HSB gradient canvas, hue bar, eyedropper button, current colour swatch + hex input, swatch grid (8×5 palette), opacity slider (shown only for properties that have alpha), Cancel / OK buttons.
+### Property row visual design
 
-OK applies the colour to the pip and hex label. Cancel discards. The picker does not modify anything until OK is pressed.
+Mood property rows follow the same `.cp-prop-row` pattern as Presence (spacer or toggle → label → control → value), but with an additional per-property enable toggle on the left of every row. The group master toggle is on the group header right side.
 
 ### Module
 
-`static/js/companion-mood.js` — loaded after `companion-presence.js`. Reads `CP_STATE_DEFAULTS` and `CP_ELEMENTS` from `companion-presence.js`. Exports:
+`static/js/companion-mood.js` — loaded after `companion-presence.js`. Reads conversion helpers and `CP_STATE_DEFAULTS` from `companion-presence.js`. Exports:
 - `cpMoodInit()`
 - `cpMoodReset()`
 - `_cpGetMoodPayload()` — called by `companion.js` `cpSave()`
@@ -219,23 +245,25 @@ companion-mood.js   ← needs companion.js, companion-presence.js, orb.js
 
 ## Mood pill (chat UI)
 
-Not yet designed. Deferred to next session. Intended location: near the orb area. Toggleable, hidden by default. Shows current mood name; pill background = mood dot colour, pill border = orb edge colour.
+Not yet designed. **Priority for next session before implementation begins.**
+
+Intended location: near the orb area in the main chat UI. Toggleable, hidden by default. Shows current mood name. Pill background = mood dot colour, pill border = orb edge colour.
 
 ---
 
 ## Implementation order
 
-1. Audit and complete Presence property set (ensure Presence exposes same properties Mood will override, so the architecture is consistent before Mood is built)
-2. Bump panel width to 720px — single CSS change to `.companion-panel` and `.settings-panel`
-3. Build `companion-mood.js` + Mood tab HTML
-4. Add `set_mood` tool (`tools/set_mood.py`)
-5. Wire system prompt injection in `chat.js` `buildSystemPrompt()`
-6. Design and implement mood pill in chat UI
+1. ~~Audit Presence property completeness~~ — Done.
+2. **Bump panel width to 720px** — single CSS change to `.companion-panel` and `.settings-panel`. Do first.
+3. **Design mood pill** — needs design pass before implementation.
+4. **Build `companion-mood.js` + Mood tab HTML**
+5. **Add `set_mood` tool (`tools/set_mood.py`)**
+6. **Wire system prompt injection in `chat.js` `buildSystemPrompt()`**
+7. **Implement mood pill**
 
 ---
 
 ## Future / noted items
 
 - **Animation on/off toggles** — currently no way to fully disable an animation (only adjust speed). A future pass should add enable/disable to Presence elements, then expose it as an overrideable property in Mood.
-- **Mood pill design** — deferred, needs its own design pass next session before implementation.
 - **Companion Creation Wizard** — Mood tab feeds directly into the Wizard's mood setup step. Wizard should pre-populate a companion's moods dict using the same schema.

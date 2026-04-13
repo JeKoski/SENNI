@@ -8,19 +8,20 @@
 //   cpPresenceRenderState(state)
 //   cpPresenceSwitchState(state, el)
 //   cpPresenceToggleElement(elemId)
-//   cpPresenceToggleColorPicker(elemId)
+//   cpPresenceToggleAnim(elemId)
+//   cpPresenceOpenColorPicker(elemId)
 //   cpPresencePickColor(elemId, hex)
 //   cpPresenceHexInput(elemId, val)
-//   cpPresenceSetAlpha(elemId, val)
-//   cpPresenceSlider(id, key, val, suffix)
+//   cpPresenceSlider(id, key, val)
+//   cpPresenceOverlayHexInput(val)
 //   cpPresenceNewPreset()
 //   cpPresenceDeletePreset(name)
 //   cpSetOrbLayout(mode)
-//   _cpGetPresencePayload()   — called by companion.js cpSave()
-//   CP_STATE_DEFAULTS         — read by companion-mood.js when built
+//   _cpGetPresencePayload()        — called by companion.js cpSave()
+//   CP_STATE_DEFAULTS              — read by companion-mood.js when built
+//   CP_ELEMENTS                    — read by companion-mood.js when built
 
 // ── Swatch palette ─────────────────────────────────────────────────────────
-// 8 hue columns × 5 lightness rows. Row 0 = lightest, row 4 = deepest.
 const CP_SWATCHES = [
   ['#c4b5fd', '#93c5fd', '#67e8f9', '#6ee7b7', '#86efac', '#fde68a', '#fda4af', '#cbd5e1'],
   ['#a78bfa', '#60a5fa', '#22d3ee', '#34d399', '#4ade80', '#fbbf24', '#fb7185', '#94a3b8'],
@@ -29,52 +30,149 @@ const CP_SWATCHES = [
   ['#4f46e5', '#1d4ed8', '#0e7490', '#047857', '#15803d', '#b45309', '#be123c', '#334155'],
 ];
 
+// ── Slider scale conversion — UI layer only ────────────────────────────────
+// Sliders display 0–100 integers. Config stores real CSS values (seconds,
+// pixels, 0–1 floats) — same format as always, unchanged everywhere else.
+// These functions are the only translation layer.
+
+const CP_SPEED_RANGES = {
+  breathSpeed: { minS: 0.4, maxS: 7.0 },
+  dotSpeed:    { minS: 0.3, maxS: 3.0 },
+  glowSpeed:   { minS: 0.4, maxS: 6.0 },
+  ringSpeed:   { minS: 0.4, maxS: 5.0 },
+};
+
+// Stored seconds → 0–100 display value (0 = slow, 100 = fast)
+function _cpSecsToSlider(secs, minS, maxS) {
+  const t = (maxS - secs) / (maxS - minS);
+  return Math.round(Math.max(0, Math.min(1, t)) * 100);
+}
+
+// 0–100 slider → stored seconds
+function _cpSliderToSecs(val, minS, maxS) {
+  const t = Math.max(0, Math.min(100, val)) / 100;
+  return parseFloat((maxS - t * (maxS - minS)).toFixed(2));
+}
+
+// Stored px (32–80) → 0–100 display value
+function _cpSizeToSlider(px) {
+  return Math.round(Math.max(0, Math.min(1, (px - 32) / 48)) * 100);
+}
+
+// 0–100 slider → stored px
+function _cpSliderToSize(val) {
+  return Math.round(32 + (Math.max(0, Math.min(100, val)) / 100) * 48);
+}
+
+// Stored px (4–36) → 0–100 display value
+function _cpIntensityToSlider(px) {
+  return Math.round(Math.max(0, Math.min(1, (px - 4) / 32)) * 100);
+}
+
+// 0–100 slider → stored px
+function _cpSliderToIntensity(val) {
+  return Math.round(4 + (Math.max(0, Math.min(100, val)) / 100) * 32);
+}
+
+// Stored 0.0–1.0 float → 0–100 display value
+function _cpAlphaToSlider(a) {
+  return Math.round(Math.max(0, Math.min(1, a)) * 100);
+}
+
+// 0–100 slider → stored 0.0–1.0 float
+function _cpSliderToAlpha(val) {
+  return parseFloat((Math.max(0, Math.min(100, val)) / 100).toFixed(2));
+}
+
 // ── Element definitions ────────────────────────────────────────────────────
-// Each element maps to a group in the accordion. The 'colorKey' is the
-// data field for the color pip. 'alphaKey' is the optional alpha field.
-// 'sliders' are the speed/size controls shown inside the expanded body.
-// 'animId' is the animation toggle id from orb.ANIMATIONS (if any).
+// colorKey: config field for the colour pip.
+// animId:   boolean config field the group toggle controls. null = no group toggle (Orb).
+// sliders:  property rows inside the expanded body. Each has:
+//   id, key, label
+//   toSlider(cssVal)    — converts stored CSS value to 0–100 display integer
+//   fromSlider(intVal)  — converts 0–100 display integer to stored CSS value
+//   format(displayVal)  — formats the display integer for the label
+//   isBreath: true      — row gets its own inline toggle (Breathing on Orb)
 const CP_ELEMENTS = [
   {
     id:       'orb',
     label:    'Orb',
     colorKey: 'edgeColor',
-    alphaKey: null,
-    animId:   'breathEnabled',
-    sliders:  [
-      { id: 'ps-orb-size',    key: 'orbSize',     min: 32, max: 80,  step: 1,   suffix: 'px', label: 'Size' },
-      { id: 'ps-breath-speed', key: 'breathSpeed', min: 0.4, max: 7, step: 0.1, suffix: 's',  label: 'Breath speed' },
+    animId:   null,
+    sliders: [
+      {
+        id: 'ps-orb-size', key: 'orbSize', label: 'Size',
+        toSlider:   (v) => _cpSizeToSlider(v),
+        fromSlider: (v) => _cpSliderToSize(v),
+        format:     (v) => Math.round(v),
+      },
+      {
+        id: 'ps-breath-speed', key: 'breathSpeed', label: 'Breathing',
+        toSlider:   (v) => _cpSecsToSlider(v, CP_SPEED_RANGES.breathSpeed.minS, CP_SPEED_RANGES.breathSpeed.maxS),
+        fromSlider: (v) => _cpSliderToSecs(v, CP_SPEED_RANGES.breathSpeed.minS, CP_SPEED_RANGES.breathSpeed.maxS),
+        format:     (v) => Math.round(v),
+        isBreath:   true,
+      },
     ],
   },
   {
     id:       'dots',
     label:    'Dots',
     colorKey: 'dotColor',
-    alphaKey: null,
     animId:   'dotsEnabled',
-    sliders:  [
-      { id: 'ps-dot-speed', key: 'dotSpeed', min: 0.3, max: 3, step: 0.1, suffix: 's', label: 'Speed' },
+    sliders: [
+      {
+        id: 'ps-dot-speed', key: 'dotSpeed', label: 'Speed',
+        toSlider:   (v) => _cpSecsToSlider(v, CP_SPEED_RANGES.dotSpeed.minS, CP_SPEED_RANGES.dotSpeed.maxS),
+        fromSlider: (v) => _cpSliderToSecs(v, CP_SPEED_RANGES.dotSpeed.minS, CP_SPEED_RANGES.dotSpeed.maxS),
+        format:     (v) => Math.round(v),
+      },
     ],
   },
   {
     id:       'glow',
     label:    'Glow',
     colorKey: 'glowColor',
-    alphaKey: 'glowAlpha',
     animId:   'glowEnabled',
-    sliders:  [
-      { id: 'ps-glow-max',   key: 'glowMax',   min: 4,   max: 36, step: 1,   suffix: 'px', label: 'Intensity' },
-      { id: 'ps-glow-speed', key: 'glowSpeed', min: 0.4, max: 6,  step: 0.1, suffix: 's',  label: 'Speed' },
+    sliders: [
+      {
+        id: 'ps-glow-opacity', key: 'glowAlpha', label: 'Opacity',
+        toSlider:   (v) => _cpAlphaToSlider(v),
+        fromSlider: (v) => _cpSliderToAlpha(v),
+        format:     (v) => Math.round(v) + '%',
+      },
+      {
+        id: 'ps-glow-speed', key: 'glowSpeed', label: 'Speed',
+        toSlider:   (v) => _cpSecsToSlider(v, CP_SPEED_RANGES.glowSpeed.minS, CP_SPEED_RANGES.glowSpeed.maxS),
+        fromSlider: (v) => _cpSliderToSecs(v, CP_SPEED_RANGES.glowSpeed.minS, CP_SPEED_RANGES.glowSpeed.maxS),
+        format:     (v) => Math.round(v),
+      },
+      {
+        id: 'ps-glow-intensity', key: 'glowMax', label: 'Intensity',
+        toSlider:   (v) => _cpIntensityToSlider(v),
+        fromSlider: (v) => _cpSliderToIntensity(v),
+        format:     (v) => Math.round(v),
+      },
     ],
   },
   {
     id:       'ring',
     label:    'Ring',
     colorKey: 'ringColor',
-    alphaKey: 'ringAlpha',
     animId:   'ringEnabled',
-    sliders:  [
-      { id: 'ps-ring-speed', key: 'ringSpeed', min: 0.4, max: 5, step: 0.1, suffix: 's', label: 'Speed' },
+    sliders: [
+      {
+        id: 'ps-ring-opacity', key: 'ringAlpha', label: 'Opacity',
+        toSlider:   (v) => _cpAlphaToSlider(v),
+        fromSlider: (v) => _cpSliderToAlpha(v),
+        format:     (v) => Math.round(v) + '%',
+      },
+      {
+        id: 'ps-ring-speed', key: 'ringSpeed', label: 'Speed',
+        toSlider:   (v) => _cpSecsToSlider(v, CP_SPEED_RANGES.ringSpeed.minS, CP_SPEED_RANGES.ringSpeed.maxS),
+        fromSlider: (v) => _cpSliderToSecs(v, CP_SPEED_RANGES.ringSpeed.minS, CP_SPEED_RANGES.ringSpeed.maxS),
+        format:     (v) => Math.round(v),
+      },
     ],
   },
 ];
@@ -85,10 +183,9 @@ let _cpActivePreset     = 'Default';
 let _cpEditingState     = 'thinking';
 let _cpPresenceDirty    = false;
 let _cpPresenceInitDone = false;
+let _cpPickerOpenFor    = null;
 
-// ── Defaults ───────────────────────────────────────────────────────────────
-// glowColor/ringColor are now independent. Ring defaults to slightly more
-// transparent so the glow feels dominant by default.
+// ── Defaults — real CSS values, unchanged from original ────────────────────
 const CP_STATE_DEFAULTS = {
   thinking:  { dotColor:'#818cf8', edgeColor:'#818cf8', glowColor:'#818cf8', glowAlpha:0.40, ringColor:'#818cf8', ringAlpha:0.28, glowMax:16, glowSpeed:2.0, ringSpeed:1.8, dotSpeed:1.2, breathSpeed:3.0, orbSize:52 },
   streaming: { dotColor:'#6dd4a8', edgeColor:'#6dd4a8', glowColor:'#6dd4a8', glowAlpha:0.35, ringColor:'#6dd4a8', ringAlpha:0.22, glowMax:12, glowSpeed:2.5, ringSpeed:2.4, dotSpeed:1.4, breathSpeed:3.0, orbSize:52 },
@@ -118,22 +215,15 @@ function cpPresenceInit() {
   _cpEditingState     = 'thinking';
   _cpPresenceInitDone = true;
 
-  // Sync layout toggle
   const currentMode = localStorage.getItem('orb_layout') || 'inline';
   document.querySelectorAll('.cp-layout-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.mode === currentMode));
 
-  // Build element accordion bodies (DOM structure)
   _cpBuildElementBodies();
-
-  // Render preset chips + select active
   cpPresenceRenderPresets();
   cpPresenceSelectPreset(_cpActivePreset);
-
-  // Sync state chips so the correct one is highlighted from the start
   _cpSyncStateChips(_cpEditingState);
 
-  // Mirror avatar into preview
   const avSrc = document.querySelector('#companion-avatar img')?.src;
   const previewIcon = document.getElementById('cpp-icon');
   if (previewIcon && avSrc) {
@@ -143,11 +233,10 @@ function cpPresenceInit() {
 
 function cpPresenceReset() {
   _cpPresenceInitDone = false;
+  _cpPickerOpenFor    = null;
 }
 
-// ── Element accordion body builder ────────────────────────────────────────
-// Injects the inner HTML for each element's body, including swatch grid,
-// hex input, optional alpha slider, and speed sliders. Called once on init.
+// ── Element accordion body builder ─────────────────────────────────────────
 function _cpBuildElementBodies() {
   CP_ELEMENTS.forEach(elem => {
     const body = document.getElementById(`cp-elem-body-${elem.id}`);
@@ -155,86 +244,48 @@ function _cpBuildElementBodies() {
 
     let html = '';
 
-    // Color picker section (collapsed by default — toggled by cpPresenceToggleColorPicker)
+    // Colour row — spacer keeps labels aligned with toggle rows
     html += `
-      <div class="cp-color-picker-wrap" id="cp-picker-wrap-${elem.id}">
-        <div class="cp-picker-header" onclick="cpPresenceToggleColorPicker('${elem.id}')">
-          <div class="cp-picker-sq" id="cp-picker-sq-${elem.id}"></div>
-          <span class="cp-picker-hex" id="cp-picker-hex-${elem.id}"></span>
-          <span class="cp-picker-arr">▶</span>
-        </div>
-        <div class="cp-picker-body" id="cp-picker-body-${elem.id}">
-          <div class="cp-swatch-grid" id="cp-swatch-grid-${elem.id}"></div>
-          <div class="cp-color-input-row">
-            <input class="cp-color-input" id="cp-color-input-${elem.id}" type="text" maxlength="7"
-              oninput="cpPresenceHexInput('${elem.id}', this.value)" placeholder="#818cf8"/>
-          </div>`;
-
-    if (elem.alphaKey) {
-      html += `
-          <div class="cp-alpha-row">
-            <span class="cp-alpha-lbl">Opacity</span>
-            <div class="cp-alpha-track">
-              <div class="cp-alpha-gradient" id="cp-alpha-gradient-${elem.id}"></div>
-              <input class="cp-alpha-slider" type="range" id="cp-alpha-slider-${elem.id}"
-                min="0" max="100" step="1"
-                oninput="cpPresenceSetAlpha('${elem.id}', this.value)"/>
-            </div>
-            <span class="cp-alpha-val" id="cp-alpha-val-${elem.id}">40%</span>
-          </div>`;
-    }
-
-    html += `
-        </div>
+      <div class="cp-prop-row">
+        <div class="cp-prop-tog-space"></div>
+        <span class="cp-prop-label">Colour</span>
+        <div class="cp-prop-pip" id="cp-prop-pip-${elem.id}"
+             onclick="cpPresenceOpenColorPicker('${elem.id}')"></div>
+        <span class="cp-prop-hex" id="cp-prop-hex-${elem.id}"></span>
       </div>`;
 
-    // Speed sliders
     elem.sliders.forEach(sl => {
-      html += `
-      <div class="cp-slider-row">
-        <span class="cp-slider-lbl">${sl.label}</span>
-        <input class="cp-slider" type="range" id="${sl.id}"
-          min="${sl.min}" max="${sl.max}" step="${sl.step}"
-          oninput="cpPresenceSlider('${sl.id}','${sl.key}',this.value,'${sl.suffix}')"/>
-        <span class="cp-slider-val" id="${sl.id}-val">—</span>
+      if (sl.isBreath) {
+        html += `
+      <div class="cp-prop-row">
+        <div class="cp-elem-tog on" id="cp-breath-tog-${elem.id}"
+             onclick="cpPresenceToggleAnim('${elem.id}')"></div>
+        <span class="cp-prop-label">${sl.label}</span>
+        <div class="cp-prop-slider-wrap">
+          <input class="cp-prop-slider" type="range" id="${sl.id}"
+            min="0" max="100" step="1"
+            oninput="cpPresenceSlider('${sl.id}','${sl.key}',this.value)"/>
+        </div>
+        <span class="cp-prop-val" id="${sl.id}-val">—</span>
       </div>`;
+      } else {
+        html += `
+      <div class="cp-prop-row">
+        <div class="cp-prop-tog-space"></div>
+        <span class="cp-prop-label">${sl.label}</span>
+        <div class="cp-prop-slider-wrap">
+          <input class="cp-prop-slider" type="range" id="${sl.id}"
+            min="0" max="100" step="1"
+            oninput="cpPresenceSlider('${sl.id}','${sl.key}',this.value)"/>
+        </div>
+        <span class="cp-prop-val" id="${sl.id}-val">—</span>
+      </div>`;
+      }
     });
 
     body.innerHTML = html;
     body.dataset.built = '1';
-
-    // Build swatch grid
-    _cpBuildSwatchGrid(elem.id);
   });
-}
-
-function _cpBuildSwatchGrid(elemId) {
-  const grid = document.getElementById(`cp-swatch-grid-${elemId}`);
-  if (!grid || grid.children.length) return;
-
-  CP_SWATCHES.forEach(row => {
-    row.forEach(hex => {
-      const sw = document.createElement('div');
-      sw.className        = 'cp-swatch';
-      sw.style.background = hex;
-      sw.dataset.hex      = hex;
-      sw.title            = hex;
-      sw.onclick          = () => cpPresencePickColor(elemId, hex);
-      grid.appendChild(sw);
-    });
-  });
-
-  // Custom swatch with native color picker overlay
-  const custom = document.createElement('div');
-  custom.className = 'cp-swatch cp-swatch-custom';
-  custom.title     = 'Custom color';
-  custom.innerHTML = '✦';
-  const native = document.createElement('input');
-  native.type    = 'color';
-  native.value   = '#818cf8';
-  native.oninput = (e) => cpPresencePickColor(elemId, e.target.value);
-  custom.appendChild(native);
-  grid.appendChild(custom);
 }
 
 // ── Accordion toggle ───────────────────────────────────────────────────────
@@ -242,13 +293,6 @@ function cpPresenceToggleElement(elemId) {
   const el = document.getElementById(`cp-elem-${elemId}`);
   if (!el) return;
   el.classList.toggle('open');
-}
-
-function cpPresenceToggleColorPicker(elemId) {
-  const wrap = document.getElementById(`cp-picker-wrap-${elemId}`);
-  if (!wrap) return;
-  wrap.classList.toggle('open');
-  if (wrap.classList.contains('open')) _cpBuildSwatchGrid(elemId);
 }
 
 // ── Preset list ────────────────────────────────────────────────────────────
@@ -277,7 +321,6 @@ function cpPresenceRenderPresets() {
     bar.appendChild(chip);
   });
 
-  // + New button
   const addBtn = document.createElement('button');
   addBtn.className   = 'cp-presence-chip-new';
   addBtn.textContent = '+ New';
@@ -319,12 +362,8 @@ function cpPresenceDeletePreset(name) {
 }
 
 // ── State selector ─────────────────────────────────────────────────────────
-// Sync the active class on state chips to match the given state name.
-// Chips are identified by their onclick attribute containing the state string.
-// Called on init (so chips start correctly) and on every state switch.
 function _cpSyncStateChips(state) {
   document.querySelectorAll('.cp-state-chip').forEach(c => {
-    // Match onclick="cpPresenceSwitchState('thinking',this)" — extract first arg
     const match = (c.getAttribute('onclick') || '').match(/cpPresenceSwitchState\('([^']+)'/);
     const chipState = match ? match[1] : null;
     c.classList.toggle('active', chipState === state);
@@ -340,61 +379,44 @@ function cpPresenceSwitchState(state, el) {
 }
 
 // ── Render state into all controls ────────────────────────────────────────
+// Reads real CSS values from data, converts to 0–100 for slider display only.
 function cpPresenceRenderState(state) {
   const preset = _cpPresenceData[_cpActivePreset] || {};
   const s = Object.assign({}, CP_STATE_DEFAULTS[state] || CP_STATE_DEFAULTS.thinking, preset[state] || {});
 
   CP_ELEMENTS.forEach(elem => {
-    const hex   = s[elem.colorKey] || '#818cf8';
-    const alpha = elem.alphaKey ? (s[elem.alphaKey] !== undefined ? s[elem.alphaKey] : 0.4) : null;
+    const hex = s[elem.colorKey] || '#818cf8';
 
-    // Update header pip + hex
-    _cpSetElemHeaderColor(elem.id, hex, alpha);
+    const pip  = document.getElementById(`cp-prop-pip-${elem.id}`);
+    const hexL = document.getElementById(`cp-prop-hex-${elem.id}`);
+    if (pip)  pip.style.background = hex;
+    if (hexL) hexL.textContent     = hex;
 
-    // Update picker square + hex input
-    const sq  = document.getElementById(`cp-picker-sq-${elem.id}`);
-    const inp = document.getElementById(`cp-color-input-${elem.id}`);
-    const phx = document.getElementById(`cp-picker-hex-${elem.id}`);
-    if (sq)  sq.style.background = hex;
-    if (inp) inp.value            = hex;
-    if (phx) phx.textContent      = hex;
-
-    // Update swatch highlight
-    _cpUpdateSwatchActive(elem.id, hex);
-
-    // Update native picker
-    const native = document.querySelector(`#cp-swatch-grid-${elem.id} input[type="color"]`);
-    if (native) native.value = cpColorToHex(hex);
-
-    // Update alpha slider
-    if (elem.alphaKey && alpha !== null) {
-      const pct  = Math.round(alpha * 100);
-      const sl   = document.getElementById(`cp-alpha-slider-${elem.id}`);
-      const val  = document.getElementById(`cp-alpha-val-${elem.id}`);
-      const grad = document.getElementById(`cp-alpha-gradient-${elem.id}`);
-      if (sl)   sl.value          = pct;
-      if (val)  val.textContent   = pct + '%';
-      if (grad) grad.style.background = `linear-gradient(to right, transparent, ${hex})`;
-    }
-
-    // Update sliders
+    // Sliders: convert real CSS value → 0–100 for display
     elem.sliders.forEach(sl => {
-      const el  = document.getElementById(sl.id);
-      const lbl = document.getElementById(sl.id + '-val');
-      if (el)  el.value         = s[sl.key];
-      if (lbl) lbl.textContent  = s[sl.key] + sl.suffix;
+      const input  = document.getElementById(sl.id);
+      const lbl    = document.getElementById(sl.id + '-val');
+      const rawVal = s[sl.key];
+      if (rawVal === undefined) return;
+      const displayVal = sl.toSlider(rawVal);
+      if (input) input.value     = displayVal;
+      if (lbl)   lbl.textContent = sl.format(displayVal);
     });
 
-    // Update animation toggle on the element header
-    const animId  = elem.animId;
-    const enabled = animId ? s[animId] !== false : true;
-    const togEl   = document.getElementById(`cp-elem-tog-${elem.id}`);
-    if (togEl) {
-      togEl.classList.toggle('on', enabled);
-      togEl.classList.toggle('off', !enabled);
+    // Group toggle (Dots/Glow/Ring) or breath toggle (Orb)
+    if (elem.animId) {
+      const enabled = s[elem.animId] !== false;
+      const tog  = document.getElementById(`cp-elem-tog-${elem.id}`);
+      const body = document.getElementById(`cp-elem-body-${elem.id}`);
+      if (tog)  { tog.classList.toggle('on', enabled);  tog.classList.toggle('off', !enabled); }
+      if (body) body.style.opacity = enabled ? '' : '0.4';
+    } else {
+      const breathEnabled = s['breathEnabled'] !== false;
+      const tog = document.getElementById(`cp-breath-tog-${elem.id}`);
+      if (tog) { tog.classList.toggle('on', breathEnabled); tog.classList.toggle('off', !breathEnabled); }
     }
 
-    // Dots element: hide if state has no dots
+    // Dots: dim if this state doesn't use dots
     const elemRow = document.getElementById(`cp-elem-${elem.id}`);
     if (elemRow && elem.id === 'dots') {
       const hasDots = !orb.ANIMATIONS.find(a => a.id === 'dotsEnabled')?.states ||
@@ -406,50 +428,112 @@ function cpPresenceRenderState(state) {
   cpPresenceUpdatePreview(s, state);
 }
 
-// Update the header-level color pip and hex display for an element row
-function _cpSetElemHeaderColor(elemId, hex, alpha) {
-  const pip  = document.getElementById(`cp-elem-pip-${elemId}`);
-  const hexL = document.getElementById(`cp-elem-hex-${elemId}`);
-  const alpL = document.getElementById(`cp-elem-alpha-${elemId}`);
-  if (pip)  pip.style.background = hex;
-  if (hexL) hexL.textContent     = hex;
-  if (alpL) alpL.textContent     = alpha !== null ? Math.round(alpha * 100) + '%' : '';
+// ── Colour picker overlay ──────────────────────────────────────────────────
+function cpPresenceOpenColorPicker(elemId) {
+  if (_cpPickerOpenFor === elemId) { _cpCloseColorPicker(); return; }
+  _cpPickerOpenFor = elemId;
+
+  const overlay = document.getElementById('cp-color-overlay');
+  if (!overlay) return;
+
+  const elem = CP_ELEMENTS.find(e => e.id === elemId);
+  if (!elem) return;
+
+  const s   = _cpCurrentStateData();
+  const hex = s[elem.colorKey] || '#818cf8';
+
+  const title    = overlay.querySelector('.cp-overlay-title');
+  const hexInput = overlay.querySelector('.cp-overlay-hex-input');
+  const preview  = overlay.querySelector('.cp-overlay-preview');
+  if (title)    title.textContent        = elem.label + ' colour';
+  if (hexInput) hexInput.value           = hex;
+  if (preview)  preview.style.background = hex;
+
+  // Build swatch grid once
+  const grid = overlay.querySelector('.cp-overlay-swatch-grid');
+  if (grid && !grid.dataset.built) {
+    CP_SWATCHES.forEach(row => {
+      row.forEach(swHex => {
+        const sw            = document.createElement('div');
+        sw.className        = 'cp-swatch';
+        sw.style.background = swHex;
+        sw.dataset.hex      = swHex;
+        sw.title            = swHex;
+        sw.onclick          = () => _cpOverlayPickHex(swHex);
+        grid.appendChild(sw);
+      });
+    });
+    const custom     = document.createElement('div');
+    custom.className = 'cp-swatch cp-swatch-custom';
+    custom.title     = 'Custom colour';
+    custom.innerHTML = '✦';
+    const native     = document.createElement('input');
+    native.type      = 'color';
+    native.value     = '#818cf8';
+    native.oninput   = (e) => _cpOverlayPickHex(e.target.value);
+    custom.appendChild(native);
+    grid.appendChild(custom);
+    grid.dataset.built = '1';
+  }
+
+  _cpOverlayUpdateSwatchActive(hex);
+
+  const okBtn     = overlay.querySelector('.cp-overlay-ok');
+  const cancelBtn = overlay.querySelector('.cp-overlay-cancel');
+  if (okBtn)     okBtn.onclick     = _cpOverlayOK;
+  if (cancelBtn) cancelBtn.onclick = _cpCloseColorPicker;
+
+  overlay.dataset.elemId = elemId;
+  overlay.classList.add('open');
 }
 
-function _cpUpdateSwatchActive(elemId, hex) {
-  const grid = document.getElementById(`cp-swatch-grid-${elemId}`);
-  if (!grid) return;
+function _cpOverlayPickHex(hex) {
+  const overlay  = document.getElementById('cp-color-overlay');
+  if (!overlay) return;
+  const hexInput = overlay.querySelector('.cp-overlay-hex-input');
+  const preview  = overlay.querySelector('.cp-overlay-preview');
+  if (hexInput) hexInput.value           = hex;
+  if (preview)  preview.style.background = hex;
+  _cpOverlayUpdateSwatchActive(hex);
+}
+
+function cpPresenceOverlayHexInput(val) {
+  const hex = val.startsWith('#') ? val : '#' + val;
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) _cpOverlayPickHex(hex);
+}
+
+function _cpOverlayUpdateSwatchActive(hex) {
+  const overlay = document.getElementById('cp-color-overlay');
+  if (!overlay) return;
   const norm = hex.toLowerCase();
-  grid.querySelectorAll('.cp-swatch:not(.cp-swatch-custom)').forEach(sw => {
+  overlay.querySelectorAll('.cp-swatch:not(.cp-swatch-custom)').forEach(sw => {
     sw.classList.toggle('active', sw.dataset.hex?.toLowerCase() === norm);
   });
 }
 
-// ── Color editing ──────────────────────────────────────────────────────────
+function _cpOverlayOK() {
+  const overlay  = document.getElementById('cp-color-overlay');
+  if (!overlay) return;
+  const elemId   = overlay.dataset.elemId;
+  const hexInput = overlay.querySelector('.cp-overlay-hex-input');
+  const hex      = hexInput?.value || '#818cf8';
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) cpPresencePickColor(elemId, hex);
+  _cpCloseColorPicker();
+}
+
+function _cpCloseColorPicker() {
+  const overlay = document.getElementById('cp-color-overlay');
+  if (overlay) overlay.classList.remove('open');
+  _cpPickerOpenFor = null;
+}
+
 function cpPresencePickColor(elemId, hex) {
   const elem = CP_ELEMENTS.find(e => e.id === elemId);
   if (!elem) return;
-
-  _cpSetElemHeaderColor(elemId, hex, null);
-  const sq  = document.getElementById(`cp-picker-sq-${elemId}`);
-  const inp = document.getElementById(`cp-color-input-${elemId}`);
-  const phx = document.getElementById(`cp-picker-hex-${elemId}`);
-  if (sq)  sq.style.background = hex;
-  if (inp) inp.value            = hex;
-  if (phx) phx.textContent      = hex;
-
-  _cpUpdateSwatchActive(elemId, hex);
-
-  const grad = document.getElementById(`cp-alpha-gradient-${elemId}`);
-  if (grad) grad.style.background = `linear-gradient(to right, transparent, ${hex})`;
-
-  // Re-read alpha from current state to preserve it
-  const s = _cpCurrentStateData();
-  if (elem.alphaKey) {
-    const alpha = s[elem.alphaKey] !== undefined ? s[elem.alphaKey] : 0.4;
-    _cpSetElemHeaderColor(elemId, hex, alpha);
-  }
-
+  const pip  = document.getElementById(`cp-prop-pip-${elemId}`);
+  const hexL = document.getElementById(`cp-prop-hex-${elemId}`);
+  if (pip)  pip.style.background = hex;
+  if (hexL) hexL.textContent     = hex;
   cpPresenceSetValue(elem.colorKey, hex);
   cpPresenceUpdatePreviewFromCurrent();
 }
@@ -459,43 +543,37 @@ function cpPresenceHexInput(elemId, val) {
   if (/^#[0-9a-fA-F]{6}$/.test(hex)) cpPresencePickColor(elemId, hex);
 }
 
-function cpPresenceSetAlpha(elemId, val) {
-  const elem = CP_ELEMENTS.find(e => e.id === elemId);
-  if (!elem?.alphaKey) return;
-
-  const alpha = parseFloat(val) / 100;
-  const lbl   = document.getElementById(`cp-alpha-val-${elemId}`);
-  if (lbl) lbl.textContent = val + '%';
-
-  // Update header alpha pill
-  const s   = _cpCurrentStateData();
-  const hex = s[elem.colorKey] || '#818cf8';
-  _cpSetElemHeaderColor(elemId, hex, alpha);
-
-  cpPresenceSetValue(elem.alphaKey, alpha);
-  cpPresenceUpdatePreviewFromCurrent();
-}
-
-// ── Animation toggle (on the element header) ───────────────────────────────
+// ── Animation toggle ───────────────────────────────────────────────────────
 function cpPresenceToggleAnim(elemId) {
-  const elem = CP_ELEMENTS.find(e => e.id === elemId);
-  if (!elem?.animId) return;
+  const elem    = CP_ELEMENTS.find(e => e.id === elemId);
+  if (!elem) return;
+  const animKey = elem.animId || 'breathEnabled';
   const s       = _cpCurrentStateData();
-  const enabled = s[elem.animId] !== false;
-  cpPresenceSetValue(elem.animId, !enabled);
-  const tog = document.getElementById(`cp-elem-tog-${elemId}`);
-  if (tog) {
-    tog.classList.toggle('on',  !enabled);
-    tog.classList.toggle('off', enabled);
+  const enabled = s[animKey] !== false;
+  cpPresenceSetValue(animKey, !enabled);
+
+  if (elem.animId) {
+    const tog  = document.getElementById(`cp-elem-tog-${elemId}`);
+    const body = document.getElementById(`cp-elem-body-${elemId}`);
+    if (tog)  { tog.classList.toggle('on', !enabled);  tog.classList.toggle('off', enabled); }
+    if (body) body.style.opacity = !enabled ? '' : '0.4';
+  } else {
+    const tog = document.getElementById(`cp-breath-tog-${elemId}`);
+    if (tog) { tog.classList.toggle('on', !enabled); tog.classList.toggle('off', enabled); }
   }
   cpPresenceUpdatePreviewFromCurrent();
 }
 
 // ── Slider ─────────────────────────────────────────────────────────────────
-function cpPresenceSlider(id, key, val, suffix) {
-  const lbl = document.getElementById(id + '-val');
-  if (lbl) lbl.textContent = val + suffix;
-  cpPresenceSetValue(key, parseFloat(val));
+// displayVal is the 0–100 integer from the range input.
+// fromSlider converts it to the real CSS value before storing.
+function cpPresenceSlider(id, key, displayVal) {
+  const sl = CP_ELEMENTS.flatMap(e => e.sliders).find(s => s.id === id);
+  if (!sl) return;
+  const cssVal = sl.fromSlider(parseFloat(displayVal));
+  const lbl    = document.getElementById(id + '-val');
+  if (lbl) lbl.textContent = sl.format(parseFloat(displayVal));
+  cpPresenceSetValue(key, cssVal);
   cpPresenceUpdatePreviewFromCurrent();
 }
 
@@ -520,6 +598,7 @@ function _cpCurrentStateData() {
 }
 
 // ── Preview orb ────────────────────────────────────────────────────────────
+// Uses real CSS values directly — no conversion needed.
 function cpPresenceUpdatePreviewFromCurrent() {
   cpPresenceUpdatePreview(_cpCurrentStateData(), _cpEditingState);
 }
@@ -536,7 +615,7 @@ function cpPresenceUpdatePreview(s, state) {
   const glowColor = s.glowColor || dotColor;
   const ringColor = s.ringColor || glowColor;
   const glowAlpha = s.glowAlpha !== undefined ? s.glowAlpha : 0.4;
-  const ringAlpha = s.ringAlpha !== undefined ? s.ringAlpha : 0.3;
+  const ringAlpha = s.ringAlpha !== undefined ? s.ringAlpha : 0.28;
 
   const size = (s.orbSize || 52) + 'px';
   orbEl.style.width  = size;
@@ -560,8 +639,7 @@ function cpPresenceUpdatePreview(s, state) {
   if (ring) {
     ring.style.setProperty('--cpp-ring-color', cpDeriveGlowColor(ringColor, ringAlpha));
     ring.style.animation = ringOn ? `cppRing ${s.ringSpeed || 1.8}s ease-out infinite` : 'none';
-    if (!ringOn) ring.style.opacity = '0';
-    else         ring.style.opacity = '';
+    ring.style.opacity   = ringOn ? '' : '0';
   }
 
   if (dots) {

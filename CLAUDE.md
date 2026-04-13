@@ -37,55 +37,10 @@ Runs on Linux (primary dev) and Windows (also tested and supported).
 
 ---
 
-## File map
-
-### Python
-| File | Purpose |
-|------|---------|
-| `scripts/server.py` | FastAPI bridge — UI, tools, config endpoints |
-| `scripts/config.py` | Config read/write, DEFAULTS, GPU detection, path resolution |
-| `scripts/memory_server.py` | Memory FastAPI router, consolidation scheduler |
-| `scripts/memory_store.py` | ChromaDB wrapper, embedding, link pipeline |
-| `scripts/tts_server.py` | Kokoro TTS router |
-| `scripts/tool_loader.py` | Auto-discovery tool loader — scans `tools/`, no config needed |
-
-### Tools (auto-loaded from `tools/` — drop a file in, it registers itself)
-| File | Purpose |
-|------|---------|
-| `tools/memory.py` | soul/ and mind/ markdown file read/write |
-| `tools/web_search.py` | Web search |
-| `tools/web_scrape.py` | URL fetch |
-| `tools/get_time.py` | Current date/time |
-| `tools/write_memory.py` | Write episodic memory note to ChromaDB |
-| `tools/retrieve_memory.py` | Deliberate (masculine-pathway) memory retrieval |
-| `tools/supersede_memory.py` | Replace an outdated note with a new one, preserving history |
-| `tools/update_relational_state.py` | Update Tier 1 relational state block |
-
-### JavaScript (load order matters — deps listed)
-| File | Purpose |
-|------|---------|
-| `static/js/tool-parser.js` | Tool call parsing/stripping — no DOM, no side effects |
-| `static/js/api.js` | Model communication, tool execution, streaming |
-| `static/js/attachments.js` | File attachment handling |
-| `static/js/orb.js` | All orb logic (state, avatar, presets, layout mode) |
-| `static/js/message-renderer.js` | Markdown rendering, message/thinking/tool DOM builders |
-| `static/js/chat-ui.js` | DOM helpers, sidebar UI, input handling, orb delegation, scroll tracking |
-| `static/js/chat.js` | Core: state, startup, session management, send, system prompt |
-| `static/js/chat-tabs.js` | Tab state, persistence, switching |
-| `static/js/chat-controls.js` | Input controls, stop button, vision mode picker |
-| `static/js/heartbeat.js` | Heartbeat system |
-| `static/js/tts.js` | TTS playback (Kokoro) |
-| `static/js/companion.js` | Companion window coordinator |
-| `static/js/companion-presence.js` | Presence tab UI |
-| `static/js/companion-tts.js` | TTS tab UI |
-| `static/js/companion-memory.js` | Memory tab UI |
-| `static/js/companion-mood.js` | **Mood tab UI — not yet built** |
-
----
-
 ## Backups
 
-Auto-backup runs on server startup. Saved to `backups/YYYY-MM-DD_HHMMSS/`.
+Before touching any file, the UI runs an auto-backup of all companion configs and key scripts.
+Saved to `backups/YYYY-MM-DD_HHMMSS/`.
 The `backups/` folder is in `.gitignore`.
 
 If something breaks, copy files from the latest backup folder.
@@ -109,6 +64,9 @@ Key global config fields:
 - `memory.enabled` — master switch for the ChromaDB memory system (default: `True`)
 - `memory.mid_convo_k` — how many notes the associative trigger surfaces (default: `4`)
 - `memory.session_start_k` — how many notes to surface at session start (default: `6`)
+
+### Presence preset config values — important
+Presence presets store **real CSS values**: seconds for speeds, pixels for sizes, 0.0–1.0 floats for alpha. The 0–100 slider scale in the UI is a display-layer conversion only. `orb.js` always receives and applies real CSS values directly — do not change this.
 
 ### Tool distinction (important for system prompt clarity)
 - `memory` tool → soul/ and mind/ **markdown file** read/write
@@ -155,38 +113,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 ### UI / Layout
 
 - **Tool and thinking pills have alignment/padding issues** — pills are misaligned relative to each other and the orb. **Bundle this fix with the pill visual rework** — don't fix in isolation.
-
----
-
-## Design folder
-
-Large design decisions live in `design/` as standalone docs. These are NOT loaded into context automatically — search project knowledge when you need them. Do not reproduce their full content in CLAUDE.md.
-
-| File | Contents |
-|------|----------|
-| `design/ARCHITECTURE.md` | Modularity plan, completed refactors, planned modules, script/stylesheet load orders |
-| `design/BOOT.md` | Boot & process lifecycle, TOCTOU problem, per-OS path resolution, file browsing via tkinter |
-| `design/SYSTEMS.md` | Current state: Orb, Presence, Heartbeat, Companion window, Settings dirty tracking, Chat tabs, Vision mode, associative memory pill |
-| `design/TTS.md` | Kokoro TTS architecture, config schema, Aurini integration boundary, what's done/pending |
-| `design/FEATURES.md` | All planned features and changes, grouped by area |
-| `design/MEMORY.md` | Full memory architecture — primitives, composites, primitive_ratios, retrieval, consolidation, ChromaDB stack. Updated 2026-04-06. |
-| `design/COMPANION_STACK.md` | Cognitive function stack format, O+J axis pairing, charge as directionality, stack position as probability. Updated 2026-04-06. |
-| `design/ORB_DESIGN.md` | Orb positioning, layout modes, CSS variable documentation |
-| `design/MOOD.md` | **Mood system — full design. Config schema, default moods, speed scale, TTS override, UI architecture, system prompt injection format. Updated 2026-04-13.** |
-
-When starting a session that touches any of these systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
-
----
-
-## Design sessions needed
-
-These items are too open-ended to task out. They need a dedicated design conversation before any implementation.
-
-- **Main Chat UI redesign** — overall feel should be "smoother, fuller, cozier". Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
-- **Mood pill (chat UI)** — small pill near the orb showing current mood name. Deferred from mood design session. Needs a design pass before implementation. Pill background = mood dot colour, border = orb edge colour. Toggleable, hidden by default.
-- **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked "design needs expanding on". These need fleshing out before wizard implementation begins.
-- **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard's closeness step is finalized.
-- **Companion Templates rework** — templates need redesigning to fit the new memory system and future features. Goals: don't clash with ChromaDB/soul/mind architecture; future-proof for Wizard and Mood system; keep token totals reasonable. Needs a design conversation before touching template files.
+- **Ghost bar appearing below tabs in companion settings** — a scrollbar-width bar flickers in on some openings. Pre-existing bug, tracked, not yet investigated.
 
 ---
 
@@ -215,6 +142,41 @@ These items are too open-ended to task out. They need a dedicated design convers
 - **CLAUDE.md** — operational instructions + active bugs + design folder index. Update at end of every session.
 - **design/*.md** — system docs and design decisions. Update when the relevant system is touched.
 - Rule: when we touch a system in a session, we document it in that session. Don't defer.
+
+---
+
+## Session notes — 2026-04-13 #2
+
+**Presence tab rework complete. No Mood implementation yet.**
+
+### What was designed / decided
+
+- Presence rework design finalised: groups (Orb / Dots / Glow / Ring), Orb has no group toggle, Breathing gets its own row-level toggle, group toggles on Dots/Glow/Ring sit on the right of the header alongside the chevron.
+- Colour picker moves from inline floating disclosure to centred overlay modal within the companion panel.
+- Opacity moves from inside the colour picker to its own slider row (alongside Speed, Intensity).
+- Speed sliders: unified 0–100 abstract scale (left = slow, right = fast). **UI-layer only** — real CSS seconds/pixels stored in config and passed to orb.js unchanged.
+- Intensity = glow max size (4–36px range). Ring has no Intensity (nothing to map it to).
+- Orb group colour labelled "Colour" (not "Edge colour") since it affects the whole orb when no avatar is set.
+- Panel width bump to 720px deferred — not done this session, still needed before Mood tab.
+
+### Files changed
+
+- `static/js/companion-presence.js` — full rewrite. New `CP_ELEMENTS` with `toSlider`/`fromSlider`/`format` per slider. New centred overlay colour picker. Breathing toggle on row, group toggles for Dots/Glow/Ring. `CP_STATE_DEFAULTS` unchanged (real CSS values). `orb.js` untouched.
+- `static/css/companion-panel.css` — Presence section replaced. New `.cp-prop-row`, `.cp-prop-tog-space`, `.cp-prop-label`, `.cp-prop-slider`, `.cp-prop-val`. New `.cp-color-overlay` modal. `.companion-panel` gets `position: relative` for overlay positioning. Old inline picker styles removed.
+- `static/chat.html` — Presence accordion restructured with new header layout (name left, toggle+chevron right). Overlay modal HTML added inside companion panel before footer.
+
+### Key architecture note
+The 0–100 slider scale is **purely a UI conversion**. `fromSlider()` converts to real CSS values before storing; `toSlider()` converts back when rendering. `orb.js` and the config format are unchanged — they always work in real CSS units.
+
+### What still needs doing (Mood track)
+
+1. ~~Audit Presence property completeness~~ — Done. Properties confirmed.
+2. **Bump panel width to 720px** — single CSS change to `.companion-panel` and `.settings-panel`. Still needed.
+3. **Design mood pill** — needs design pass before implementation (see design sessions needed).
+4. **Build `companion-mood.js` + Mood tab HTML**
+5. **`tools/set_mood.py`**
+6. **System prompt injection in `chat.js` `buildSystemPrompt()`**
+7. **Mood pill implementation**
 
 ---
 
@@ -247,15 +209,6 @@ Full Mood tab UI design, iterated through 5 mockup versions. Key decisions:
 
 - Animation on/off toggles (enable/disable glow, ring, etc.) — not in scope now, noted for future Presence + Mood pass.
 - Mood pill in chat UI — deferred, needs design next session before implementation.
-
-### Implementation order (next sessions)
-
-1. Audit Presence property completeness — confirm Presence exposes all properties Mood will override
-2. Bump panel width to 720px — CSS only, trivial
-3. Build `companion-mood.js` + Mood tab HTML
-4. `tools/set_mood.py`
-5. System prompt injection in `chat.js` `buildSystemPrompt()`
-6. Mood pill design + implementation
 
 ---
 
@@ -344,3 +297,35 @@ Full Mood tab UI design, iterated through 5 mockup versions. Key decisions:
 ## Session notes — 2026-04-06
 
 **Memory system design finalised and implementation begun. TTS confirmed working.**
+
+---
+
+## Design folder
+
+Large design decisions live in `design/` as standalone docs. These are NOT loaded into context automatically — search project knowledge when you need them. Do not reproduce their full content in CLAUDE.md.
+
+| File | Contents |
+|------|----------|
+| `design/ARCHITECTURE.md` | Modularity plan, completed refactors, planned modules, script/stylesheet load orders |
+| `design/BOOT.md` | Boot & process lifecycle, TOCTOU problem, per-OS path resolution, file browsing via tkinter |
+| `design/SYSTEMS.md` | Current state: Orb, Presence, Heartbeat, Companion window, Settings dirty tracking, Chat tabs, Vision mode, associative memory pill |
+| `design/TTS.md` | Kokoro TTS architecture, config schema, Aurini integration boundary, what's done/pending |
+| `design/FEATURES.md` | All planned features and changes, grouped by area |
+| `design/MEMORY.md` | Full memory architecture — primitives, composites, primitive_ratios, retrieval, consolidation, ChromaDB stack. Updated 2026-04-06. |
+| `design/COMPANION_STACK.md` | Cognitive function stack format, O+J axis pairing, charge as directionality, stack position as probability. Updated 2026-04-06. |
+| `design/ORB_DESIGN.md` | Orb positioning, layout modes, CSS variable documentation |
+| `design/MOOD.md` | Mood system — full design + implementation notes. Config schema, default moods, speed scale, TTS override, UI architecture, system prompt injection format. Updated 2026-04-13 #2. |
+
+When starting a session that touches any of these systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
+
+---
+
+## Design sessions needed
+
+These items are too open-ended to task out. They need a dedicated design conversation before any implementation.
+
+- **Main Chat UI redesign** — overall feel should be "smoother, fuller, cozier". Known starting points: sidebar is too large (split into sections or cards?), buttons to pill shape, tools list moved out of sidebar into Settings, companion state/mood pills near the orb area. Color scheme is already good. Needs visual exploration before touching code.
+- **Mood pill (chat UI)** — small pill near the orb showing current mood name. Needs design pass before implementation. Pill background = mood dot colour, border = orb edge colour. Toggleable, hidden by default. Next session priority.
+- **Companion Creation Wizard — appearance sections** — Hair style grid, face shape, eyes, nose, outfit system, accessories, fetishes/kinks, natural triggers, and several other sections are marked "design needs expanding on". These need fleshing out before wizard implementation begins.
+- **Closeness/relationship progression** — may become a gamified system (develop closeness over time). Needs design before the wizard's closeness step is finalized.
+- **Companion Templates rework** — templates need redesigning to fit the new memory system and future features. Goals: don't clash with ChromaDB/soul/mind architecture; future-proof for Wizard and Mood system; keep token totals reasonable. Needs a design conversation before touching template files.

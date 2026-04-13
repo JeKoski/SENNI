@@ -31,6 +31,7 @@
   max-height: 88vh;
   display: flex; flex-direction: column;
   overflow: hidden;
+  position: relative;
   animation: fadeUp .28s ease both;
 }
 
@@ -426,7 +427,7 @@ select.cp-input option,
 .cp-elements {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .cp-elem {
@@ -437,27 +438,46 @@ select.cp-input option,
   transition: border-color .15s, background .15s;
 }
 .cp-elem.open {
-  border-color: rgba(129,140,248,0.25);
-  background: rgba(129,140,248,0.03);
+  border-color: rgba(129,140,248,0.2);
+  background: rgba(129,140,248,0.02);
 }
 
-/* Header row: toggle | name | pip | hex | alpha-pill | spacer | speed | chevron */
+/* Header: group name left — toggle + chevron right */
 .cp-elem-header {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
   cursor: pointer;
   user-select: none;
 }
 
-/* Animation on/off toggle pill */
+.cp-elem-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.cp-elem-name {
+  font-size: 12.5px;
+  color: rgba(221,225,240,0.6);
+  font-weight: 500;
+}
+.cp-elem-name.dimmed { color: rgba(221,225,240,0.28); }
+
+.cp-elem-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Toggle — used both on group headers (Dots/Glow/Ring) and Breathing row */
 .cp-elem-tog {
   width: 28px; height: 15px;
   border-radius: 8px;
   flex-shrink: 0;
-  background: rgba(129,140,248,0.2);
-  border: 1px solid rgba(129,140,248,0.35);
+  background: rgba(129,140,248,0.25);
+  border: 1px solid rgba(129,140,248,0.4);
   position: relative;
   cursor: pointer;
   transition: background .15s, border-color .15s;
@@ -478,57 +498,13 @@ select.cp-input option,
 .cp-elem-tog.on::after  { transform: translateX(13px); }
 .cp-elem-tog.off::after { background: rgba(221,225,240,0.2); }
 
-/* Color pip — square swatch matching the grid style */
-.cp-elem-pip {
-  width: 18px; height: 18px;
-  border-radius: 5px;
-  flex-shrink: 0;
-  border: 1.5px solid rgba(255,255,255,0.14);
-  cursor: pointer;
-  transition: transform .1s;
-}
-.cp-elem-pip:hover { transform: scale(1.12); }
-
-.cp-elem-name {
-  font-size: 12px;
-  color: rgba(221,225,240,0.65);
-  flex-shrink: 0;
-  width: 40px;
-}
-
-.cp-elem-hex {
-  font-size: 11px;
-  font-family: 'DM Mono', monospace;
-  color: rgba(165,180,252,0.5);
-  flex-shrink: 0;
-}
-
-.cp-elem-alpha-pill {
-  font-size: 10px;
-  font-family: 'DM Mono', monospace;
-  background: rgba(129,140,248,0.1);
-  color: rgba(165,180,252,0.5);
-  padding: 1px 6px;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-
-.cp-elem-spacer { flex: 1; }
-
-.cp-elem-speed {
-  font-size: 10px;
-  font-family: 'DM Mono', monospace;
-  color: rgba(221,225,240,0.2);
-  flex-shrink: 0;
-}
-
-/* Chevron — styled mini pill, same visual language as the toggle */
+/* Chevron */
 .cp-elem-chevron {
-  width: 18px; height: 18px;
-  border-radius: 5px;
+  width: 16px; height: 16px;
+  border-radius: 4px;
   flex-shrink: 0;
   background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(140,145,220,0.18);
+  border: 1px solid rgba(140,145,220,0.15);
   display: flex; align-items: center; justify-content: center;
   font-size: 8px;
   color: rgba(221,225,240,0.3);
@@ -536,77 +512,155 @@ select.cp-input option,
 }
 .cp-elem.open .cp-elem-chevron {
   transform: rotate(90deg);
-  background: rgba(129,140,248,0.18);
-  border-color: rgba(129,140,248,0.3);
+  background: rgba(129,140,248,0.15);
+  border-color: rgba(129,140,248,0.28);
   color: #a5b4fc;
 }
 
 /* Body */
 .cp-elem-body {
   display: none;
-  padding: 4px 10px 12px;
+  padding: 2px 12px 12px;
+  border-top: 1px solid rgba(140,145,220,0.08);
+  transition: opacity .15s;
 }
 .cp-elem.open .cp-elem-body { display: block; }
 
-/* ── Color picker (collapsed inline disclosure) ───────────────────────────── */
-.cp-color-picker-wrap {
-  margin-bottom: 8px;
-}
-
-.cp-picker-header {
-  display: inline-flex;
+/* ── Property rows (inside element bodies) ────────────────────────────────── */
+/* Layout: [toggle or spacer] | label | control | value */
+.cp-prop-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border-radius: 8px;
-  cursor: pointer;
-  border: 1px solid rgba(140,145,220,0.12);
-  background: rgba(255,255,255,0.03);
-  transition: border-color .15s, background .15s;
+  gap: 10px;
+  padding: 7px 0;
 }
-.cp-picker-header:hover {
-  border-color: rgba(129,140,248,0.25);
-  background: rgba(129,140,248,0.05);
-}
-.cp-color-picker-wrap.open .cp-picker-header {
-  border-color: rgba(129,140,248,0.3);
-  background: rgba(129,140,248,0.08);
+.cp-prop-row + .cp-prop-row {
+  border-top: 1px solid rgba(140,145,220,0.06);
 }
 
-/* Square pip inside the picker header — same style as accordion header pip */
-.cp-picker-sq {
-  width: 14px; height: 14px;
-  border-radius: 4px;
+/* Fixed-width spacer matching toggle width for non-toggle rows */
+.cp-prop-tog-space {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.cp-prop-label {
+  font-size: 12px;
+  color: rgba(221,225,240,0.5);
+  width: 72px;
+  flex-shrink: 0;
+}
+
+/* Colour pip in property row */
+.cp-prop-pip {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(255,255,255,0.14);
+  cursor: pointer;
+  transition: transform .1s, border-color .15s;
+}
+.cp-prop-pip:hover {
+  transform: scale(1.12);
+  border-color: rgba(255,255,255,0.28);
+}
+
+.cp-prop-hex {
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  color: rgba(165,180,252,0.45);
+  flex: 1;
+}
+
+/* Slider wrap fills remaining space */
+.cp-prop-slider-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.cp-prop-slider {
+  width: 100%;
+  accent-color: #818cf8;
+  height: 3px;
+  cursor: pointer;
+}
+
+.cp-prop-val {
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  color: rgba(165,180,252,0.55);
+  width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Colour picker overlay modal ──────────────────────────────────────────── */
+/* Centred within the companion panel — not anchored to the pip. */
+.cp-color-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0,0,0,0.55);
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+}
+.cp-color-overlay.open { display: flex; }
+
+.cp-overlay-modal {
+  background: #21232e;
+  border: 1px solid rgba(140,145,220,0.18);
+  border-radius: 14px;
+  padding: 16px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cp-overlay-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(221,225,240,0.6);
+  text-transform: capitalize;
+  margin-bottom: 2px;
+}
+
+.cp-overlay-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-overlay-preview {
+  width: 28px; height: 28px;
+  border-radius: 7px;
   border: 1.5px solid rgba(255,255,255,0.15);
   flex-shrink: 0;
 }
 
-.cp-picker-hex {
-  font-size: 11px;
+.cp-overlay-hex-input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(140,145,220,0.14);
+  border-radius: 8px;
+  padding: 5px 9px;
   font-family: 'DM Mono', monospace;
-  color: rgba(165,180,252,0.65);
+  font-size: 12px;
+  color: #dde1f0;
+  width: 100px;
+  transition: border-color .2s;
 }
+.cp-overlay-hex-input:focus { outline: none; border-color: rgba(129,140,248,0.4); }
 
-.cp-picker-arr {
-  font-size: 8px;
-  color: rgba(165,180,252,0.3);
-  transition: transform .15s;
-}
-.cp-color-picker-wrap.open .cp-picker-arr { transform: rotate(90deg); }
-
-.cp-picker-body {
-  display: none;
-  padding-top: 8px;
-}
-.cp-color-picker-wrap.open .cp-picker-body { display: block; }
-
-/* ── Swatch grid ──────────────────────────────────────────────────────────── */
-.cp-swatch-grid {
+/* Swatch grid inside overlay */
+.cp-overlay-swatch-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 4px;
-  margin-bottom: 7px;
 }
+
+/* Shared swatch styles (used both in overlay and any future inline pickers) */
 .cp-swatch {
   width: 100%;
   aspect-ratio: 1;
@@ -639,58 +693,38 @@ select.cp-input option,
   border: none; padding: 0;
 }
 
-/* Hex input row */
-.cp-color-input-row { display: flex; align-items: center; gap: 7px; }
-.cp-color-input {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(140,145,220,0.14);
-  border-radius: 8px; padding: 4px 9px;
-  font-family: 'DM Mono', monospace; font-size: 12px;
-  color: #dde1f0; width: 90px;
-  transition: border-color .2s;
+/* Overlay OK / Cancel buttons */
+.cp-overlay-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
 }
-.cp-color-input:focus { outline: none; border-color: rgba(129,140,248,0.4); }
+.cp-overlay-cancel {
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(140,145,220,0.18);
+  background: none;
+  color: rgba(221,225,240,0.45);
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .15s;
+}
+.cp-overlay-cancel:hover { background: rgba(255,255,255,0.06); color: rgba(221,225,240,0.75); }
+.cp-overlay-ok {
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(129,140,248,0.35);
+  background: rgba(129,140,248,0.15);
+  color: #a5b4fc;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .15s;
+}
+.cp-overlay-ok:hover { background: rgba(129,140,248,0.25); border-color: rgba(129,140,248,0.5); }
 
-/* Alpha slider */
-.cp-alpha-row { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
-.cp-alpha-lbl { font-size: 11px; color: rgba(221,225,240,0.3); width: 42px; flex-shrink: 0; }
-.cp-alpha-track {
-  flex: 1; position: relative; height: 9px;
-  border-radius: 5px; overflow: hidden;
-}
-.cp-alpha-track::before {
-  content: '';
-  position: absolute; inset: 0; border-radius: 5px;
-  background: repeating-conic-gradient(
-    rgba(255,255,255,0.08) 0% 25%, rgba(0,0,0,0.08) 0% 50%
-  ) 0 0 / 8px 8px;
-}
-.cp-alpha-gradient { position: absolute; inset: 0; border-radius: 5px; }
-.cp-alpha-slider {
-  position: relative; width: 100%;
-  appearance: none; -webkit-appearance: none;
-  height: 9px; background: transparent; cursor: pointer; margin: 0;
-  accent-color: #818cf8;
-}
-.cp-alpha-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 13px; height: 13px; border-radius: 50%;
-  background: #fff; border: 2px solid rgba(0,0,0,0.25);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-}
-.cp-alpha-val {
-  font-size: 11px; font-family: 'DM Mono', monospace;
-  color: rgba(165,180,252,0.6); width: 30px; text-align: right;
-}
-
-/* ── Slider rows (inside element bodies) ──────────────────────────────────── */
-.cp-slider-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.cp-slider-lbl { font-size: 11px; color: rgba(221,225,240,0.3); width: 80px; flex-shrink: 0; }
-.cp-slider     { flex: 1; accent-color: #818cf8; height: 3px; cursor: pointer; }
-.cp-slider-val {
-  font-size: 11px; font-family: 'DM Mono', monospace;
-  color: rgba(165,180,252,0.6); width: 34px; text-align: right;
-}
 
 /* ── Voice (TTS) tab ──────────────────────────────────────────────────────── */
 .cp-tts-unavailable {

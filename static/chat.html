@@ -429,60 +429,57 @@
       <div class="cp-section" style="padding-top:4px">Appearance</div>
       <div class="cp-elements">
 
-        <!-- ORB -->
+        <!-- ORB — no group toggle (Orb is properties, not an animation) -->
         <div class="cp-elem open" id="cp-elem-orb">
           <div class="cp-elem-header" onclick="cpPresenceToggleElement('orb')">
-            <div class="cp-elem-tog on" id="cp-elem-tog-orb" onclick="event.stopPropagation();cpPresenceToggleAnim('orb')"></div>
-            <span class="cp-elem-name">Orb</span>
-            <div class="cp-elem-pip" id="cp-elem-pip-orb" onclick="event.stopPropagation();cpPresenceToggleColorPicker('orb')"></div>
-            <span class="cp-elem-hex" id="cp-elem-hex-orb">#818cf8</span>
-            <span class="cp-elem-spacer"></span>
-            <span class="cp-elem-speed" id="cp-elem-speed-orb"></span>
-            <div class="cp-elem-chevron">▶</div>
+            <div class="cp-elem-header-left">
+              <span class="cp-elem-name">Orb</span>
+            </div>
+            <div class="cp-elem-header-right">
+              <div class="cp-elem-chevron">▶</div>
+            </div>
           </div>
           <div class="cp-elem-body" id="cp-elem-body-orb"></div>
         </div>
 
-        <!-- DOTS -->
+        <!-- DOTS — group toggle controls dots animation -->
         <div class="cp-elem" id="cp-elem-dots">
           <div class="cp-elem-header" onclick="cpPresenceToggleElement('dots')">
-            <div class="cp-elem-tog on" id="cp-elem-tog-dots" onclick="event.stopPropagation();cpPresenceToggleAnim('dots')"></div>
-            <span class="cp-elem-name">Dots</span>
-            <div class="cp-elem-pip" id="cp-elem-pip-dots" onclick="event.stopPropagation();cpPresenceToggleColorPicker('dots')"></div>
-            <span class="cp-elem-hex" id="cp-elem-hex-dots">#818cf8</span>
-            <span class="cp-elem-spacer"></span>
-            <span class="cp-elem-speed" id="cp-elem-speed-dots"></span>
-            <div class="cp-elem-chevron">▶</div>
+            <div class="cp-elem-header-left">
+              <span class="cp-elem-name" id="cp-elem-name-dots">Dots</span>
+            </div>
+            <div class="cp-elem-header-right">
+              <div class="cp-elem-tog on" id="cp-elem-tog-dots" onclick="event.stopPropagation();cpPresenceToggleAnim('dots')"></div>
+              <div class="cp-elem-chevron">▶</div>
+            </div>
           </div>
           <div class="cp-elem-body" id="cp-elem-body-dots"></div>
         </div>
 
-        <!-- GLOW -->
+        <!-- GLOW — group toggle controls glow animation -->
         <div class="cp-elem" id="cp-elem-glow">
           <div class="cp-elem-header" onclick="cpPresenceToggleElement('glow')">
-            <div class="cp-elem-tog on" id="cp-elem-tog-glow" onclick="event.stopPropagation();cpPresenceToggleAnim('glow')"></div>
-            <span class="cp-elem-name">Glow</span>
-            <div class="cp-elem-pip" id="cp-elem-pip-glow" onclick="event.stopPropagation();cpPresenceToggleColorPicker('glow')"></div>
-            <span class="cp-elem-hex" id="cp-elem-hex-glow">#818cf8</span>
-            <span class="cp-elem-alpha-pill" id="cp-elem-alpha-glow">40%</span>
-            <span class="cp-elem-spacer"></span>
-            <span class="cp-elem-speed" id="cp-elem-speed-glow"></span>
-            <div class="cp-elem-chevron">▶</div>
+            <div class="cp-elem-header-left">
+              <span class="cp-elem-name" id="cp-elem-name-glow">Glow</span>
+            </div>
+            <div class="cp-elem-header-right">
+              <div class="cp-elem-tog on" id="cp-elem-tog-glow" onclick="event.stopPropagation();cpPresenceToggleAnim('glow')"></div>
+              <div class="cp-elem-chevron">▶</div>
+            </div>
           </div>
           <div class="cp-elem-body" id="cp-elem-body-glow"></div>
         </div>
 
-        <!-- RING -->
+        <!-- RING — group toggle controls ring animation -->
         <div class="cp-elem" id="cp-elem-ring">
           <div class="cp-elem-header" onclick="cpPresenceToggleElement('ring')">
-            <div class="cp-elem-tog on" id="cp-elem-tog-ring" onclick="event.stopPropagation();cpPresenceToggleAnim('ring')"></div>
-            <span class="cp-elem-name">Ring</span>
-            <div class="cp-elem-pip" id="cp-elem-pip-ring" onclick="event.stopPropagation();cpPresenceToggleColorPicker('ring')"></div>
-            <span class="cp-elem-hex" id="cp-elem-hex-ring">#818cf8</span>
-            <span class="cp-elem-alpha-pill" id="cp-elem-alpha-ring">30%</span>
-            <span class="cp-elem-spacer"></span>
-            <span class="cp-elem-speed" id="cp-elem-speed-ring"></span>
-            <div class="cp-elem-chevron">▶</div>
+            <div class="cp-elem-header-left">
+              <span class="cp-elem-name" id="cp-elem-name-ring">Ring</span>
+            </div>
+            <div class="cp-elem-header-right">
+              <div class="cp-elem-tog on" id="cp-elem-tog-ring" onclick="event.stopPropagation();cpPresenceToggleAnim('ring')"></div>
+              <div class="cp-elem-chevron">▶</div>
+            </div>
           </div>
           <div class="cp-elem-body" id="cp-elem-body-ring"></div>
         </div>
@@ -535,6 +532,23 @@
       </div>
     </div>
         <!-- Footer -->
+    <!-- Colour picker overlay — centred modal, shared across all elements -->
+    <div class="cp-color-overlay" id="cp-color-overlay" onclick="event.target===this&&_cpCloseColorPicker()">
+      <div class="cp-overlay-modal">
+        <div class="cp-overlay-title">Colour</div>
+        <div class="cp-overlay-preview-row">
+          <div class="cp-overlay-preview" id="cp-overlay-preview"></div>
+          <input class="cp-overlay-hex-input" id="cp-overlay-hex-input" type="text" maxlength="7"
+            placeholder="#818cf8" oninput="cpPresenceOverlayHexInput(this.value)"/>
+        </div>
+        <div class="cp-overlay-swatch-grid"></div>
+        <div class="cp-overlay-actions">
+          <button class="cp-overlay-cancel">Cancel</button>
+          <button class="cp-overlay-ok">OK</button>
+        </div>
+      </div>
+    </div>
+
     <div class="companion-panel-footer">
       <button class="sp-btn-ghost" onclick="cpSave()">Apply</button>
       <button class="sp-btn-primary" onclick="cpSave(true)">Save &amp; close</button>
