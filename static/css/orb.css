@@ -431,3 +431,62 @@ body.chat-scrolled-up #scroll-to-bottom { display: flex; }
   border-color: rgba(129,140,248,0.3);
   color: #a5b4fc;
 }
+
+/* ── Mood pill ────────────────────────────────────────────────────────────── */
+/*
+  #mood-pill sits inside #orb-home as a flex sibling of #companion-orb.
+  #orb-home uses align-items:flex-end, so the pill base aligns with the
+  bottom of the orb body regardless of orb size — no JS needed for scaling.
+
+  Icon slot (.mp-icon): currently a coloured dot. Future: swap in an SVG
+  icon from a per-mood icon library by replacing the element content in
+  mood-pill.js — the slot size and position are stable.
+
+  Visibility is driven by .mp-visible / .mp-hidden classes toggled by
+  mood-pill.js. The transition handles both show and fade-out.
+*/
+#mood-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(129,140,248,0.35);
+  background: rgba(129,140,248,0.1);
+  color: rgba(129,140,248,0.85);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1;
+  pointer-events: auto;
+  /* Colour transitions mirror orb body */
+  transition: background .4s ease, border-color .4s ease, color .4s ease,
+              opacity .35s ease, transform .35s ease;
+}
+
+#mood-pill.mp-hidden {
+  opacity: 0;
+  transform: translateX(-4px);
+  pointer-events: none;
+}
+
+#mood-pill.mp-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Icon slot — dot by default, ready for future icon library */
+.mp-icon {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #818cf8;
+  flex-shrink: 0;
+  transition: background .4s ease;
+}
+
+/* Name label */
+.mp-name {
+  /* inherits colour from #mood-pill */
+}

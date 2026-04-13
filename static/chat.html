@@ -113,6 +113,11 @@
             <div class="orb-icon" id="orb-icon">✦</div>
           </div>
         </div>
+        <!-- Mood pill — sits to the right of the orb, bottom-aligned via orb-home flex -->
+        <div id="mood-pill" class="mp-hidden" aria-live="polite">
+          <span class="mp-icon"></span>
+          <span class="mp-name"></span>
+        </div>
         <!-- Scroll-to-bottom button — appears when user scrolled up -->
         <button id="scroll-to-bottom" onclick="scrollToBottom()" title="Scroll to latest">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -777,6 +782,7 @@
 <script src="/static/js/tts.js"></script>
 <script src="/static/js/companion.js"></script>
 <script src="/static/js/companion-presence.js"></script>
+<script src="/static/js/mood-pill.js"></script>
 <script src="/static/js/companion-tts.js"></script>
 <script src="/static/js/companion-memory.js"></script>
 <script src="/static/js/settings.js"></script>
