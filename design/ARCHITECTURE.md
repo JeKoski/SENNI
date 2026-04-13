@@ -21,12 +21,14 @@ When creating a new module, it should:
 - `static/css/chat.css` → split into base/messages/orb/companion-panel.css ✓
 - `static/js/settings.js` → split into coordinator + server/generation/companion tab files ✓
 - `static/js/companion-memory.js` — Memory tab UI ✓
+- `static/js/companion-color-picker.js` — colour picker overlay extracted from companion-presence.js ✓
+- `static/js/mood-pill.js` — mood pill IIFE module ✓
+- `static/js/companion-mood.js` — Mood tab UI ✓
 
 ---
 
 ## Planned future modules
 
-- `static/js/companion-mood.js` — Mood UI tab (new file when Mood UI is built)
 - `static/js/system-prompt.js` — extract `buildSystemPrompt()` from chat.js (low priority)
 
 ---
@@ -34,27 +36,35 @@ When creating a new module, it should:
 ## Current `chat.html` script load order
 
 ```
-tool-parser.js          ← no deps
-api.js                  ← needs tool-parser.js
+tool-parser.js              ← no deps
+api.js                      ← needs tool-parser.js
 attachments.js
 orb.js
-message-renderer.js     ← no deps
-chat-ui.js              ← needs message-renderer.js, orb.js, appendMemoryPill()
-                           (appendMemoryPill now required by chat-tabs.js and api.js — load order already correct)
-chat-tabs.js            ← needs message-renderer.js, chat-ui.js, chat-controls.js
+message-renderer.js         ← no deps
+chat-ui.js                  ← needs message-renderer.js, orb.js, appendMemoryPill()
+chat-tabs.js                ← needs message-renderer.js, chat-ui.js, chat-controls.js
 chat-controls.js
 chat.js
 heartbeat.js
-tts.js                  ← needs api.js (onTtsToken), no DOM deps at load time
-companion.js            ← coordinator, loads before presence/tts/memory
-companion-presence.js   ← needs companion.js (cpSettings, cpMarkDirty), orb.js
-companion-tts.js        ← needs companion.js (cpSettings, cpMarkDirty), tts.js
-companion-memory.js     ← needs companion.js (cpSettings, cpMarkDirty, cpShowToast)
-settings.js             ← coordinator, loads before tab files
-settings-server.js      ← needs settings.js
-settings-generation.js  ← needs settings.js
-settings-companion.js   ← needs settings.js
-settings_os_paths.js    ← needs settings.js, settings-server.js
+tts.js                      ← needs api.js (onTtsToken), no DOM deps at load time
+companion.js                ← coordinator, loads before presence/tts/memory/mood
+companion-presence.js       ← needs companion.js (cpSettings, cpMarkDirty), orb.js
+                               exports CP_SWATCHES, CP_ELEMENTS, CP_SPEED_RANGES,
+                               conversion helpers (_cpSecsToSlider etc.)
+companion-color-picker.js   ← needs CP_SWATCHES from companion-presence.js
+                               exports cpOpenColorPicker(), cpCloseColorPicker(), cpPickerHexInput()
+mood-pill.js                ← no deps (IIFE module)
+                               exports moodPill.update(), .setVisibility(), .getVisibility()
+companion-mood.js           ← needs companion.js, companion-presence.js (conversion helpers),
+                               companion-color-picker.js, mood-pill.js
+                               exports cpMoodInit(), cpMoodReset(), _cpGetMoodPayload()
+companion-tts.js            ← needs companion.js (cpSettings, cpMarkDirty), tts.js
+companion-memory.js         ← needs companion.js (cpSettings, cpMarkDirty, cpShowToast)
+settings.js                 ← coordinator, loads before tab files
+settings-server.js          ← needs settings.js
+settings-generation.js      ← needs settings.js
+settings-companion.js       ← needs settings.js
+settings_os_paths.js        ← needs settings.js, settings-server.js
 ```
 
 ---
@@ -64,7 +74,39 @@ settings_os_paths.js    ← needs settings.js, settings-server.js
 ```
 base.css             ← defines all CSS variables — must be first
 messages.css         ← depends on base.css variables
-orb.css              ← depends on base.css variables
-companion-panel.css  ← depends on base.css variables, orb.css keyframes
+orb.css              ← depends on base.css variables; mood pill styles appended here
+companion-panel.css  ← depends on base.css variables, orb.css keyframes;
+                       Presence tab styles + Mood tab styles (cm-* classes) both here
 settings.css         ← pre-existing, independent
 ```
+
+---
+
+## Colour picker architecture
+
+The colour picker overlay is a shared singleton in the companion panel DOM (`#cp-color-overlay`). It is owned by `companion-color-picker.js` — neither Presence nor Mood knows about each other's internals.
+
+**API:**
+```js
+cpOpenColorPicker({ title, hex, onPick, onClose })
+cpCloseColorPicker()
+cpPickerHexInput(val)   // called by oninput on overlay hex field in chat.html
+```
+
+`companion-presence.js` calls `cpOpenColorPicker()` via its thin wrapper `cpPresenceOpenColorPicker(elemId)`.
+`companion-mood.js` calls `cpOpenColorPicker()` directly.
+
+`cpPresenceOverlayHexInput()` is kept as a one-liner bridge in `companion-presence.js` for backward compatibility with the `oninput` attribute in `chat.html` — it delegates to `cpPickerHexInput()`.
+
+---
+
+## Mood → Orb schema translation
+
+`orb.js` expects mood data in a flat `_enabled` format:
+```js
+{ _enabled: { edgeColor: true, glowColor: true }, edgeColor: '#6dd4a8', glowColor: '#6dd4a8' }
+```
+
+Our config schema uses a nested `{ enabled, value }` format per property (see `design/MOOD.md`).
+
+Translation happens in `_applyMoodToOrb(moodName)` in `chat.js`. This function is the single bridge between the two formats — do not duplicate this logic elsewhere.

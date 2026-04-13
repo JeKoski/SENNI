@@ -131,6 +131,25 @@ async function loadStatus() {
     config.presence_presets       = data.presence_presets || {};
     config.active_presence_preset = data.active_presence_preset || 'Default';
 
+    // Mood — store in config and update pill
+    config.active_mood          = data.active_mood          ?? null;
+    config.mood_pill_visibility = data.mood_pill_visibility ?? 'always';
+    config.moods                = data.moods                ?? {};
+    if (typeof moodPill !== 'undefined') {
+      moodPill.setVisibility(config.mood_pill_visibility);
+      if (config.active_mood && config.moods[config.active_mood]) {
+        // Derive dot colour from mood orb/glow/dots overrides
+        const m = config.moods[config.active_mood];
+        const dotColor = m.orb?.edgeColor?.enabled  && m.orb.edgeColor.value  ||
+                         m.glow?.color?.enabled      && m.glow.color.value     ||
+                         m.dots?.color?.enabled      && m.dots.color.value     ||
+                         '#818cf8';
+        moodPill.update(config.active_mood, dotColor, dotColor);
+      } else {
+        moodPill.update(null);
+      }
+    }
+
     if (data.context_size) _contextSize = data.context_size;
 
     // markdown_enabled lives in global generation — read from data.config directly
@@ -937,6 +956,15 @@ RELATIONAL STATE — use update_relational_state only when the relationship itse
   if (mode === 'heartbeat') {
     // Heartbeat prompt is built entirely in heartbeat.js — this shouldn't be called
     return p;
+  }
+
+  // ── Mood block ──
+  const moods      = config.moods || {};
+  const activeMood = config.active_mood || null;
+  const inRotation = Object.entries(moods).filter(([, m]) => m.in_rotation);
+  if (inRotation.length > 0) {
+    const moodLines = inRotation.map(([name, m]) => `- ${name}: ${m.description || '(no description)'}`).join('\n');
+    p += `\n\n<moods>\nYou have a set_mood tool. Call it to change your active mood.\n\nAvailable moods:\n${moodLines}\n\nCurrent mood: ${activeMood || 'None'}\n\nCall set_mood with mood_name null to return to no mood.\n</moods>`;
   }
 
   if (mode === 'first_run') {

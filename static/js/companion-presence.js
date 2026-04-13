@@ -1,7 +1,8 @@
 // companion-presence.js — Presence tab: presets, state editor, preview orb, layout toggle
 // Loaded after companion.js. Depends on: orb.js
+// Colour picker delegated to companion-color-picker.js (loaded after this file).
 //
-// Exports (globals used by companion.js):
+// Exports (globals used by companion.js and companion-mood.js):
 //   cpPresenceInit()
 //   cpPresenceReset()
 //   cpPresenceRenderPresets()
@@ -9,17 +10,17 @@
 //   cpPresenceSwitchState(state, el)
 //   cpPresenceToggleElement(elemId)
 //   cpPresenceToggleAnim(elemId)
-//   cpPresenceOpenColorPicker(elemId)
+//   cpPresenceOpenColorPicker(elemId)   — thin wrapper → cpOpenColorPicker()
 //   cpPresencePickColor(elemId, hex)
-//   cpPresenceHexInput(elemId, val)
 //   cpPresenceSlider(id, key, val)
-//   cpPresenceOverlayHexInput(val)
+//   cpPresenceOverlayHexInput(val)      — kept for chat.html oninput attr compat
 //   cpPresenceNewPreset()
 //   cpPresenceDeletePreset(name)
 //   cpSetOrbLayout(mode)
-//   _cpGetPresencePayload()        — called by companion.js cpSave()
-//   CP_STATE_DEFAULTS              — read by companion-mood.js when built
-//   CP_ELEMENTS                    — read by companion-mood.js when built
+//   _cpGetPresencePayload()             — called by companion.js cpSave()
+//   CP_STATE_DEFAULTS                   — read by companion-mood.js
+//   CP_ELEMENTS                         — read by companion-mood.js
+//   CP_SWATCHES                         — read by companion-color-picker.js
 
 // ── Swatch palette ─────────────────────────────────────────────────────────
 const CP_SWATCHES = [
@@ -183,7 +184,6 @@ let _cpActivePreset     = 'Default';
 let _cpEditingState     = 'thinking';
 let _cpPresenceDirty    = false;
 let _cpPresenceInitDone = false;
-let _cpPickerOpenFor    = null;
 
 // ── Defaults — real CSS values, unchanged from original ────────────────────
 const CP_STATE_DEFAULTS = {
@@ -233,7 +233,6 @@ function cpPresenceInit() {
 
 function cpPresenceReset() {
   _cpPresenceInitDone = false;
-  _cpPickerOpenFor    = null;
 }
 
 // ── Element accordion body builder ─────────────────────────────────────────
@@ -428,103 +427,22 @@ function cpPresenceRenderState(state) {
   cpPresenceUpdatePreview(s, state);
 }
 
-// ── Colour picker overlay ──────────────────────────────────────────────────
+// ── Colour picker — delegates to companion-color-picker.js ─────────────────
 function cpPresenceOpenColorPicker(elemId) {
-  if (_cpPickerOpenFor === elemId) { _cpCloseColorPicker(); return; }
-  _cpPickerOpenFor = elemId;
-
-  const overlay = document.getElementById('cp-color-overlay');
-  if (!overlay) return;
-
   const elem = CP_ELEMENTS.find(e => e.id === elemId);
   if (!elem) return;
-
   const s   = _cpCurrentStateData();
   const hex = s[elem.colorKey] || '#818cf8';
-
-  const title    = overlay.querySelector('.cp-overlay-title');
-  const hexInput = overlay.querySelector('.cp-overlay-hex-input');
-  const preview  = overlay.querySelector('.cp-overlay-preview');
-  if (title)    title.textContent        = elem.label + ' colour';
-  if (hexInput) hexInput.value           = hex;
-  if (preview)  preview.style.background = hex;
-
-  // Build swatch grid once
-  const grid = overlay.querySelector('.cp-overlay-swatch-grid');
-  if (grid && !grid.dataset.built) {
-    CP_SWATCHES.forEach(row => {
-      row.forEach(swHex => {
-        const sw            = document.createElement('div');
-        sw.className        = 'cp-swatch';
-        sw.style.background = swHex;
-        sw.dataset.hex      = swHex;
-        sw.title            = swHex;
-        sw.onclick          = () => _cpOverlayPickHex(swHex);
-        grid.appendChild(sw);
-      });
-    });
-    const custom     = document.createElement('div');
-    custom.className = 'cp-swatch cp-swatch-custom';
-    custom.title     = 'Custom colour';
-    custom.innerHTML = '✦';
-    const native     = document.createElement('input');
-    native.type      = 'color';
-    native.value     = '#818cf8';
-    native.oninput   = (e) => _cpOverlayPickHex(e.target.value);
-    custom.appendChild(native);
-    grid.appendChild(custom);
-    grid.dataset.built = '1';
-  }
-
-  _cpOverlayUpdateSwatchActive(hex);
-
-  const okBtn     = overlay.querySelector('.cp-overlay-ok');
-  const cancelBtn = overlay.querySelector('.cp-overlay-cancel');
-  if (okBtn)     okBtn.onclick     = _cpOverlayOK;
-  if (cancelBtn) cancelBtn.onclick = _cpCloseColorPicker;
-
-  overlay.dataset.elemId = elemId;
-  overlay.classList.add('open');
-}
-
-function _cpOverlayPickHex(hex) {
-  const overlay  = document.getElementById('cp-color-overlay');
-  if (!overlay) return;
-  const hexInput = overlay.querySelector('.cp-overlay-hex-input');
-  const preview  = overlay.querySelector('.cp-overlay-preview');
-  if (hexInput) hexInput.value           = hex;
-  if (preview)  preview.style.background = hex;
-  _cpOverlayUpdateSwatchActive(hex);
-}
-
-function cpPresenceOverlayHexInput(val) {
-  const hex = val.startsWith('#') ? val : '#' + val;
-  if (/^#[0-9a-fA-F]{6}$/.test(hex)) _cpOverlayPickHex(hex);
-}
-
-function _cpOverlayUpdateSwatchActive(hex) {
-  const overlay = document.getElementById('cp-color-overlay');
-  if (!overlay) return;
-  const norm = hex.toLowerCase();
-  overlay.querySelectorAll('.cp-swatch:not(.cp-swatch-custom)').forEach(sw => {
-    sw.classList.toggle('active', sw.dataset.hex?.toLowerCase() === norm);
+  cpOpenColorPicker({
+    title:   elem.label + ' colour',
+    hex,
+    onPick:  (picked) => cpPresencePickColor(elemId, picked),
   });
 }
 
-function _cpOverlayOK() {
-  const overlay  = document.getElementById('cp-color-overlay');
-  if (!overlay) return;
-  const elemId   = overlay.dataset.elemId;
-  const hexInput = overlay.querySelector('.cp-overlay-hex-input');
-  const hex      = hexInput?.value || '#818cf8';
-  if (/^#[0-9a-fA-F]{6}$/.test(hex)) cpPresencePickColor(elemId, hex);
-  _cpCloseColorPicker();
-}
-
-function _cpCloseColorPicker() {
-  const overlay = document.getElementById('cp-color-overlay');
-  if (overlay) overlay.classList.remove('open');
-  _cpPickerOpenFor = null;
+// Kept for backward compat — chat.html still has oninput="cpPresenceOverlayHexInput()"
+function cpPresenceOverlayHexInput(val) {
+  cpPickerHexInput(val);
 }
 
 function cpPresencePickColor(elemId, hex) {

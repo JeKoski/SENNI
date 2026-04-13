@@ -79,8 +79,9 @@ function closeCompanionWindow() {
     if (!confirm('You have unsaved changes. Close anyway?')) return;
   }
   cpPresenceReset();  // allow fresh init on next open (defined in companion-presence.js)
-  if (typeof cpTtsReset === 'function') cpTtsReset();
-  if (typeof cpMemoryReset === 'function') cpMemoryReset();
+  if (typeof cpMoodReset    === 'function') cpMoodReset();
+  if (typeof cpTtsReset     === 'function') cpTtsReset();
+  if (typeof cpMemoryReset  === 'function') cpMemoryReset();
   cpClearDirty();
   document.getElementById('companion-overlay').classList.remove('open');
 }
@@ -209,6 +210,9 @@ function cpSwitchTab(tab) {
   }
   if (tab === 'voice') {
     if (typeof cpTtsInit === 'function') cpTtsInit();
+  }
+  if (tab === 'mood') {
+    if (typeof cpMoodInit === 'function') cpMoodInit();
   }
 }
 
@@ -404,7 +408,7 @@ async function cpSave(andClose = false) {
       // Only include TTS payload if slots have been populated — guards against
       // overwriting saved TTS config when the Voice tab was never opened.
       ...(typeof _cpGetTtsPayload === 'function' && _cpTtsSlots.length > 0 ? _cpGetTtsPayload() : {}),
-      // ..._cpGetMoodPayload(),    // from companion-mood.js (future)
+      ...(typeof _cpGetMoodPayload === 'function' ? _cpGetMoodPayload() : {}),
     };
 
     const res = await fetch('/api/settings/companion', {
@@ -424,7 +428,12 @@ async function cpSave(andClose = false) {
       cpSettings.active_companion.heartbeat               = body.heartbeat;
       cpSettings.active_companion.active_presence_preset  = body.active_presence_preset;
       cpSettings.presence_presets                         = body.presence_presets;
-      if (body.tts) cpSettings.active_companion.tts       = body.tts;
+      if (body.tts)  cpSettings.active_companion.tts       = body.tts;
+      if (body.moods !== undefined) {
+        cpSettings.active_companion.moods                 = body.moods;
+        cpSettings.active_companion.active_mood           = body.active_mood;
+        cpSettings.active_companion.mood_pill_visibility  = body.mood_pill_visibility;
+      }
     }
 
     // ── Apply the active preset to the live orb right now ──

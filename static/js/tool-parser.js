@@ -197,6 +197,25 @@ const TOOL_DEFINITIONS = [
   {
     type: "function",
     function: {
+      name: "set_mood",
+      description:
+        "Set your current mood. Pass a mood name to activate it, or null to return to no mood. " +
+        "The mood name must match one of the available moods listed in the system prompt exactly.",
+      parameters: {
+        type: "object",
+        properties: {
+          mood_name: {
+            type: ["string", "null"],
+            description: "Name of the mood to activate (e.g. 'Playful'), or null to clear."
+          }
+        },
+        required: ["mood_name"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "update_relational_state",
       description:
         "Update the relational state block — a compact summary of where the relationship " +

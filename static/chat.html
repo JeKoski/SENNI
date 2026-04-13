@@ -189,6 +189,7 @@
       <button class="cp-tab" data-tab="memory"     onclick="cpSwitchTab('memory')">Memory</button>
       <button class="cp-tab" data-tab="heartbeat"  onclick="cpSwitchTab('heartbeat')">Heartbeat</button>
       <button class="cp-tab" data-tab="presence"   onclick="cpSwitchTab('presence')" style="color:rgba(167,139,250,0.7)">Presence ✦</button>
+      <button class="cp-tab" data-tab="mood"       onclick="cpSwitchTab('mood')">Mood</button>
       <button class="cp-tab" data-tab="voice"      onclick="cpSwitchTab('voice')">Voice</button>
     </div>
     <!-- Identity -->
@@ -492,6 +493,10 @@
       </div>
 
     </div>
+        <!-- Mood -->
+    <div class="cp-tab-body" id="cp-tab-mood">
+      <!-- Rendered by cpMoodInit() in companion-mood.js -->
+    </div>
         <!-- Voice (TTS) -->
     <div class="cp-tab-body" id="cp-tab-voice">
 
@@ -782,7 +787,9 @@
 <script src="/static/js/tts.js"></script>
 <script src="/static/js/companion.js"></script>
 <script src="/static/js/companion-presence.js"></script>
+<script src="/static/js/companion-color-picker.js"></script>
 <script src="/static/js/mood-pill.js"></script>
+<script src="/static/js/companion-mood.js"></script>
 <script src="/static/js/companion-tts.js"></script>
 <script src="/static/js/companion-memory.js"></script>
 <script src="/static/js/settings.js"></script>

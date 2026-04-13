@@ -27,7 +27,7 @@
   background: #21232e;
   border: 1px solid rgba(140,145,220,0.14);
   border-radius: 20px;
-  width: 540px; max-width: 95vw;
+  width: 720px; max-width: 95vw;
   max-height: 88vh;
   display: flex; flex-direction: column;
   overflow: hidden;
@@ -829,3 +829,296 @@ select.cp-input option,
 .cp-tts-preview-btn {
   flex-shrink: 0;
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOOD TAB
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Active mood row ──────────────────────────────────────────────────────── */
+.cm-active-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.cm-active-badge {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #a5b4fc;
+  background: rgba(129,140,248,0.1);
+  border: 1px solid rgba(129,140,248,0.22);
+  border-radius: 20px;
+  padding: 2px 10px;
+}
+
+.cm-clear-btn {
+  background: none;
+  border: 1px solid rgba(140,145,220,0.18);
+  border-radius: 8px;
+  color: rgba(221,225,240,0.35);
+  font-size: 11.5px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  padding: 2px 10px;
+  transition: all .15s;
+}
+.cm-clear-btn:hover { color: rgba(221,225,240,0.7); border-color: rgba(140,145,220,0.35); }
+
+/* ── Pill visibility row ──────────────────────────────────────────────────── */
+.cm-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(140,145,220,0.08);
+}
+
+/* ── Segmented toggle (Always / Fade / Hide) ──────────────────────────────── */
+.cm-seg-toggle {
+  display: flex;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(140,145,220,0.15);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cm-seg-btn {
+  padding: 4px 13px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  background: none;
+  border: none;
+  color: rgba(221,225,240,0.4);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.cm-seg-btn + .cm-seg-btn {
+  border-left: 1px solid rgba(140,145,220,0.15);
+}
+.cm-seg-btn:hover   { color: rgba(221,225,240,0.7); background: rgba(255,255,255,0.05); }
+.cm-seg-btn.active  { color: #a5b4fc; background: rgba(129,140,248,0.14); }
+
+/* ── Card list ────────────────────────────────────────────────────────────── */
+.cm-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* ── Mood card ────────────────────────────────────────────────────────────── */
+.cm-card {
+  border: 1px solid rgba(140,145,220,0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.02);
+  transition: border-color .15s, background .15s;
+}
+.cm-card.open {
+  border-color: rgba(129,140,248,0.2);
+  background: rgba(129,140,248,0.02);
+}
+
+/* ── Card header ──────────────────────────────────────────────────────────── */
+.cm-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  gap: 8px;
+}
+
+.cm-card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cm-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #818cf8;
+  transition: background .2s;
+}
+
+.cm-card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(221,225,240,0.75);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cm-card-desc-preview {
+  font-size: 11.5px;
+  color: rgba(221,225,240,0.28);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.cm-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cm-rotation-label {
+  font-size: 10.5px;
+  color: rgba(221,225,240,0.25);
+  letter-spacing: .04em;
+}
+
+/* ── Card body ────────────────────────────────────────────────────────────── */
+.cm-card-body {
+  padding: 4px 12px 12px;
+  border-top: 1px solid rgba(140,145,220,0.08);
+}
+
+.cm-body-section {
+  margin-bottom: 12px;
+}
+
+/* ── Activate / delete row ────────────────────────────────────────────────── */
+.cm-activate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.cm-activate-btn {
+  padding: 4px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(140,145,220,0.2);
+  background: rgba(255,255,255,0.04);
+  color: rgba(221,225,240,0.5);
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .15s;
+}
+.cm-activate-btn:hover { background: rgba(255,255,255,0.08); color: rgba(221,225,240,0.8); }
+.cm-activate-btn.active {
+  background: rgba(109,212,168,0.1);
+  border-color: rgba(109,212,168,0.3);
+  color: #6dd4a8;
+}
+
+.cm-delete-btn {
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(248,113,113,0.15);
+  background: none;
+  color: rgba(248,113,113,0.4);
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .15s;
+  margin-left: auto;
+}
+.cm-delete-btn:hover {
+  background: rgba(248,113,113,0.08);
+  border-color: rgba(248,113,113,0.35);
+  color: rgba(248,113,113,0.85);
+}
+
+/* ── Element groups ───────────────────────────────────────────────────────── */
+.cm-group {
+  border: 1px solid rgba(140,145,220,0.09);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.015);
+  margin-bottom: 4px;
+}
+
+.cm-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cm-group-header-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cm-group-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(221,225,240,0.55);
+}
+
+.cm-group-count {
+  font-size: 10.5px;
+  font-family: 'DM Mono', monospace;
+  color: rgba(221,225,240,0.22);
+}
+
+.cm-group-header-right {
+  display: flex;
+  align-items: center;
+}
+
+.cm-group-body {
+  padding: 2px 10px 8px;
+  border-top: 1px solid rgba(140,145,220,0.07);
+}
+
+.cm-tts-body {
+  padding-top: 6px;
+}
+
+/* ── Per-property enable toggle (smaller context than group toggle) ────────── */
+/* Reuses .cp-elem-tog dimensions — no override needed.                        */
+/* The .cm-prop-tog class is a marker only, for JS targeting.                  */
+.cm-prop-tog { cursor: pointer; }
+
+/* ── Disabled property row ────────────────────────────────────────────────── */
+.cm-prop-disabled {
+  opacity: 0.38;
+  pointer-events: none;
+}
+/* Re-enable the toggle itself so the user can turn it back on */
+.cm-prop-disabled .cm-prop-tog {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── TTS blend slots ──────────────────────────────────────────────────────── */
+.cm-tts-blend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* ── Add mood button ──────────────────────────────────────────────────────── */
+.cm-add-btn {
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px;
+  border-radius: 10px;
+  border: 1px dashed rgba(140,145,220,0.2);
+  background: none;
+  color: rgba(221,225,240,0.3);
+  font-size: 12.5px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+}
+.cm-add-btn:hover { color: rgba(221,225,240,0.65); border-color: rgba(140,145,220,0.38); }
