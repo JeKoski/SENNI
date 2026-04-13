@@ -598,8 +598,13 @@ function cpMoodSetActive(name) {
   if (badge)    badge.textContent          = _cpActiveMood || 'None';
   if (clearBtn) clearBtn.style.visibility  = _cpActiveMood ? 'visible' : 'hidden';
 
-  // Optimistic pill update
-  if (typeof moodPill !== 'undefined') {
+  // Optimistic orb + pill update — reflects the new mood immediately in the UI
+  // without waiting for a save. _applyMoodToOrb also updates config.active_mood
+  // so the system prompt stays in sync for the next send.
+  if (typeof _applyMoodToOrb === 'function') {
+    _applyMoodToOrb(_cpActiveMood);
+  } else if (typeof moodPill !== 'undefined') {
+    // Fallback: pill only (shouldn't happen if chat.js loaded correctly)
     if (_cpActiveMood) moodPill.update(_cpActiveMood, _cpMoodDotColor(_cpActiveMood), _cpMoodDotColor(_cpActiveMood));
     else               moodPill.update(null);
   }

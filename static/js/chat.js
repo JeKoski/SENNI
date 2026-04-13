@@ -137,18 +137,8 @@ async function loadStatus() {
     config.moods                = data.moods                ?? {};
     if (typeof moodPill !== 'undefined') {
       moodPill.setVisibility(config.mood_pill_visibility);
-      if (config.active_mood && config.moods[config.active_mood]) {
-        // Derive dot colour from mood orb/glow/dots overrides
-        const m = config.moods[config.active_mood];
-        const dotColor = m.orb?.edgeColor?.enabled  && m.orb.edgeColor.value  ||
-                         m.glow?.color?.enabled      && m.glow.color.value     ||
-                         m.dots?.color?.enabled      && m.dots.color.value     ||
-                         '#818cf8';
-        moodPill.update(config.active_mood, dotColor, dotColor);
-      } else {
-        moodPill.update(null);
-      }
     }
+    _applyMoodToOrb(config.active_mood || null);
 
     if (data.context_size) _contextSize = data.context_size;
 
@@ -213,6 +203,10 @@ function setupToolCallHandler() {
         }
       }
       updateMemoryCounts();
+      // Mood hook — instant orb + pill update when set_mood completes
+      if (name === 'set_mood') {
+        _applyMoodToOrb(args?.mood_name ?? null);
+      }
     }
   };
 
@@ -221,6 +215,85 @@ function setupToolCallHandler() {
     _saveCurrentTabState();
     saveTabs();
   };
+}
+
+// ── Mood → orb + pill ─────────────────────────────────────────────────────────
+// Single canonical bridge between config mood schema and orb.js / moodPill.
+// Called from: loadStatus() on startup, onToolCall() when set_mood completes.
+//
+// Config schema per mood:  { orb, glow, ring, dots, voice, tts }
+//   Each visual group has per-property { enabled, value } objects, e.g.:
+//   m.orb.edgeColor  = { enabled: true,  value: '#4A5568' }
+//   m.glow.color     = { enabled: false, value: '#4A5568' }
+//
+// orb.js applyPreset(preset, mood) expects mood as a flat object:
+//   { _enabled: { edgeColor: true, glowColor: true }, edgeColor: '#…', glowColor: '#…', … }
+function _applyMoodToOrb(moodName) {
+  // Update config so system prompt and memory retrieval stay in sync
+  config.active_mood = moodName || null;
+
+  if (!moodName) {
+    // Clear mood — reapply current presence preset without mood layer
+    if (typeof orb !== 'undefined') {
+      const preset = config.presence_presets?.[config.active_presence_preset] || {};
+      orb.applyPreset(preset, null);
+    }
+    if (typeof moodPill !== 'undefined') moodPill.update(null);
+    return;
+  }
+
+  const m = config.moods?.[moodName];
+  if (!m) {
+    console.warn('[mood] unknown mood:', moodName);
+    return;
+  }
+
+  // ── Translate config schema → orb.js flat mood object ──────────────────
+  const flat     = {};
+  const _enabled = {};
+
+  // Orb group: edgeColor, dotColor
+  if (m.orb?.edgeColor?.enabled)  { flat.edgeColor  = m.orb.edgeColor.value;  _enabled.edgeColor  = true; }
+  if (m.orb?.dotColor?.enabled)   { flat.dotColor   = m.orb.dotColor.value;   _enabled.dotColor   = true; }
+  if (m.orb?.size?.enabled)       { flat.orbSize     = m.orb.size.value;       _enabled.orbSize    = true; }
+  if (m.orb?.breathSpeed?.enabled){ flat.breathSpeed = m.orb.breathSpeed.value;_enabled.breathSpeed= true; }
+
+  // Glow group: color, alpha, size (glowMax), speed
+  if (m.glow?.color?.enabled)     { flat.glowColor  = m.glow.color.value;     _enabled.glowColor  = true; }
+  if (m.glow?.alpha?.enabled)     { flat.glowAlpha  = m.glow.alpha.value;     _enabled.glowAlpha  = true; }
+  if (m.glow?.size?.enabled)      { flat.glowMax    = m.glow.size.value;      _enabled.glowMax    = true; }
+  if (m.glow?.speed?.enabled)     { flat.glowSpeed  = m.glow.speed.value;     _enabled.glowSpeed  = true; }
+
+  // Ring group: color, alpha, speed
+  if (m.ring?.color?.enabled)     { flat.ringColor  = m.ring.color.value;     _enabled.ringColor  = true; }
+  if (m.ring?.alpha?.enabled)     { flat.ringAlpha  = m.ring.alpha.value;     _enabled.ringAlpha  = true; }
+  if (m.ring?.speed?.enabled)     { flat.ringSpeed  = m.ring.speed.value;     _enabled.ringSpeed  = true; }
+
+  // Dots group: color, speed
+  if (m.dots?.color?.enabled)     { flat.dotColor   = m.dots.color.value;     _enabled.dotColor   = true; }
+  if (m.dots?.speed?.enabled)     { flat.dotSpeed   = m.dots.speed.value;     _enabled.dotSpeed   = true; }
+
+  // Animation toggles (glowEnabled, breathEnabled, ringEnabled, dotsEnabled)
+  const animKeys = ['glowEnabled', 'breathEnabled', 'ringEnabled', 'dotsEnabled'];
+  animKeys.forEach(k => {
+    if (m.orb?.[k]?.enabled !== undefined) { flat[k] = m.orb[k].value; _enabled[k] = true; }
+  });
+
+  flat._enabled = _enabled;
+
+  // ── Apply to orb ────────────────────────────────────────────────────────
+  if (typeof orb !== 'undefined') {
+    const preset = config.presence_presets?.[config.active_presence_preset] || {};
+    orb.applyPreset(preset, flat);
+  }
+
+  // ── Update mood pill ─────────────────────────────────────────────────────
+  if (typeof moodPill !== 'undefined') {
+    // Pill dot colour: prefer edgeColor, fall back through glow → dots → default
+    const dotColor = flat.edgeColor || flat.glowColor || flat.dotColor || '#818cf8';
+    const edgeColor = flat.edgeColor || dotColor;
+    moodPill.update(moodName, dotColor, edgeColor);
+  }
 }
 
 // ── Server boot ───────────────────────────────────────────────────────────────

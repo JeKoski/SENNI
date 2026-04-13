@@ -147,6 +147,24 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-13 #5
+
+**Mood system hook + bugfix pass.**
+
+### What was built / fixed
+
+- `chat.js` — `onToolCall` handler now calls `_applyMoodToOrb()` when `set_mood` completes. No polling.
+- `chat.js` — `_applyMoodToOrb(moodName)` implemented. Single canonical bridge: translates config `{ enabled, value }` schema to orb.js flat `{ _enabled, ...values }` format. Calls `orb.applyPreset(preset, flat)` with current presence preset preserved underneath. Also updates `config.active_mood` and mood pill. Passing `null` clears both.
+- `chat.js` — `loadStatus()` mood block simplified: now calls `_applyMoodToOrb()` instead of inline pill-only logic. One code path for startup and tool call.
+- `orb.js` — `applyPreset()` now uses a `KEEP_MOOD = Symbol('keep')` sentinel as default for the mood argument. Mood layer is only cleared when `null` is explicitly passed, not when mood arg is omitted. Fixes orb reverting to presence-only on every state transition.
+- `companion-mood.js` — `cpMoodSetActive()` now calls `_applyMoodToOrb()` instead of only updating the pill. Orb updates immediately when activating a mood in the panel.
+- `tts.js` — `_ttsGetActiveVoices()` and `_ttsGetActiveSetting()` now check mood TTS override first. Only applied when `tts.enabled === true` explicitly. Falls through to companion default otherwise. Fixes mood TTS being applied regardless of enabled toggle.
+
+### Known issue carried forward
+
+- **Orb reverts on companion settings save** — saving in the companion panel resets the orb to presence-only. KEEP_MOOD sentinel fixes state transitions but not the save path. Needs investigation in `companion.js` / `companion-presence.js`. Next session priority.
+
+---
 ## Session notes — 2026-04-13 #4
 
 **Mood system fully implemented and working.**
@@ -171,7 +189,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### What still needs doing
 
-- **Hook orb/pill update to tool call result** — replace `_startMoodPoll()` with a direct hook on the `set_mood` tool call completing in `api.js` / `onToolCall`. Instant update, no polling overhead. Next session priority.
+- ~~**Hook orb/pill update to tool call result** — replace `_startMoodPoll()` with a direct hook on the `set_mood` tool call completing in `api.js` / `onToolCall`. Instant update, no polling overhead. Next session priority.~~
 
 ---
 

@@ -4,8 +4,9 @@ Written after design session: 2026-04-13
 Updated after implementation session: 2026-04-13 #2
 Updated after mood pill design session: 2026-04-13 #3
 Updated after full implementation session: 2026-04-13 #4
+Updated after hook + bugfix session: 2026-04-13 #5
 
-Status: **Fully implemented and working.** Mood tab built, set_mood tool working, orb + pill updating on mood change. One pending improvement: orb/pill update should be hooked to the tool call result rather than a poll loop (next session).
+Status: **Fully implemented and working.** Mood tab built, set_mood tool working, orb + pill updating on mood change. Tool call hook implemented (no polling). Known pending issue: orb reverts to presence preset when saving companion settings (see pending items).
 
 ---
 
@@ -128,13 +129,56 @@ Conversion helpers from `companion-presence.js` (globals):
 { _enabled: { edgeColor: true, glowColor: true }, edgeColor: '#6dd4a8', glowColor: '#6dd4a8' }
 ```
 
-Our config schema uses `{ enabled, value }` per property. Translation happens in `_applyMoodToOrb(moodName)` in `chat.js` — this is the single canonical bridge, do not duplicate.
+Our config schema uses `{ enabled, value }` per property. Translation happens in `_applyMoodToOrb(moodName)` in `chat.js` — this is the single canonical bridge. Do not duplicate this logic elsewhere.
+
+### Property key mapping (config → flat)
+
+| Config path | Flat key |
+|---|---|
+| `orb.edgeColor` | `edgeColor` |
+| `orb.dotColor` | `dotColor` |
+| `orb.size` | `orbSize` |
+| `orb.breathSpeed` | `breathSpeed` |
+| `glow.color` | `glowColor` |
+| `glow.alpha` | `glowAlpha` |
+| `glow.size` | `glowMax` |
+| `glow.speed` | `glowSpeed` |
+| `ring.color` | `ringColor` |
+| `ring.alpha` | `ringAlpha` |
+| `ring.speed` | `ringSpeed` |
+| `dots.color` | `dotColor` |
+| `dots.speed` | `dotSpeed` |
+
+Animation toggles (`glowEnabled`, `breathEnabled`, `ringEnabled`, `dotsEnabled`) are read from `orb.<key>.value`.
+
+---
+
+## orb.js mood persistence
+
+`orb.js` stores `_moodData` internally. `applyPreset(preset, mood)` uses a `KEEP_MOOD` sentinel as default:
+
+```js
+const KEEP_MOOD = Symbol('keep');
+function applyPreset(preset, mood = KEEP_MOOD) {
+  if (mood !== KEEP_MOOD) _moodData = mood || null;
+  ...
+}
+```
+
+This means:
+- `orb.applyPreset(preset)` — mood layer preserved (state transitions, heartbeat, etc.)
+- `orb.applyPreset(preset, null)` — mood explicitly cleared
+- `orb.applyPreset(preset, flat)` — mood set to new value
+
+Without this, every presence state transition (idle → thinking → streaming → idle) would wipe the mood layer.
 
 ---
 
 ## TTS override
 
-When a mood has `tts.enabled = true`, the entire TTS configuration (voice blend, speed, pitch) is replaced for the duration of that mood. No per-property granularity — complete override or nothing.
+When a mood has `tts.enabled = true`, the TTS voice blend, speed, and pitch are replaced for the duration of that mood. No per-property granularity — complete override or nothing.
+
+**Implementation:** `_ttsGetActiveVoices()` and `_ttsGetActiveSetting()` in `tts.js` check `config.active_mood` and `config.moods[moodName].tts.enabled` first. If enabled, mood TTS settings are used. If not, falls through to companion default from `cpSettings`. The `enabled` check is strict — `tts.enabled` must be explicitly `true`, not just truthy.
 
 ---
 
@@ -188,27 +232,14 @@ Implemented. Small pill to the right of the orb inside `#orb-home`, bottom-align
 
 ## Orb + pill update flow
 
-Currently: `_startMoodPoll()` in `chat.js` polls `/api/status` every 4 seconds. On change, calls `_applyMoodToOrb(moodName)` which updates both orb and pill.
+`_applyMoodToOrb(moodName)` in `chat.js` is the single canonical update path. Called from:
+1. `loadStatus()` — on page load, applies whatever `active_mood` is in config
+2. `onToolCall()` — when `set_mood` completes (status === 'done'), instant update, no polling
+3. `cpMoodSetActive()` in `companion-mood.js` — when user activates a mood in the panel
 
-**Pending improvement:** hook the update to the `set_mood` tool call result in `api.js` / `onToolCall` instead of polling. When `set_mood` returns successfully, call `_applyMoodToOrb()` immediately. Remove the poll loop. This is cleaner and instant — next session priority.
+Passing `null` clears the mood layer on both orb and pill.
 
----
-
-## Companion settings Mood tab
-
-**File:** `static/js/companion-mood.js` (~857 lines)
-
-**Tab:** between Presence and Voice in the companion panel.
-
-**Card structure per mood:**
-- Header (collapsed): dot, name, description preview, rotation toggle, chevron
-- Body (expanded, lazy-built): description textarea, activate button, element groups (Orb/Glow/Ring/Dots), Voice section
-
-**Element groups:** group master toggle (suspends/restores group), per-property enable toggle on every row, colour pip opens shared overlay picker via `cpOpenColorPicker()`, sliders use presence conversion helpers.
-
-**Colour picker:** shared overlay singleton (`#cp-color-overlay`) owned by `companion-color-picker.js`. Both Presence and Mood call `cpOpenColorPicker({ title, hex, onPick })` — neither knows the other's internals.
-
-**Save payload:** `_cpGetMoodPayload()` returns `{ moods, active_mood, mood_pill_visibility }`. Called by `companion.js` `cpSave()`. `_groupEnabled` is stripped before saving (UI state only).
+**No polling.** The old `_startMoodPoll()` approach was never implemented — the hook-based approach was built directly.
 
 ---
 
@@ -222,13 +253,22 @@ Currently: `_startMoodPoll()` in `chat.js` polls `/api/status` every 4 seconds. 
 6. ~~Build `companion-mood.js` + Mood tab HTML~~ — Done.
 7. ~~Add `set_mood` tool~~ — Done. (`tools/set_mood.py`, `tool-parser.js`)
 8. ~~Wire system prompt injection~~ — Done. (`chat.js` `buildSystemPrompt()`)
-9. **Hook orb/pill update to tool call result** — pending. Replace poll with direct hook in `api.js`/`onToolCall`.
+9. ~~Hook orb/pill update to tool call result~~ — Done. (`onToolCall` in `chat.js`)
+10. ~~Write `_applyMoodToOrb()`~~ — Done. (`chat.js`)
+11. ~~Fix orb mood layer being wiped by state transitions~~ — Done. (`orb.js` KEEP_MOOD sentinel)
+12. ~~Fix TTS override ignoring enabled toggle~~ — Done. (`tts.js`)
+13. ~~Wire `cpMoodSetActive()` to call `_applyMoodToOrb()`~~ — Done. (`companion-mood.js`)
+
+---
+
+## Pending / known issues
+
+- **Orb reverts on companion settings save** — when the companion panel saves, something calls `applyPreset` or equivalent that resets the orb to presence-only. The KEEP_MOOD sentinel fixes state transitions but the save path bypasses it. Needs investigation in `companion.js` / `companion-presence.js` — find what's called on save and ensure it goes through `_applyMoodToOrb` or passes the current mood through to `applyPreset`. Next session priority.
 
 ---
 
 ## Future / noted items
 
-- **Tool call hook** — replace `_startMoodPoll()` with a direct hook on `set_mood` tool result. Instant update, no polling overhead.
 - **Icon library for mood pill** — `pill_icon` field already in schema as `"dot"`. Future: user-assignable SVG icons per mood. Render-only change in `mood-pill.js`.
 - **Animation on/off toggles** — expose as overrideable property in Mood (future Presence + Mood pass).
-- **Companion Creation Wizard** — Mood tab feeds into the Wizard's mood setup step.
+- **Mood × Memory** — `mood_at_write` encoding and retrieval bias not yet implemented.

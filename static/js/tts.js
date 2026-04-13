@@ -230,7 +230,20 @@ function ttsEndGeneration() {
 // ── Voice/setting helpers ──────────────────────────────────────────────────────
 
 function _ttsGetActiveVoices() {
-  // Read from the currently loaded companion settings (set by companion.js)
+  // Mood TTS override — only applied when tts.enabled is explicitly true
+  try {
+    const moodName = (typeof config !== 'undefined') ? config.active_mood : null;
+    if (moodName) {
+      const moodTts = config?.moods?.[moodName]?.tts;
+      if (moodTts?.enabled === true) {
+        const blend = moodTts.voice_blend;
+        if (blend && typeof blend === 'object' && Object.keys(blend).length > 0) {
+          return blend;
+        }
+      }
+    }
+  } catch {}
+  // Fall back to companion default voice blend
   try {
     const tts = cpSettings?.active_companion?.tts || {};
     const blend = tts.voice_blend;
@@ -242,6 +255,18 @@ function _ttsGetActiveVoices() {
 }
 
 function _ttsGetActiveSetting(key, fallback) {
+  // Mood TTS override — only applied when tts.enabled is explicitly true
+  try {
+    const moodName = (typeof config !== 'undefined') ? config.active_mood : null;
+    if (moodName) {
+      const moodTts = config?.moods?.[moodName]?.tts;
+      if (moodTts?.enabled === true) {
+        const val = moodTts[key];
+        if (val !== undefined && val !== null) return Number(val);
+      }
+    }
+  } catch {}
+  // Fall back to companion default setting
   try {
     const tts = cpSettings?.active_companion?.tts || {};
     const val = tts[key];

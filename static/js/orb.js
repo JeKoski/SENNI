@@ -184,9 +184,14 @@ const orb = (() => {
   }
 
   // ── Public: applyPreset ───────────────────────────────────────────────────
-  function applyPreset(preset, mood = null) {
+  // mood argument:
+  //   omitted / KEEP_MOOD — preserve whatever _moodData is already set
+  //   null               — explicitly clear the mood layer
+  //   object             — set a new mood
+  const KEEP_MOOD = Symbol('keep');
+  function applyPreset(preset, mood = KEEP_MOOD) {
     if (!preset) return;
-    _moodData = mood || null;
+    if (mood !== KEEP_MOOD) _moodData = mood || null;
     if (preset.state || preset.glowColor || preset.dotColor) {
       const targetState = preset.state || _state;
       if (!_presetData) _presetData = {};
