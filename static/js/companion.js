@@ -442,6 +442,11 @@ async function cpSave(andClose = false) {
       if (livePreset) applyPresencePreset(livePreset);
     }
 
+    // ── Reapply active mood so presence save doesn't clear it ──
+    if (typeof _applyMoodToOrb === 'function') {
+      _applyMoodToOrb(body.active_mood || null);
+    }
+
     // ── Update sidebar immediately ──
     const nameEl = document.getElementById('companion-name');
     if (nameEl) nameEl.textContent = body.companion_name || 'Companion';

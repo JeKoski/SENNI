@@ -8,14 +8,13 @@ Search for it using project knowledge before doing anything else.
 ## Session Flow
 1. Start session with CLAUDE.md
 2. We'll figure out what we're doing this session. Often listed on this doc.
-3. Claude asks for needed files
-4. Surgical work happens
+3. Surgical work happens (Claude reads files directly — no uploads needed)
 
 ---
 
 ## Critical working rules
 
-- **Always provide complete files** — never code sections, never snippets, never "find X and replace with Y". The user has ADHD and finds partial edits extremely difficult. Full file replacements only.
+- **Prefer surgical edits** — use targeted find-and-replace edits for most changes. Full file rewrites are fine for large refactors where most of the file is changing. The old "complete files only" rule was a Web UI workaround — Claude Code applies edits directly, so partial edits are no longer a problem.
 - **One file at a time** where possible. Flag upfront if a feature will require touching multiple files and get agreement before proceeding.
 - **Stop and check in** if things start going wrong rather than pushing through. Escalating complexity when stuck makes things worse.
 - **Never ask the user to remember to do things** at specific times — ADHD means this won't work. Automate it or build it into existing flows instead.
