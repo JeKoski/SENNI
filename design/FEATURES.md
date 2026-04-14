@@ -44,10 +44,7 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 ## Companion
 
-- **Timeline awareness**
-  - The companion should be better attuned to the passage of time — not just aware of the current date, but sensitive to how much time has passed since the last message or session.
-  - `get_time` should be called as a direct system instruction at session start, and again if a significant gap since the previous message is detected (e.g. after a long idle). Currently it relies on the companion choosing to call it herself, which is unreliable.
-  - Implementation note: session-start instruction could inject the current timestamp automatically rather than requiring a tool call. Mid-session gap detection could piggyback on the idle timer already used for consolidation.
+- ~~**Timeline awareness**~~ — **Done (partial).** Time of day now injected into system prompt alongside date, re-computed each turn. Memory resurfaced on `newChat()` and empty tab switches. Remaining: mid-session gap detection (long idle → re-inject updated timestamp) — piggyback on consolidation idle timer when needed.
 
 - **Companion Templates rework** *(design needed)*
   - Current templates (soul files, user profile, etc.) were designed before the ChromaDB memory system existed and may clash with or duplicate what the system now manages automatically.

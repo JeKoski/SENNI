@@ -329,8 +329,10 @@ async function switchTab(id) {
   document.getElementById('msg-input')?.focus();
   _saveTabIndex();
 
-  if (!tab.messages?.length && typeof heartbeatOnSessionStart === 'function') {
-    heartbeatOnSessionStart();
+  if (!tab.messages?.length) {
+    // Fresh tab — resurface memory context and fire session-start heartbeat
+    if (typeof reloadMemoryContext === 'function') reloadMemoryContext();
+    if (typeof heartbeatOnSessionStart === 'function') heartbeatOnSessionStart();
   }
 }
 

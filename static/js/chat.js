@@ -630,6 +630,9 @@ function newChat(keepVisible) {
     saveTabs();
     appendSystemNote('--- context reset --- new conversation below ---');
   }
+  // Refresh memory context so the new conversation starts with fresh surface
+  reloadMemoryContext();
+
   enableInput();
   document.getElementById('msg-input')?.focus();
 }
@@ -822,7 +825,9 @@ async function sendMessage() {
 // ── System prompt ─────────────────────────────────────────────────────────────
 function buildSystemPrompt(mode) {
   const name = (companionName && companionName !== 'Companion') ? companionName : 'an AI companion';
-  const date = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const now  = new Date();
+  const date = now.toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // Soul files — static identity layer
   let identity = '';
@@ -830,7 +835,7 @@ function buildSystemPrompt(mode) {
     if (text && text.trim()) identity += '\n\n[' + fname + ']\n' + text.trim();
   }
 
-  let p = 'Your name is ' + name + '. Today is ' + date + '.';
+  let p = 'Your name is ' + name + '. Today is ' + date + ', ' + time + '.';
   if (identity) p += '\n\nYour identity:\n' + identity;
 
   // Memory context — session-start retrieval from ChromaDB (empty when unavailable)
