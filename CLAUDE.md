@@ -14,25 +14,26 @@ Search for it using project knowledge before doing anything else.
 
 ## Critical working rules
 
+- **Modular Architecture:** We should work towards making everything modular - within reason - while creating new code and also noting down possible refactors when going over old code. Adding, editing or replacing small or large components shouldn't require edits across multiple files. Creating separate helper scripts when functionality repeats will help with consistency and bug fixing.
+- **Simplicity and efficiency** — are to be prioritized when it makes sense. Overengineering is to be avoided.
 - **Prefer surgical edits** — use targeted find-and-replace edits for most changes. Full file rewrites are fine for large refactors where most of the file is changing. The old "complete files only" rule was a Web UI workaround — Claude Code applies edits directly, so partial edits are no longer a problem.
 - **One file at a time** where possible. Flag upfront if a feature will require touching multiple files and get agreement before proceeding.
 - **Stop and check in** if things start going wrong rather than pushing through. Escalating complexity when stuck makes things worse.
 - **Never ask the user to remember to do things** at specific times — ADHD means this won't work. Automate it or build it into existing flows instead.
 - **Suggest Extended Thinking** and/or Opus when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
 - **End every session by updating CLAUDE.md and any relevant design docs.** This is non-negotiable — it's what makes the next session productive.
-- Remind user to push changes and refresh project knowledge.
 
 ---
 
 ## Project overview
 
-SENNI is a local AI companion framework. Currently running with Qwen3.5 9B Q4_K_M, Intel Arc GPU. Also tested with Gemma 4 on Vulkan.
+SENNI is a local AI companion framework. Currently running with Gemma 4 E4B Q4_K_M, Intel Arc GPU. Previously Qwen3.5 9B Q4_K_M.
 
 Two servers:
 - **Python bridge** (`scripts/server.py`) — FastAPI, handles UI, tools, config. Needs terminal restart for changes.
 - **llama-server** — the model itself. Can be restarted in-app.
 
-Runs on Linux (primary dev) and Windows (also tested and supported).
+Runs on Linux (primary dev) and Windows (also tested and supported). Currently mostly running on Windows while still on old PC.
 
 ---
 
