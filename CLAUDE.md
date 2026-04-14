@@ -95,6 +95,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 - ~~**Orb edge color not applying from presence preset**~~ — **Fixed**
 - ~~**Heartbeat state uses idle values**~~ — **Fixed**
+- ~~**Orb reverts on companion settings save**~~ — **Fixed**. `cpSave()` in `companion.js` now reapplies active mood after applying presence preset.
 
 ### Chat
 
@@ -146,6 +147,24 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-14
+
+**Claude Code Desktop App setup + three bug/feature fixes.**
+
+### What changed
+
+- **Workflow** — migrated from Web UI to Claude Code Desktop App. CLAUDE.md and session flow updated to reflect surgical edits, direct file access, and branch-per-session git workflow.
+- `.gitignore` — added `.claude/` entry to exclude Claude Code worktree folder from git.
+- `companion.js` — **fix:** `cpSave()` now reapplies active mood after applying presence preset, so orb no longer reverts to presence-only on settings save.
+- `chat.js` — time of day now injected into system prompt alongside date (re-computed each turn). `reloadMemoryContext()` added to `newChat()` so memory is resurfaced on context reset and clear chat.
+- `chat-tabs.js` — `reloadMemoryContext()` added to `switchTab()` for new/empty tabs so memory surfaces when a new chat tab is opened.
+
+### Next session
+
+- **Pill visual rework** — real-time streaming content into thinking pills + visual consistency with chat bubbles. Bundles the alignment/padding bug fix.
+
+---
+
 ## Session notes — 2026-04-13 #5
 
 **Mood system hook + bugfix pass.**
@@ -158,10 +177,6 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - `orb.js` — `applyPreset()` now uses a `KEEP_MOOD = Symbol('keep')` sentinel as default for the mood argument. Mood layer is only cleared when `null` is explicitly passed, not when mood arg is omitted. Fixes orb reverting to presence-only on every state transition.
 - `companion-mood.js` — `cpMoodSetActive()` now calls `_applyMoodToOrb()` instead of only updating the pill. Orb updates immediately when activating a mood in the panel.
 - `tts.js` — `_ttsGetActiveVoices()` and `_ttsGetActiveSetting()` now check mood TTS override first. Only applied when `tts.enabled === true` explicitly. Falls through to companion default otherwise. Fixes mood TTS being applied regardless of enabled toggle.
-
-### Known issue carried forward
-
-- **Orb reverts on companion settings save** — saving in the companion panel resets the orb to presence-only. KEEP_MOOD sentinel fixes state transitions but not the save path. Needs investigation in `companion.js` / `companion-presence.js`. Next session priority.
 
 ---
 ## Session notes — 2026-04-13 #4
