@@ -269,6 +269,60 @@ body::before {
 }
 .attach-btn:hover { color: var(--indigo-hi); background: var(--indigo-glow); }
 
+.mic-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: color .2s, background .2s;
+}
+.mic-btn:hover { color: rgba(248,113,113,0.8); background: rgba(248,113,113,0.1); }
+
+/* ── Voice recording indicator ─────────────────────────────────────────────── */
+.voice-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+.voice-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  flex-shrink: 0;
+  animation: voicePulse 1.1s ease-in-out infinite;
+}
+@keyframes voicePulse {
+  0%,100% { opacity: 1;   transform: scale(1); }
+  50%     { opacity: 0.4; transform: scale(0.75); }
+}
+#voice-timer {
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  color: var(--red);
+  min-width: 28px;
+}
+.voice-stop-btn {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 11px;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.voice-stop-btn:hover { background: rgba(248,113,113,0.15); }
+
 .send-btn {
   width: 42px; height: 42px;
   background: linear-gradient(135deg, #6366f1, #7c3aed);
