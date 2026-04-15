@@ -83,32 +83,33 @@ body::before {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
-.companion-header-top {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
 .avatar {
-  width: clamp(80px, calc(var(--sidebar-w) - 32px), 220px);
-  height: clamp(80px, calc(var(--sidebar-w) - 32px), 220px);
-  border-radius: 50%;
+  width: calc(var(--sidebar-w) - 16px);
+  max-width: 320px;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
   background: linear-gradient(135deg, #6366f1, #7c3aed);
   display: flex; align-items: center; justify-content: center;
   font-size: clamp(28px, calc(var(--sidebar-w) * 0.18), 64px);
   flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(129,140,248,0.25);
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
 }
 .companion-name {
   font-family: 'Lora', serif;
   font-size: 16px;
   color: #eef0fb;
   line-height: 1.2;
+}
+.companion-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .companion-status {
   font-size: 11px;
