@@ -106,8 +106,13 @@ function _startChunk() {
   _curRecorder.onstop = async () => {
     const blob = new Blob(_curChunkBlobs, { type: _curRecorder.mimeType || 'audio/webm' });
     await _finaliseChunk(blob, _chunkCount);
-    // If still recording, start the next chunk immediately
-    if (_isRecording) _startChunk();
+    if (_isRecording) {
+      // Mid-session chunk boundary — start the next chunk immediately
+      _startChunk();
+    } else {
+      // Recording fully stopped — auto-send
+      if (typeof sendMessage === 'function') sendMessage();
+    }
   };
 
   _curRecorder.start();
