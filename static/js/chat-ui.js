@@ -147,7 +147,10 @@ function autoResize(el) {
     if (!sidebar || !handle) return;
 
     const saved = localStorage.getItem('sidebar_width');
-    if (saved) sidebar.style.width = saved + 'px';
+    if (saved) {
+      sidebar.style.width = saved + 'px';
+      document.documentElement.style.setProperty('--sidebar-w', saved + 'px');
+    }
 
     let startX = 0, startW = 0, dragging = false;
 
@@ -166,6 +169,7 @@ function autoResize(el) {
       const delta = e.clientX - startX;
       const newW  = Math.min(400, Math.max(160, startW + delta));
       sidebar.style.width = newW + 'px';
+      document.documentElement.style.setProperty('--sidebar-w', newW + 'px');
     });
 
     document.addEventListener('mouseup', () => {
