@@ -392,6 +392,7 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
       }
     }
   } catch(e) {
+    if (typeof sealThinkingBlock === "function") sealThinkingBlock();
     if (e.name === "AbortError") {
       if (typeof ttsStop === "function") ttsStop();
       if (bubbleHandle) _finaliseStreamBubble(bubbleHandle, accumulated);
@@ -401,6 +402,10 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
     return null;
   }
 
+  // Seal any streaming thinking block — handles the case where the model goes
+  // straight from thinking into a tool call with no text preamble (in which case
+  // _createStreamBubble is never called and the dots would otherwise stay).
+  if (typeof sealThinkingBlock === "function") sealThinkingBlock();
   if (typeof setPresenceState === "function") setPresenceState("idle");
   if (bubbleHandle) {
     _finaliseStreamBubble(bubbleHandle, accumulated);
@@ -421,6 +426,8 @@ function streamWasRendered() {
 
 function _createStreamBubble() {
   document.querySelector(".typing-row")?.remove();
+  // Thinking phase just ended — seal the streaming thinking block (collapse + remove cursor).
+  if (typeof sealThinkingBlock === "function") sealThinkingBlock();
 
   const list = document.getElementById("messages");
   if (!list) return null;
@@ -452,9 +459,13 @@ function _updateStreamBubble({ bubble }, text) {
   if (!bubble) return;
   bubble.dataset.rawText = text;
   const rendered = typeof renderMarkdown === "function" ? renderMarkdown(text) : text;
-  // Inject the cursor span inline at the very end of the rendered content
-  // so it sits after the last character, not below the last paragraph block.
-  bubble.innerHTML = rendered + '<span class="stream-cursor"></span>';
+  // Insert cursor INSIDE the last block element so it sits inline with the
+  // text rather than below it (appending after </p> creates a new block).
+  const cursor = '<span class="stream-cursor"></span>';
+  const html = rendered.endsWith('</p>')
+    ? rendered.slice(0, -4) + cursor + '</p>'
+    : rendered + cursor;
+  bubble.innerHTML = html;
   // Use scrollIfFollowing so we don't fight the user if they've scrolled up
   if (typeof scrollIfFollowing === "function") scrollIfFollowing();
   else if (typeof scrollToBottom === "function") scrollToBottom();

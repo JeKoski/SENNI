@@ -16,9 +16,14 @@ let _markdownEnabled = false;
 
 function setMarkdownEnabled(val) {
   _markdownEnabled = !!val;
-  document.querySelectorAll('.bubble[data-raw-text]').forEach(b => {
+  // Exclude active stream bubbles — re-rendering them strips the cursor span.
+  document.querySelectorAll('.bubble[data-raw-text]:not(.stream-bubble)').forEach(b => {
     b.innerHTML = renderMarkdown(b.dataset.rawText);
   });
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function renderMarkdown(text) {
@@ -106,27 +111,44 @@ function appendThinkingBlock(thinkText) {
   if (_pendingThinkId) {
     const existing = document.getElementById(_pendingThinkId);
     if (existing) {
-      existing.querySelector('.think-content').textContent = thinkText;
+      // Still streaming — update content with inline cursor
+      const content = existing.querySelector('.think-content');
+      if (content) content.innerHTML = escapeHtml(thinkText) + '<span class="stream-cursor"></span>';
       return;
     }
   }
 
   const id = 'think-' + Date.now();
   const el = document.createElement('div');
-  el.className = 'think-wrap';
+  el.className = 'think-wrap streaming';
   el.id = id;
   el.innerHTML = `
     <button class="think-toggle" onclick="this.closest('.think-wrap').classList.toggle('open')">
       ${THINK_ICON}
       <span class="think-label">Thinking</span>
+      <span class="think-dots"><span class="think-dot"></span><span class="think-dot"></span><span class="think-dot"></span></span>
       <span class="think-chevron">▶</span>
     </button>
     <div class="think-body"><div class="think-content"></div></div>`;
-  el.querySelector('.think-content').textContent = thinkText;
+  el.querySelector('.think-content').innerHTML = escapeHtml(thinkText) + '<span class="stream-cursor"></span>';
   list.appendChild(el);
-  _pendingThinkId = null;
+  _pendingThinkId = id;
   scrollToBottom();
   return el;
+}
+
+// Called when the model starts responding (thinking phase is over).
+// Collapses the streaming thinking block and removes the cursor.
+function sealThinkingBlock() {
+  const el = document.querySelector('.think-wrap.streaming');
+  if (!el) return;
+  el.classList.remove('streaming', 'open');
+  const content = el.querySelector('.think-content');
+  if (content) {
+    // Remove cursor span, keep plain text
+    content.textContent = content.textContent;
+  }
+  _pendingThinkId = null;
 }
 
 // ── Tool indicators ───────────────────────────────────────────────────────────

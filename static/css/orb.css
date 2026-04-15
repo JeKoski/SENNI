@@ -67,6 +67,11 @@
 body.orb-inline .msg-row.companion {
   padding-left: var(--orb-indent);
 }
+/* Align thinking blocks and tool indicators with companion bubble text in orb-inline mode */
+body.orb-inline .think-wrap,
+body.orb-inline .tool-indicator {
+  margin-left: var(--orb-indent);
+}
 
 .msg-row.companion {
   margin-bottom: calc(var(--orb-size, 36px) - var(--orb-overlap-y) + 8px);
