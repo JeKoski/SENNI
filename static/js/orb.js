@@ -150,6 +150,11 @@ const orb = (() => {
     Object.entries(overrides).forEach(([prop, val]) => {
       orbEl.style.setProperty(prop.startsWith('--') ? prop : '--' + prop, val);
     });
+    // Propagate color vars to :root so other elements (e.g. sidebar avatar
+    // border) can consume them without being inside the orb subtree.
+    ['--orb-border', '--glow-color'].forEach(prop => {
+      if (prop in overrides) document.documentElement.style.setProperty(prop, overrides[prop]);
+    });
     ANIMATIONS.forEach(anim => {
       const attr = 'data-no-' + anim.id.replace('Enabled', '').toLowerCase();
       if (overrides['--anim-' + anim.id] === '0') {
