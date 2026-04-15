@@ -64,20 +64,26 @@ function _makeSessionId() {
 
 // ── Disk save / load ──────────────────────────────────────────────────────────
 
-// Strip inline base64 image content from history entries before saving to disk.
-// Images are written as separate files; history entries keep path references.
+// Strip inline base64 image/audio content from history entries before saving to disk.
+// Media files are written as separate files; history entries keep path references.
 // Handles two formats:
-//   _attachments: [{type:'image', content: base64, mimeType, ...}]  ← chat.js format
-//   content: [{type:'image_url', image_url:{url:'data:...'}}]        ← API array format
-let _pendingImages = []; // [{name, data_url}] — flushed in _saveCurrentSessionToDisk
+//   _attachments: [{type:'image'|'audio', content: base64, mimeType, ...}]  ← chat.js format
+//   content: [{type:'image_url'|'audio_url', image_url|audio_url:{url:'data:...'}}]  ← API format
+let _pendingImages = []; // [{name, data_url}] — flushed in _saveCurrentSessionToDisk (images + audio)
 
 function _stripImagesFromHistory(history) {
   return history.map(msg => {
-    // ── _attachments format (how chat.js stores image attachments) ──
+    // ── _attachments format (how chat.js stores attachments) ──
     if (msg._attachments?.length) {
       msg._attachments.filter(a => a.type === 'image').forEach(a => {
         const dataUrl = `data:${a.mimeType};base64,${a.content}`;
         const name = `img_${String(_pendingImages.length + 1).padStart(3, '0')}` +
+                     _extFromDataUrl(dataUrl);
+        _pendingImages.push({ name, data_url: dataUrl });
+      });
+      msg._attachments.filter(a => a.type === 'audio').forEach(a => {
+        const dataUrl = `data:${a.mimeType};base64,${a.content}`;
+        const name = `aud_${String(_pendingImages.length + 1).padStart(3, '0')}` +
                      _extFromDataUrl(dataUrl);
         _pendingImages.push({ name, data_url: dataUrl });
       });
@@ -86,7 +92,7 @@ function _stripImagesFromHistory(history) {
       return rest;
     }
 
-    // ── API array-format content (image_url parts) ──
+    // ── API array-format content (image_url / audio_url parts) ──
     if (Array.isArray(msg.content)) {
       const stripped = msg.content.map(part => {
         if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
@@ -94,6 +100,12 @@ function _stripImagesFromHistory(history) {
                        _extFromDataUrl(part.image_url.url);
           _pendingImages.push({ name, data_url: part.image_url.url });
           return { type: 'image_ref', path: name };
+        }
+        if (part.type === 'audio_url' && part.audio_url?.url?.startsWith('data:')) {
+          const name = `aud_${String(_pendingImages.length + 1).padStart(3, '0')}` +
+                       _extFromDataUrl(part.audio_url.url);
+          _pendingImages.push({ name, data_url: part.audio_url.url });
+          return { type: 'audio_ref', path: name };
         }
         return part;
       });
@@ -105,11 +117,14 @@ function _stripImagesFromHistory(history) {
 }
 
 function _extFromDataUrl(dataUrl) {
-  const m = dataUrl.match(/^data:image\/(\w+);/);
+  // Handles image/* and audio/* MIME types (codecs suffix ignored by \w+)
+  const m = dataUrl.match(/^data:(image|audio)\/(\w+)/);
   if (!m) return '.bin';
-  const t = m[1].toLowerCase();
-  if (t === 'jpeg') return '.jpg';
-  return '.' + t;
+  const [, category, sub] = m;
+  const s = sub.toLowerCase();
+  if (category === 'image') return s === 'jpeg' ? '.jpg' : '.' + s;
+  // audio: webm/opus captures as 'webm', mp3 = mpeg, ogg, wav, mp4
+  return s === 'mpeg' ? '.mp3' : s === 'ogg' ? '.ogg' : s === 'mp4' ? '.mp4' : s === 'wav' ? '.wav' : '.webm';
 }
 
 async function saveTabs() {
@@ -461,6 +476,12 @@ function _serializeMessages() {
           if (img.src.startsWith('data:')) {
             const ref = img.getAttribute('data-img-ref');
             img.src = `/api/history/media/${folder}/${_activeTabId}/${_currentSessionId}/${ref}`;
+          }
+        });
+        clone.querySelectorAll('audio[data-audio-ref]').forEach(aud => {
+          if (aud.src.startsWith('data:')) {
+            const ref = aud.getAttribute('data-audio-ref');
+            aud.src = `/api/history/media/${folder}/${_activeTabId}/${_currentSessionId}/${ref}`;
           }
         });
         const entry = { type: 'message', role, html: clone.innerHTML, time: time?.textContent || '' };

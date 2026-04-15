@@ -148,6 +148,12 @@
       <div id="attachment-strip" style="display:none"></div>
       <div class="input-wrap" id="input-wrap">
         <button class="attach-btn" id="attach-btn" onclick="openAttachMenu(event)" title="Attach file">+</button>
+        <button class="mic-btn"    id="mic-btn"    onclick="voiceStart()"           title="Voice input">🎙</button>
+        <div id="voice-indicator" class="voice-indicator" style="display:none">
+          <span class="voice-dot"></span>
+          <span id="voice-timer">0:00</span>
+          <button class="voice-stop-btn" onclick="voiceStop()" title="Stop recording">■</button>
+        </div>
         <textarea
           id="msg-input"
           placeholder="Say something…"
@@ -781,6 +787,7 @@
 <script src="/static/js/tool-parser.js"></script>
 <script src="/static/js/api.js"></script>
 <script src="/static/js/attachments.js"></script>
+<script src="/static/js/voice-input.js"></script>
 <script src="/static/js/orb.js"></script>
 <script src="/static/js/message-renderer.js"></script>
 <script src="/static/js/chat-ui.js"></script>

@@ -98,6 +98,8 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - ~~**Heartbeat state uses idle values**~~ — **Fixed**
 - ~~**Orb reverts on companion settings save**~~ — **Fixed**. `cpSave()` in `companion.js` now reapplies active mood after applying presence preset.
 - ~~**Presence settings changes don't apply live**~~ — **Fixed.** `cpSave()` now updates `config.presence_presets` and `config.active_presence_preset` before calling `_applyMoodToOrb`, so it reads fresh values instead of overwriting the orb with stale page-load data.
+- ~~**Message controls misaligned in orb-inline mode**~~ — **Fixed.** Added `body.orb-inline .msg-row.companion .msg-controls { left: calc(var(--orb-indent) + 8px) }` in `orb.css`.
+- ~~**Memory/heartbeat pills not indented in orb-inline mode**~~ — **Fixed.** Added `.memory-pill` and `.heartbeat-pill` to the existing `margin-left: var(--orb-indent)` rule in `orb.css`.
 
 ### Chat
 
@@ -149,6 +151,35 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-16 #2
+
+**Rich attachment types + voice input — partially complete (session ran out of context).**
+
+### What changed
+
+- `static/js/chat.js` — `sendMessage()`: replaced text-label fallback for audio/doc attachments with visual elements. Audio → `<audio controls class="msg-audio" data-audio-ref="aud_NNN.ext">`. Text files → `.msg-doc-chip` div with 📄 icon. `attachLabel` removed (all types now have visual treatment). Audio note still appended to `histContent` as model fallback.
+- `static/js/api.js` — Message transformation now includes audio. `audios = m._attachments.filter(a => a.type === "audio")` extracted alongside images. Audio included in content array as `{ type: "audio_url", audio_url: { url: "data:..." } }` — format comment included for easy adjustment if llama-server uses a different key. Audio only included for `idx === lastUserIdx` (always "once" — never re-sent for older messages).
+- `static/js/chat-tabs.js` — `_stripImagesFromHistory`: extended to also extract audio from `_attachments` (pushed to `_pendingImages` queue with `aud_NNN` names) and strip `audio_url` parts from API-format content arrays. `_extFromDataUrl`: extended to handle `audio/*` MIME types. `_serializeMessages`: extended to rewrite `audio[data-audio-ref]` data: src → media route URL on save, mirroring the image pattern. Server already accepts any data_url in its `images` array — no server changes needed.
+- `static/js/attachments.js` — Added `addAttachment(att)` public function for voice-input.js to push chunks directly into the attachment queue without going through file pickers.
+- `static/js/voice-input.js` — **New file.** MediaRecorder-based voice recording. `voiceStart()` / `voiceStop()` public API. Auto-split at 30s: `_startChunk()` creates a new `MediaRecorder`, sets a 30s `setTimeout` that stops it (triggering `onstop`), which finalises the chunk via `_finaliseChunk(blob, chunkNum)` (base64-encodes, calls `addAttachment`) then starts the next chunk if still recording. `voiceStop()` sets `_isRecording = false` so `onstop` doesn't start a new chunk. Prefers `audio/webm;codecs=opus`, falls back through webm/ogg/mp4/browser-default.
+- `static/chat.html` — Mic button (`.mic-btn#mic-btn`) and voice indicator (`#voice-indicator` with pulsing dot, timer, stop button) added inside `.input-wrap`. `voice-input.js` loaded after `attachments.js`.
+- `static/css/messages.css` — Added `.msg-audio` (block, max 280px, accent-color indigo) and `.msg-doc-chip` (indigo pill with icon).
+- `static/css/base.css` — Added `.mic-btn` (same shape as attach-btn, red hover tint), `.voice-indicator`, `.voice-dot` (pulsing red), `#voice-timer` (DM Mono, red), `.voice-stop-btn`.
+
+### What still needs doing (next session)
+
+- **Test and verify** — no live testing done this session (ran out of context). Verify:
+  1. Audio file attachment → chip in strip → send → `<audio>` player appears in bubble and plays
+  2. Text file attachment → chip in strip → send → `📄 filename` chip in bubble (no `[File: ...]` text)
+  3. Voice button → mic permission → recording indicator with timer → 30s auto-split → multiple chips → send → all players in bubble
+  4. Tab reload → audio players restored (media route URLs)
+  5. Check DevTools: outgoing request has `audio_url` content part (or falls back gracefully if unsupported)
+- **`audio_url` format may need adjustment** — `audio_url` is best-guess for llama-server + Gemma 4. Location to change: `api.js` in the `audios.map(...)` block. Alternative format: `{ type: "input_audio", input_audio: { data: aud.content, format: "wav" } }`
+- **Orb-inline bug fixes from this session** — `.memory-pill`, `.heartbeat-pill`, and companion `.msg-controls` left-offset fixed in `orb.css`. Applied before rich attachments work.
+- **Presence save bug fix** — `cpSave()` now updates `config.presence_presets` before `_applyMoodToOrb` so orb updates correctly after saving presence settings.
+
+---
+
 ## Session notes — 2026-04-16
 
 **Image storage fixes — avatar extract + inline thumbnails + two follow-up bug fixes.**
@@ -173,6 +204,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### Next session
 
+- **Rich attachments + voice input — finish remaining work** — see "Session notes — 2026-04-16 #2" below for what's done and what's left.
 - **Sidebar redesign design conversation** — tools list → Settings, companion state card (larger avatar + mood + recent memory), memory viewer/editor. Needs dedicated design session before building.
 - **Image thumbnail click-to-expand** — `.msg-img` shows thumbnail. Click to view full size not yet implemented.
 
