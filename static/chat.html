@@ -164,7 +164,7 @@
       <button class="cp-tab" data-tab="generation" onclick="cpSwitchTab('generation')">Generation</button>
       <button class="cp-tab" data-tab="memory"     onclick="cpSwitchTab('memory')">Memory</button>
       <button class="cp-tab" data-tab="heartbeat"  onclick="cpSwitchTab('heartbeat')">Heartbeat</button>
-      <button class="cp-tab" data-tab="presence"   onclick="cpSwitchTab('presence')" style="color:rgba(167,139,250,0.7)">Presence ✦</button>
+      <button class="cp-tab cp-tab-special" data-tab="presence"   onclick="cpSwitchTab('presence')">Presence ✦</button>
       <button class="cp-tab" data-tab="mood"       onclick="cpSwitchTab('mood')">Mood</button>
       <button class="cp-tab" data-tab="voice"      onclick="cpSwitchTab('voice')">Voice</button>
       <button class="cp-tab" data-tab="tools"     onclick="cpSwitchTab('tools')">Tools</button>
@@ -172,20 +172,24 @@
     <!-- Identity -->
     <div class="cp-tab-body" id="cp-tab-identity">
       <div class="cp-section">Avatar</div>
+      <!-- Two slot previews — click either to re-crop -->
+      <div class="cp-av-slots">
+        <div class="cp-av-slot" onclick="cpAvatarRecrop('orb')" title="Click to re-crop for orb">
+          <div class="cp-av-orb-prev" id="cp-av-orb-prev">✦</div>
+          <span class="cp-av-slot-label">Orb</span>
+        </div>
+        <div class="cp-av-slot" onclick="cpAvatarRecrop('sidebar')" title="Click to re-crop for sidebar">
+          <div class="cp-av-sb-prev" id="cp-av-sb-prev">✦</div>
+          <span class="cp-av-slot-label">Sidebar</span>
+        </div>
+      </div>
       <div class="cp-avatar-zone" ondragover="event.preventDefault()" ondrop="cpAvatarDrop(event)">
-        <div class="cp-avatar-preview" id="cp-avatar-preview">✦</div>
         <div class="cp-avatar-hint">
           Drop image or <span class="cp-link" onclick="cpAvatarBrowse()">browse</span>
-          <span id="cp-avatar-reset-wrap" style="display:none"> · <span class="cp-link cp-link-muted" onclick="cpAvatarReset()">reset to default</span></span>
+          <span id="cp-avatar-reset-wrap" style="display:none"> · <span class="cp-link cp-link-muted" onclick="cpAvatarReset()">clear</span></span>
         </div>
       </div>
       <input type="file" id="cp-avatar-file" accept="image/*" style="display:none" onchange="cpAvatarFile(this)"/>
-      <div id="cp-crop-wrap" style="display:none">
-        <img id="cp-crop-img" style="max-width:240px;border-radius:12px;display:block;margin:0 auto 10px"/>
-        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
-          <button class="sp-btn-primary" onclick="cpAvatarCrop()">Use this</button>
-        </div>
-      </div>
       <div class="cp-section" style="margin-top:16px">Name</div>
       <input type="text" class="cp-input" id="cp-companion-name" placeholder="Companion name" style="margin-bottom:16px" oninput="cpMarkDirty()"/>
       <div class="cp-section">Identity editing <span class="cp-note">what the companion can change about itself</span></div>
@@ -550,6 +554,35 @@
       <button class="sp-btn-primary" onclick="cpSave(true)">Save &amp; close</button>
     </div>
   </div>
+
+  <!-- Avatar crop modal — overlays the companion panel -->
+  <div id="cp-avatar-modal" style="display:none">
+    <div class="cp-av-backdrop" onclick="cpAvatarDone()"></div>
+    <div class="cp-av-box">
+      <div class="cp-av-header">
+        <span>Crop Avatar</span>
+        <button class="cp-av-close-btn" onclick="cpAvatarDone()">✕</button>
+      </div>
+      <div class="cp-av-mode-row">
+        <button class="cp-av-mode-btn active" data-mode="orb" onclick="cpAvatarSetMode('orb')">
+          Orb <span class="cp-av-check" id="cp-av-orb-check" style="display:none">✓</span>
+        </button>
+        <button class="cp-av-mode-btn" data-mode="sidebar" onclick="cpAvatarSetMode('sidebar')">
+          Sidebar <span class="cp-av-check" id="cp-av-sb-check" style="display:none">✓</span>
+        </button>
+      </div>
+      <canvas id="cp-avatar-canvas" width="360" height="360"></canvas>
+      <div class="cp-av-zoom-row">
+        <button class="cp-av-zoom-btn" onclick="cpAvatarZoom(-0.03)">−</button>
+        <span class="cp-av-zoom-label">Zoom</span>
+        <button class="cp-av-zoom-btn" onclick="cpAvatarZoom(0.03)">+</button>
+      </div>
+      <div class="cp-av-actions">
+        <button class="cp-btn cp-btn-secondary" onclick="cpAvatarApply()">Set for this slot</button>
+        <button class="cp-btn cp-btn-primary" onclick="cpAvatarDone()">Done</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ── Settings overlay ──────────────────────────────────────────────────── -->
@@ -785,6 +818,7 @@
 <script src="/static/js/chat.js"></script>
 <script src="/static/js/heartbeat.js"></script>
 <script src="/static/js/tts.js"></script>
+<script src="/static/js/companion-avatar.js"></script>
 <script src="/static/js/companion.js"></script>
 <script src="/static/js/companion-presence.js"></script>
 <script src="/static/js/companion-color-picker.js"></script>

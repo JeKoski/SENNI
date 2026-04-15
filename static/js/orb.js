@@ -208,9 +208,9 @@ const orb = (() => {
     setState(_state);
   }
 
-  // ── Public: syncAvatar ────────────────────────────────────────────────────
-  function syncAvatar() {
-    const src  = document.querySelector('#companion-avatar img')?.src;
+  // ── Public: setAvatar ─────────────────────────────────────────────────────
+  // Set orb avatar directly from a URL — used when orb has its own crop.
+  function setAvatar(src) {
     const icon = document.getElementById('orb-icon');
     if (!icon) return;
     if (src) {
@@ -218,6 +218,14 @@ const orb = (() => {
     } else {
       icon.textContent = '✦';
     }
+  }
+
+  // ── Public: syncAvatar ────────────────────────────────────────────────────
+  // Sync orb avatar from the sidebar #companion-avatar element.
+  // Used on page load when separate orb URL is not yet known.
+  function syncAvatar() {
+    const src = document.querySelector('#companion-avatar img')?.src;
+    setAvatar(src || '');
   }
 
   // ── Public: setMode ───────────────────────────────────────────────────────
@@ -239,6 +247,6 @@ const orb = (() => {
     return `rgba(${r},${g},${b},${alpha})`;
   }
 
-  return { init, setState, applyPreset, syncAvatar, setMode, ANIMATIONS };
+  return { init, setState, applyPreset, setAvatar, syncAvatar, setMode, ANIMATIONS };
 
 })();

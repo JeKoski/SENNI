@@ -461,6 +461,7 @@ async def api_status():
         # calling /api/boot a second time while the model is still loading.
         "model_launching":           _boot_launching and not _boot_ready,
         "avatar_url":                f"/api/companion/{comp_folder}/avatar" if companion_cfg.get("avatar_path") else "",
+        "sidebar_avatar_url":        f"/api/companion/{comp_folder}/avatar?slot=sidebar" if companion_cfg.get("sidebar_avatar_path") else "",
         "companion_name":            companion_cfg.get("companion_name", config.get("companion_name", "")),
         "context_size":              int(ctx_size) if ctx_size else 16384,
         "effective_generation":      effective_gen,
@@ -888,7 +889,8 @@ async def api_get_settings():
     comp_folder = config.get("companion_folder", "default")
     active_cfg  = load_companion_config(comp_folder)
     active_cfg  = migrate_avatar(comp_folder, active_cfg)
-    active_cfg["avatar_url"] = f"/api/companion/{comp_folder}/avatar" if active_cfg.get("avatar_path") else ""
+    active_cfg["avatar_url"]         = f"/api/companion/{comp_folder}/avatar" if active_cfg.get("avatar_path") else ""
+    active_cfg["sidebar_avatar_url"] = f"/api/companion/{comp_folder}/avatar?slot=sidebar" if active_cfg.get("sidebar_avatar_path") else ""
     return {
         "config":                   config,
         "companions":               companions,
@@ -992,16 +994,45 @@ async def api_save_companion_settings(request: Request):
     companion_folder = body.get("folder", config.get("companion_folder", "default"))
     companion_cfg    = load_companion_config(companion_folder)
 
-    # Avatar: write to file instead of storing base64 in config
-    if "avatar_data" in body:
-        if body["avatar_data"]:
-            filename = write_avatar_file(companion_folder, body["avatar_data"])
+    # ── Avatar slots ──────────────────────────────────────────────────────────
+    # Accepts orb_avatar_data, sidebar_avatar_data (new), or avatar_data (legacy).
+    # Empty string = clear that slot. Omitted key = leave slot unchanged.
+
+    # Orb avatar (also handles legacy 'avatar_data')
+    orb_data = body.get("orb_avatar_data", body.get("avatar_data"))
+    if orb_data is not None:
+        if orb_data:
+            filename = write_avatar_file(companion_folder, orb_data, slot='orb')
             if filename:
                 companion_cfg["avatar_path"] = filename
         else:
-            delete_avatar_files(companion_folder)
+            # Clear orb slot only
+            for _ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+                _p = COMPANIONS_DIR / companion_folder / f"avatar{_ext}"
+                if _p.exists():
+                    try: _p.unlink()
+                    except Exception: pass
             companion_cfg["avatar_path"] = ""
-        companion_cfg.pop("avatar_data", None)
+
+    # Sidebar avatar
+    sb_data = body.get("sidebar_avatar_data")
+    if sb_data is not None:
+        if sb_data:
+            filename = write_avatar_file(companion_folder, sb_data, slot='sidebar')
+            if filename:
+                companion_cfg["sidebar_avatar_path"] = filename
+        else:
+            # Clear sidebar slot only
+            for _ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+                _p = COMPANIONS_DIR / companion_folder / f"sidebar_avatar{_ext}"
+                if _p.exists():
+                    try: _p.unlink()
+                    except Exception: pass
+            companion_cfg["sidebar_avatar_path"] = ""
+
+    # Strip transient data keys so they never end up in saved config
+    for _k in ("avatar_data", "orb_avatar_data", "sidebar_avatar_data"):
+        companion_cfg.pop(_k, None)
 
     for key in ("companion_name", "generation", "soul_edit_mode",
                 "heartbeat", "force_read_before_write", "presence_presets",
@@ -1010,8 +1041,9 @@ async def api_save_companion_settings(request: Request):
         if key in body:
             companion_cfg[key] = body[key]
 
-    # Ensure avatar_data never ends up in saved config
-    companion_cfg.pop("avatar_data", None)
+    # Belt-and-suspenders: ensure transient keys never persist
+    for _k in ("avatar_data", "orb_avatar_data", "sidebar_avatar_data"):
+        companion_cfg.pop(_k, None)
 
     save_companion_config(companion_folder, companion_cfg)
 
@@ -1024,9 +1056,19 @@ async def api_save_companion_settings(request: Request):
 
 
 @app.get("/api/companion/{companion_folder}/avatar")
-async def api_companion_avatar(companion_folder: str):
-    """Serve the avatar image file for a companion."""
+async def api_companion_avatar(companion_folder: str, slot: str = "orb"):
+    """Serve the avatar image for a companion.
+    slot='orb' (default) → avatar.ext
+    slot='sidebar'       → sidebar_avatar.ext, falls back to orb avatar
+    """
     folder = re.sub(r"[^a-zA-Z0-9_\-]", "", companion_folder)[:64]
+    # Try sidebar-specific file first
+    if slot == "sidebar":
+        for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+            p = COMPANIONS_DIR / folder / f"sidebar_avatar{ext}"
+            if p.exists():
+                return FileResponse(str(p), media_type=mimetypes.guess_type(str(p))[0] or "image/jpeg")
+    # Orb avatar (also the fallback for sidebar if no sidebar file exists)
     for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
         p = COMPANIONS_DIR / folder / f"avatar{ext}"
         if p.exists():
