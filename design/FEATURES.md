@@ -27,15 +27,24 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 ## Chat
 
-- **Pill visual rework** *(bundle alignment/padding bug fix with this)*
-  - Thinking pills: stream content in real time (like llama.cpp's own WebUI does) — makes long thinking waits much more bearable.
-  - Visual update to make pills thematically consistent with chat bubbles.
+- ~~**Pill visual rework**~~ — **Done.** Thinking pill restyled to match memory-pill aesthetic (pill shape, DM Sans, indigo tint). Streaming state shows pulsing dots + inline cursor in think-content. Block collapses when response starts; auto-open-while-streaming is a toggle in Generation settings. Alignment fix for orb-inline mode. Streaming chat cursor now sits inline within the last `<p>` (was appearing below it).
 
 - **File upload visualization in chat**
   - Sent files should be visible in the chat message (no filename text, just the visual).
   - Images: thumbnail inline, click to view full size.
   - Audio: mini inline player.
   - Text/other: format-relevant icon, click to view.
+
+- **Image storage — two known base64 leaks** *(fix next session)*
+
+  **Session messages (DOM replay format):**
+  - `history` (API format) correctly strips images — extracts to `img_001.jpg` etc. with `image_ref` pointers. ✓
+  - `messages` (DOM replay) serializes `bubble.innerHTML` verbatim. User bubbles with images contain `<img src="data:image/...">` — full base64 blob lands in `session.json`. Sessions with images can balloon to megabytes.
+  - Fix: store filename as `data-img-ref` on the DOM `<img>` when the attachment is first added. `_serializeMessages` uses that ref instead of the blob. Server needs a route to serve session images for replay (`/history/<session>/<filename>`).
+
+  **Companion avatar:**
+  - `avatar_data` stored as full base64 data URL in `config.json`. A 100KB JPEG becomes ~133KB of text in the config on every read/write.
+  - Fix: on save, server writes data URL to `avatar.jpg` in companion folder, stores `avatar_path: "avatar.jpg"` in config instead. Serve via static file route. Auto-migrate on first load if `avatar_data` exists and `avatar_path` doesn't.
 
 - **Animated avatars** *(wishlist — no design yet)*
   - Sprites, Live2D, or other — needs exploration. Document as future consideration only.
@@ -66,7 +75,7 @@ Items grouped by area. Items marked **(design needed)** have open questions that
   - **Export update** — exporting a session should zip the whole session folder (images + JSON). Currently images not included in exports.
   - **Import update** — importing should handle the new session folder format.
 
-- **`mid_convo_k` config wiring** — `ASSOC_INTERVAL` reads from `config.memory.mid_convo_k` (done). The interval itself could also be exposed as a configurable setting in the UI.
+- ~~**`mid_convo_k` config wiring**~~ — **Done.** UI in Companion Settings > Memory. Saves to `/api/settings/memory`, read back by `loadStatus()` into `config.memory.mid_convo_k`. Minor gap: change doesn't take live effect until reload (could mirror the `markdown_enabled` pattern to update `config.memory` immediately after save — low priority).
 
 ---
 
@@ -77,10 +86,9 @@ Items grouped by area. Items marked **(design needed)** have open questions that
   - Companion Settings: per-tool enable/disable toggles; per-tool per-companion settings (e.g. `get_time` format).
 
 - **TTS — remaining work**
-  - Toggle to completely enable/disable (does not load at all when disabled).
-  - CPU or GPU option — **note: Intel Arc / oneAPI support for Kokoro is unconfirmed, needs research.**
-  - Setting for inference device (CPU, GPU).
-  - Streaming audio output.
+  - ~~Global enable/disable toggle~~ — **Done.** Under Settings > Server.
+  - ~~Streaming audio output~~ — **Done.**
+  - CPU or GPU option — Intel Arc A750, no CUDA. Need to research if/how Kokoro runs on Arc (oneAPI/SYCL). Low priority until confirmed feasible.
   - Mood integration: map moods to voice presets (null/neutral mood = companion default; each mood can override).
 
 ---
@@ -99,6 +107,20 @@ Key design points:
 - *Depends on Mood system being built first (mood/presence visuals are part of companion identity).*
 
 Appearance sections (hair style, face shape, eyes, nose, outfit system, accessories, etc.) are marked **design needs expanding on** — flesh these out before wizard implementation begins.
+
+---
+
+## Sidebar / UI *(design session needed)*
+
+- **Tools list → Settings** — move the static tool-pills list out of the sidebar and into Settings > Generation (or Companion Settings for per-companion toggles). Frees a full sidebar block for something more meaningful.
+
+- **Companion state card** *(replaces tools section)* — live sidebar card showing:
+  - Larger avatar image (prominent, above the name)
+  - Current mood + orb state
+  - Recently surfaced memory (title + timestamp) as passive feedback that the memory system is active
+  - Design conversation needed before building — ties into the Main Chat UI redesign.
+
+- **Memory viewer / editor** — a panel or tab for browsing, editing, and saving memory notes directly (soul/, mind/, and ChromaDB episodic store). Useful for reviewing what Senni knows, correcting outdated notes, and writing entries without phrasing them as chat messages. Could live in Companion Settings or as a dedicated sidebar panel.
 
 ---
 

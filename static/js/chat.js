@@ -177,7 +177,13 @@ async function loadStatus() {
 
 // ── Tool call handler setup ───────────────────────────────────────────────────
 function setupToolCallHandler() {
-  onThinking = (thinkText) => { appendThinkingBlock(thinkText); };
+  onThinking = (thinkText) => {
+    const el = appendThinkingBlock(thinkText);
+    // Auto-open while streaming if the user has enabled it in Generation settings.
+    if (el && (config.generation?.thinking_autoopen === true)) {
+      el.classList.add('open');
+    }
+  };
 
   onUsageUpdate = (promptTokens) => {
     _contextTokens = promptTokens;

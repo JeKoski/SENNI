@@ -206,7 +206,9 @@ body::before {
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  padding: 32px 40px 80px;
+  /* Bottom padding accounts for #orb-home height (orb-size + 20px padding)
+     plus comfortable clearance above it so content never hides behind the orb. */
+  padding: 32px 40px calc(var(--orb-size, 36px) + 56px);
   display: flex;
   flex-direction: column;
   gap: 6px;

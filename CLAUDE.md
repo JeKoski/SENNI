@@ -100,7 +100,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### Chat
 
-- **Streaming text visual (token-by-token appearance) regressed** — secondary priority. Needs investigation.
+- ~~**Streaming text visual (token-by-token appearance) regressed**~~ — **Fixed.** Cursor was being inserted after `</p>` (block element), making it appear below the text. Now inserted inside the last `<p>`. Also added inline cursor to streaming thinking content.
 - **Message loss on restart/refresh suspected** — likely improved by history system rework. Keep open until confirmed stable over several sessions.
 
 ### llama-server / model
@@ -115,7 +115,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### UI / Layout
 
-- **Tool and thinking pills have alignment/padding issues** — pills are misaligned relative to each other and the orb. **Bundle this fix with the pill visual rework** — don't fix in isolation.
+- ~~**Tool and thinking pills have alignment/padding issues**~~ — **Fixed** as part of pill visual rework (see session notes 2026-04-15).
 - **Ghost bar appearing below tabs in companion settings** — a scrollbar-width bar flickers in on some openings. Pre-existing bug, tracked, not yet investigated.
 
 ---
@@ -145,6 +145,29 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - **CLAUDE.md** — operational instructions + active bugs + design folder index. Update at end of every session.
 - **design/*.md** — system docs and design decisions. Update when the relevant system is touched.
 - Rule: when we touch a system in a session, we document it in that session. Don't defer.
+
+---
+
+## Session notes — 2026-04-15
+
+**Pill visual rework + streaming cursor fix + doc updates.**
+
+### What changed
+
+- `static/js/api.js` — **fix:** streaming cursor now inserted inside the last `</p>` instead of after it (was appearing below the text). `sealThinkingBlock()` called in `_createStreamBubble()` AND at stream end / on error/abort — fixes dots staying visible when model goes straight from thinking to tool call with no text.
+- `static/js/message-renderer.js` — `appendThinkingBlock()` now creates element with `streaming` class and pulsing dots markup; updates thinking content with `innerHTML` + inline cursor during streaming. New `sealThinkingBlock()` removes `streaming`/`open` classes and clears cursor. `setMarkdownEnabled()` now excludes `.stream-bubble` to prevent cursor being stripped mid-stream. New `escapeHtml()` helper.
+- `static/js/chat.js` — `onThinking` callback wires auto-open setting: adds `open` class on block creation if `config.generation.thinking_autoopen === true`.
+- `static/js/settings-generation.js` — `thinking_autoopen` toggle added (populate, save, toggle function).
+- `static/chat.html` — toggle row for "Auto-open thinking block while streaming" added to Generation tab.
+- `static/css/messages.css` — thinking toggle restyled as pill (border-radius 20px, indigo tint, DM Sans) matching memory-pill aesthetic. Streaming state shows pulsing dots, chevron hidden. `think-body` open state uses `max-height: 60vh` instead of `none` (enables collapse transition). `think-content` opacity 0.4 → 0.55.
+- `static/css/orb.css` — `body.orb-inline .think-wrap, .tool-indicator` get `margin-left: var(--orb-indent)` to align with companion bubble text.
+- `static/css/base.css` — `.messages` bottom padding changed from hardcoded `80px` to `calc(var(--orb-size) + 56px)` so it scales with orb size and content never hides behind the orb/mood pill.
+- `design/FEATURES.md` — updated: pill rework done, mid_convo_k done, TTS streaming/toggle done, image storage issues documented, sidebar/UI ideas added, memory viewer idea added.
+
+### Next session
+
+- **Image storage fix** — two base64 leaks: (1) DOM replay messages save `bubble.innerHTML` including `<img src="data:...">` blobs; fix via `data-img-ref` on DOM image + server route for session files. (2) Avatar stored as base64 in `config.json`; extract to `avatar.jpg` in companion folder with auto-migration.
+- **Sidebar redesign design conversation** — tools list → Settings, companion state card (larger avatar + mood + recent memory), memory viewer/editor. Needs dedicated design session before building.
 
 ---
 
