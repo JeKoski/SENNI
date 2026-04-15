@@ -39,6 +39,7 @@ from scripts.config import (
     DEFAULTS,
     build_initial_config,
     build_server_command,
+    delete_avatar_files,
     detect_gpu,
     find_gguf_files,
     find_mmproj_candidates,
@@ -46,8 +47,10 @@ from scripts.config import (
     list_companions,
     load_companion_config,
     load_config,
+    migrate_avatar,
     save_companion_config,
     save_config,
+    write_avatar_file,
 )
 from scripts.tool_loader import get_tool, load_tools
 
@@ -442,7 +445,9 @@ async def api_status():
     )
     model_running = process_alive and _boot_ready
 
-    companion_cfg = load_companion_config(config.get("companion_folder", "default"))
+    comp_folder   = config.get("companion_folder", "default")
+    companion_cfg = load_companion_config(comp_folder)
+    companion_cfg = migrate_avatar(comp_folder, companion_cfg)
     ctx_size      = config.get("server_args", {}).get("ctx", {}).get("value", 16384)
     global_gen    = config.get("generation", {})
     companion_gen = companion_cfg.get("generation", {})
@@ -455,7 +460,7 @@ async def api_status():
         # Also expose whether we're mid-launch — chat.js uses this to avoid
         # calling /api/boot a second time while the model is still loading.
         "model_launching":           _boot_launching and not _boot_ready,
-        "avatar_data":               companion_cfg.get("avatar_data", ""),
+        "avatar_url":                f"/api/companion/{comp_folder}/avatar" if companion_cfg.get("avatar_path") else "",
         "companion_name":            companion_cfg.get("companion_name", config.get("companion_name", "")),
         "context_size":              int(ctx_size) if ctx_size else 16384,
         "effective_generation":      effective_gen,
@@ -878,9 +883,12 @@ async def api_shutdown_model():
 
 @app.get("/api/settings")
 async def api_get_settings():
-    config     = load_config()
-    companions = list_companions()
-    active_cfg = load_companion_config(config.get("companion_folder", "default"))
+    config      = load_config()
+    companions  = list_companions()
+    comp_folder = config.get("companion_folder", "default")
+    active_cfg  = load_companion_config(comp_folder)
+    active_cfg  = migrate_avatar(comp_folder, active_cfg)
+    active_cfg["avatar_url"] = f"/api/companion/{comp_folder}/avatar" if active_cfg.get("avatar_path") else ""
     return {
         "config":                   config,
         "companions":               companions,
@@ -984,12 +992,26 @@ async def api_save_companion_settings(request: Request):
     companion_folder = body.get("folder", config.get("companion_folder", "default"))
     companion_cfg    = load_companion_config(companion_folder)
 
-    for key in ("companion_name", "avatar_data", "generation", "soul_edit_mode",
+    # Avatar: write to file instead of storing base64 in config
+    if "avatar_data" in body:
+        if body["avatar_data"]:
+            filename = write_avatar_file(companion_folder, body["avatar_data"])
+            if filename:
+                companion_cfg["avatar_path"] = filename
+        else:
+            delete_avatar_files(companion_folder)
+            companion_cfg["avatar_path"] = ""
+        companion_cfg.pop("avatar_data", None)
+
+    for key in ("companion_name", "generation", "soul_edit_mode",
                 "heartbeat", "force_read_before_write", "presence_presets",
                 "active_presence_preset", "moods", "active_mood", "tts",
                 "cognitive_stack"):
         if key in body:
             companion_cfg[key] = body[key]
+
+    # Ensure avatar_data never ends up in saved config
+    companion_cfg.pop("avatar_data", None)
 
     save_companion_config(companion_folder, companion_cfg)
 
@@ -999,6 +1021,17 @@ async def api_save_companion_settings(request: Request):
         save_config(config)
 
     return {"ok": True, "folder": companion_folder}
+
+
+@app.get("/api/companion/{companion_folder}/avatar")
+async def api_companion_avatar(companion_folder: str):
+    """Serve the avatar image file for a companion."""
+    folder = re.sub(r"[^a-zA-Z0-9_\-]", "", companion_folder)[:64]
+    for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+        p = COMPANIONS_DIR / folder / f"avatar{ext}"
+        if p.exists():
+            return FileResponse(str(p), media_type=mimetypes.guess_type(str(p))[0] or "image/jpeg")
+    return Response(status_code=404)
 
 
 @app.post("/api/settings/companion/new")
@@ -1015,7 +1048,7 @@ async def api_new_companion(request: Request):
     get_companion_paths(folder)
     save_companion_config(folder, {
         "companion_name": name,
-        "avatar_data":    "",
+        "avatar_path":    "",
         "generation":     dict(DEFAULTS["generation"]),
     })
     return {"ok": True, "folder": folder, "name": name}

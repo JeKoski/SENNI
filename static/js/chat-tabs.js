@@ -436,7 +436,17 @@ function _serializeMessages() {
       const bubble = el.querySelector('.bubble');
       const time   = el.querySelector('.msg-time');
       if (bubble) {
-        const entry = { type: 'message', role, html: bubble.innerHTML, time: time?.textContent || '' };
+        // Clone bubble and replace data: URLs on image thumbnails with media route URLs.
+        // Keeps base64 blobs out of session.json.
+        const clone  = bubble.cloneNode(true);
+        const folder = (typeof config !== 'undefined' ? config.companion_folder : null) || 'default';
+        clone.querySelectorAll('img[data-img-ref]').forEach(img => {
+          if (img.src.startsWith('data:')) {
+            const ref = img.getAttribute('data-img-ref');
+            img.src = `/api/history/media/${folder}/${_activeTabId}/${_currentSessionId}/${ref}`;
+          }
+        });
+        const entry = { type: 'message', role, html: clone.innerHTML, time: time?.textContent || '' };
         if (el.classList.contains('heartbeat-msg')) entry.heartbeat = true;
         msgs.push(entry);
       }

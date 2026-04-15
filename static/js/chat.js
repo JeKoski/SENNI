@@ -112,8 +112,9 @@ async function loadStatus() {
 
     const avatarEl = document.getElementById('companion-avatar');
     if (avatarEl) {
-      avatarEl.innerHTML = data.avatar_data
-        ? `<img src="${data.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+      const avatarUrl = data.avatar_url || '';
+      avatarEl.innerHTML = avatarUrl
+        ? `<img src="${avatarUrl}?v=${Date.now()}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
         : '✦';
     }
     // Mirror avatar into the persistent companion orb
@@ -773,13 +774,38 @@ async function sendMessage() {
     }
   }
 
-  // Build display message
-  const attachLabel = attachments.length
-    ? ' ' + attachments.map(a => `[${a.type}: ${a.name}]`).join(' ')
+  // Build display message — images get inline thumbnails with data-img-ref for safe serialization
+  const imageAttachments = attachments.filter(a => a.type === 'image');
+  const otherAttachments = attachments.filter(a => a.type !== 'image');
+  const attachLabel = otherAttachments.length
+    ? ' ' + otherAttachments.map(a => `[${a.type}: ${a.name}]`).join(' ')
     : '';
   const userRow = appendMessage('user', (text || '') + attachLabel);
   _attachMessageControls(userRow, 'user');
   if (text) _autoTitleTab(text);
+
+  if (imageAttachments.length) {
+    // Count images already in conversationHistory to compute correct filenames
+    let imgOffset = 0;
+    for (const msg of conversationHistory) {
+      if (Array.isArray(msg.content)) {
+        for (const part of msg.content) { if (part.type === 'image_url') imgOffset++; }
+      }
+    }
+    const bubble = userRow?.querySelector('.bubble');
+    if (bubble) {
+      imageAttachments.forEach((a, i) => {
+        const ext  = a.mimeType?.includes('png') ? '.png' : a.mimeType?.includes('gif') ? '.gif' : a.mimeType?.includes('webp') ? '.webp' : '.jpg';
+        const name = `img_${String(imgOffset + i + 1).padStart(3, '0')}${ext}`;
+        const img  = document.createElement('img');
+        img.className = 'msg-img';
+        img.setAttribute('data-img-ref', name);
+        img.src = `data:${a.mimeType};base64,${a.content}`;
+        img.alt = a.name;
+        bubble.appendChild(img);
+      });
+    }
+  }
 
   // Build history content
   let histContent = text || '';

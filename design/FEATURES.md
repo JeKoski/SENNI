@@ -29,22 +29,16 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 - ~~**Pill visual rework**~~ — **Done.** Thinking pill restyled to match memory-pill aesthetic (pill shape, DM Sans, indigo tint). Streaming state shows pulsing dots + inline cursor in think-content. Block collapses when response starts; auto-open-while-streaming is a toggle in Generation settings. Alignment fix for orb-inline mode. Streaming chat cursor now sits inline within the last `<p>` (was appearing below it).
 
-- **File upload visualization in chat**
-  - Sent files should be visible in the chat message (no filename text, just the visual).
-  - Images: thumbnail inline, click to view full size.
-  - Audio: mini inline player.
-  - Text/other: format-relevant icon, click to view.
+- **File upload visualization in chat** *(partially done)*
+  - Images: thumbnail inline ✓ (`.msg-img`, `data-img-ref` safe serialization). Click to view full size — not yet.
+  - Audio: mini inline player — not yet.
+  - Text/other: format-relevant icon — not yet.
 
-- **Image storage — two known base64 leaks** *(fix next session)*
+- ~~**Image storage — two base64 leaks**~~ — **Done.**
 
-  **Session messages (DOM replay format):**
-  - `history` (API format) correctly strips images — extracts to `img_001.jpg` etc. with `image_ref` pointers. ✓
-  - `messages` (DOM replay) serializes `bubble.innerHTML` verbatim. User bubbles with images contain `<img src="data:image/...">` — full base64 blob lands in `session.json`. Sessions with images can balloon to megabytes.
-  - Fix: store filename as `data-img-ref` on the DOM `<img>` when the attachment is first added. `_serializeMessages` uses that ref instead of the blob. Server needs a route to serve session images for replay (`/history/<session>/<filename>`).
+  **Session messages:** User bubbles with images now use `<img class="msg-img" data-img-ref="img_001.jpg">`. `_serializeMessages` clones the bubble and replaces any `data:` src with the proper `/api/history/media/` URL before storing in `session.json`. Server media route already existed.
 
-  **Companion avatar:**
-  - `avatar_data` stored as full base64 data URL in `config.json`. A 100KB JPEG becomes ~133KB of text in the config on every read/write.
-  - Fix: on save, server writes data URL to `avatar.jpg` in companion folder, stores `avatar_path: "avatar.jpg"` in config instead. Serve via static file route. Auto-migrate on first load if `avatar_data` exists and `avatar_path` doesn't.
+  **Companion avatar:** `avatar_data` (base64 in config.json) replaced by `avatar_path` + file on disk. Server writes `avatar.jpg` on save, serves via `GET /api/companion/{folder}/avatar`. Auto-migration runs on page load for any companion still using the old format. `config.py` helpers: `write_avatar_file`, `delete_avatar_files`, `migrate_avatar`.
 
 - **Animated avatars** *(wishlist — no design yet)*
   - Sprites, Live2D, or other — needs exploration. Document as future consideration only.
