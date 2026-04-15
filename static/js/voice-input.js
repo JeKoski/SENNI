@@ -126,24 +126,80 @@ function _startChunk() {
 }
 
 // ── Internal: base64-encode blob and push to attachment queue ─────────────────
-function _finaliseChunk(blob, chunkNum) {
+async function _finaliseChunk(blob, chunkNum) {
+  // Transcode to WAV — llama-server only accepts "wav" or "mp3".
+  // AudioContext.decodeAudioData handles webm/ogg/mp4 natively.
+  let wavBlob;
+  try {
+    wavBlob = await _toWav(blob);
+  } catch (e) {
+    console.warn('[voice] WAV transcode failed, using original:', e);
+    wavBlob = blob;
+  }
+
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
-      const dataUrl  = e.target.result;
-      const base64   = dataUrl.split(',')[1];
-      const mimeType = blob.type || 'audio/webm';
-      const ext      = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : mimeType.includes('wav') ? 'wav' : 'webm';
-      const name     = `voice_${String(chunkNum).padStart(3, '0')}.${ext}`;
+      const base64   = e.target.result.split(',')[1];
+      const name     = `voice_${String(chunkNum).padStart(3, '0')}.wav`;
       const note     = `[Voice recording: ${name}]`;
-
       if (typeof addAttachment === 'function') {
-        addAttachment({ type: 'audio', name, content: base64, mimeType, note });
+        addAttachment({ type: 'audio', name, content: base64, mimeType: 'audio/wav', note });
       }
       resolve();
     };
-    reader.readAsDataURL(blob);
+    reader.readAsDataURL(wavBlob);
   });
+}
+
+// ── Internal: transcode any audio blob to 16-bit PCM WAV ─────────────────────
+async function _toWav(blob) {
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioCtx    = new AudioContext();
+  let   audioBuffer;
+  try {
+    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  } finally {
+    audioCtx.close();
+  }
+
+  const numChannels   = audioBuffer.numberOfChannels;
+  const sampleRate    = audioBuffer.sampleRate;
+  const numSamples    = audioBuffer.length;
+  const dataSize      = numSamples * numChannels * 2; // 16-bit = 2 bytes/sample
+  const wavBuffer     = new ArrayBuffer(44 + dataSize);
+  const v             = new DataView(wavBuffer);
+
+  // RIFF/WAVE header
+  _wavStr(v,  0, 'RIFF');
+  v.setUint32( 4, 36 + dataSize, true);
+  _wavStr(v,  8, 'WAVE');
+  _wavStr(v, 12, 'fmt ');
+  v.setUint32(16, 16, true);                                    // fmt chunk size
+  v.setUint16(20,  1, true);                                    // PCM
+  v.setUint16(22, numChannels, true);
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * numChannels * 2, true);          // byte rate
+  v.setUint16(32, numChannels * 2, true);                       // block align
+  v.setUint16(34, 16, true);                                    // bits per sample
+  _wavStr(v, 36, 'data');
+  v.setUint32(40, dataSize, true);
+
+  // Interleaved int16 samples
+  let offset = 44;
+  for (let i = 0; i < numSamples; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const s = Math.max(-1, Math.min(1, audioBuffer.getChannelData(ch)[i]));
+      v.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([wavBuffer], { type: 'audio/wav' });
+}
+
+function _wavStr(view, offset, str) {
+  for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
