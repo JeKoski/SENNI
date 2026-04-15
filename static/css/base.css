@@ -98,7 +98,8 @@ body::before {
   font-size: clamp(28px, calc(var(--sidebar-w) * 0.18), 64px);
   flex-shrink: 0;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+  border: 2px solid var(--orb-border, rgba(129,140,248,0.35));
+  box-shadow: 0 0 14px 2px var(--glow-color, rgba(129,140,248,0.2));
 }
 .companion-name {
   font-family: 'Lora', serif;
