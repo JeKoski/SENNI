@@ -182,6 +182,44 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-16 #5
+
+**Memory dedup + sidebar/avatar redesign.**
+
+### Memory dedup
+
+- `scripts/memory_store.py` — added `dedup_notes(dry_run=False)`: groups all notes by exact content, keeps oldest non-superseded per group, deletes rest in batches of 100. Cleans up `pending_llm_consolidation` for deleted IDs.
+- `scripts/memory_server.py` — added `POST /api/memory/dedup?dry_run=false` endpoint. `dry_run` defaults to `True` (safe). Also accepts JSON body. Fixed: on Windows CMD single quotes break JSON parsing — query param is the safe way to call it.
+- Result: companions went from ~742→65 and ~972→272 notes after cleanup.
+
+### Sidebar redesign (pragmatic pass — Wizard deferred)
+
+Decision: defer full sidebar redesign until after the Companion Creation Wizard, which will define visual language for the full UI. This session does the high-value low-risk subset.
+
+**What changed:**
+- `static/chat.html` — removed Memory and Tools sidebar sections. Footer buttons → `footer-pill` class. Added dummy Tools tabs to both Settings and Companion Settings panels. Companion header restructured: portrait avatar → name → `● online ⚙` row.
+- `static/css/base.css` — `.avatar` is now a 3:4 portrait rounded rectangle (`border-radius: 12px`, `aspect-ratio: 3/4`, `overflow: hidden`). Border uses `--orb-border`, glow uses `--glow-color` (tracks orb color + mood live). Avatar width: `calc(var(--sidebar-w) - 16px)` max 320px. Footer pills: 2-column grid, `border-radius: 20px`.
+- `static/js/chat-ui.js` — sidebar resize now updates `--sidebar-w` on `document.documentElement` so avatar scales live while dragging.
+- `static/js/orb.js` — `_apply()` now propagates `--orb-border` and `--glow-color` to `:root` after resolving overrides, so elements outside the orb subtree (e.g. avatar border) track color/mood changes.
+- `static/js/chat.js`, `companion.js`, `settings-companion.js` — removed `border-radius:50%` from sidebar avatar `<img>` inline styles (container handles clipping via `overflow: hidden`). Orb/panel preview images unchanged.
+- `static/js/settings-server.js`, `chat.js` — restart button textContent updated to include "Restart" label so it survives pill format.
+- `main.py` — added `sys.stdout.reconfigure(encoding='utf-8')` so Unicode prints correctly on Windows terminals.
+
+### Architecture notes
+
+- `--orb-border` / `--glow-color` are now on `:root` (not just `#companion-orb`). Any future element that wants to match the orb color can use these variables directly.
+- Sidebar avatar is portrait 3:4; orb avatar stays circular. These are visually decoupled but still share the same `avatar_path` source file. Separate avatar slots (`sidebar_avatar_path`) tracked in FEATURES.md.
+- The avatar border style (`2px solid --orb-border` + `0 0 14px 2px --glow-color`) is a confirmed keeper — user loved it.
+
+### What's still pending
+
+- **Separate sidebar/orb avatar slots** — tracked in FEATURES.md
+- **Avatar crop tool portrait mode** — tracked in FEATURES.md
+- **Image thumbnail click-to-expand** — still open
+- **Full sidebar redesign** — deferred until after Companion Creation Wizard
+
+---
+
 ## Session notes — 2026-04-16 #4
 
 **Session duplication bug fix.**
