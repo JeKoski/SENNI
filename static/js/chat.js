@@ -456,14 +456,14 @@ function watchBootLog(onReady) {
     if (msg.line) { console.log('[llama-server]', msg.line); updateBootStatus(msg.line); }
     if (msg.ready && !readyFired) {
       readyFired = true;
-      if (btn) { btn.textContent = '\u21ba'; btn.disabled = false; }
+      if (btn) { btn.textContent = '\u21ba Restart'; btn.disabled = false; }
       if (typeof onReady === 'function') onReady();
       es.close();
       _activeBootES = null;
     }
   };
   es.onerror = () => {
-    if (btn) { btn.textContent = '\u21ba'; btn.disabled = false; }
+    if (btn) { btn.textContent = '\u21ba Restart'; btn.disabled = false; }
   };
 }
 

@@ -121,7 +121,8 @@ Appearance sections (hair style, face shape, eyes, nose, outfit system, accessor
 - **Memory viewer / editor** — a panel or tab for browsing, editing, creating, and deleting memory notes directly. Scope:
   - **soul/ and mind/ markdown files** — read/edit/save via the existing `memory` tool backend
   - **ChromaDB episodic notes** — list, read, edit content, delete individual entries
-  - **Duplicate detection + cleanup** — the session-duplication bug (now fixed) generated hundreds of duplicate notes. Need a way to find and remove them — either a manual "deduplicate" action or an automated pass during consolidation. Could use embedding similarity to surface near-duplicates for human review.
+  - **Duplicate detection + cleanup** — `POST /api/memory/dedup` endpoint already exists (exact-content dedup, used for session-id bug cleanup). UI should expose this as a button. Future: embedding-similarity pass for near-duplicates with human review.
+  - **Note breakdown by source** — `status` endpoint currently returns total count only. Add breakdown: how many are companion-written (`function_source` = T/S/N/F) vs system-ingested (`session_history`). Useful for understanding memory composition.
   - **Note health indicators** — surfaced count, last retrieved, superseded status
   - Could live in Companion Settings as a dedicated Memory tab, or as a sidebar panel. Needs design conversation before building.
 
