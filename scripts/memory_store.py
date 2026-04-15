@@ -998,6 +998,105 @@ class MemoryStore:
             return 0
         return self._collection.count()
 
+    def dedup_notes(self, dry_run: bool = False) -> dict:
+        """
+        Remove duplicate notes by exact content match.
+
+        Groups all notes by their content field. For each group with >1 note,
+        keeps the best candidate (non-superseded preferred, then oldest by
+        created_at) and deletes the rest.
+
+        Primarily targets session_history ingestion duplicates caused by the
+        session-id bug (now fixed), but applies to any identical content.
+
+        Also cleans up pending_llm_consolidation to remove deleted IDs.
+
+        Args:
+            dry_run: If True, report what would be deleted without deleting.
+
+        Returns dict:
+            checked    — total notes scanned
+            groups     — number of unique content groups
+            duplicates — number of duplicate notes found
+            deleted    — number deleted (0 if dry_run=True)
+        """
+        if not self._collection:
+            return {"error": "memory system not available"}
+
+        total = self._collection.count()
+        if total == 0:
+            return {"checked": 0, "groups": 0, "duplicates": 0, "deleted": 0}
+
+        # Fetch all notes — ChromaDB default limit may be low, pass total explicitly
+        result = self._collection.get(
+            limit=total,
+            include=["metadatas"],
+        )
+
+        ids = result.get("ids", [])
+        metadatas = result.get("metadatas", [])
+
+        # Group by exact content: content_text → list of (note_id, created_at, superseded_by)
+        from collections import defaultdict
+        content_groups: dict = defaultdict(list)
+
+        for nid, meta in zip(ids, metadatas):
+            content = meta.get("content", "")
+            created_at = meta.get("created_at", "")
+            superseded_by = meta.get("superseded_by", "")
+            content_groups[content].append((nid, created_at, superseded_by))
+
+        # Determine which notes to delete
+        to_delete: list[str] = []
+
+        for entries in content_groups.values():
+            if len(entries) <= 1:
+                continue
+
+            # Sort: non-superseded first, then oldest created_at
+            def sort_key(entry):
+                nid, created_at, superseded_by = entry
+                is_superseded = 0 if superseded_by == "" else 1
+                return (is_superseded, created_at)
+
+            entries.sort(key=sort_key)
+            # Keep first (best candidate), delete rest
+            for nid, _, _ in entries[1:]:
+                to_delete.append(nid)
+
+        deleted = 0
+        if not dry_run and to_delete:
+            deleted_set = set(to_delete)
+
+            # Delete in batches of 100
+            batch_size = 100
+            for i in range(0, len(to_delete), batch_size):
+                batch = to_delete[i:i + batch_size]
+                try:
+                    self._collection.delete(ids=batch)
+                    deleted += len(batch)
+                except Exception as e:
+                    log.warning(f"dedup: delete batch error: {e}")
+
+            # Clean up pending_llm_consolidation
+            pending = self._meta.get("pending_llm_consolidation", [])
+            cleaned = [p for p in pending if p not in deleted_set]
+            if len(cleaned) != len(pending):
+                self._meta["pending_llm_consolidation"] = cleaned
+                self._save_meta()
+
+            log.info(
+                f"dedup: {deleted} duplicates removed "
+                f"({total} → {total - deleted} notes)"
+            )
+
+        return {
+            "checked": total,
+            "groups": len(content_groups),
+            "duplicates": len(to_delete),
+            "deleted": deleted,
+        }
+
     def get_note(self, note_id: str) -> Optional[dict]:
         """Fetch a single note by ID. Returns None if not found."""
         if not self._collection:
