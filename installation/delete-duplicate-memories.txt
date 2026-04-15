@@ -1,0 +1,5 @@
+# Dry run (safe default even without ?dry_run=true)
+curl -X POST http://localhost:8000/api/memory/dedup
+
+# Actually delete
+curl -X POST "http://localhost:8000/api/memory/dedup?dry_run=false"
