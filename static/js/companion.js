@@ -116,8 +116,10 @@ function cpPopulate() {
   // Update panel header
   const headerName = document.getElementById('cp-header-name');
   if (headerName) headerName.textContent = c.companion_name || 'Companion';
-  const orbUrl = c.avatar_url         ? `${c.avatar_url}?v=${Date.now()}`         : '';
-  const sbUrl  = c.sidebar_avatar_url ? `${c.sidebar_avatar_url}?v=${Date.now()}` : '';
+  const v      = Date.now();
+  const orbUrl = c.avatar_url         ? `${c.avatar_url}?v=${v}`          : '';
+  // sidebar_avatar_url already has ?slot=sidebar — append with & not ?
+  const sbUrl  = c.sidebar_avatar_url ? `${c.sidebar_avatar_url}&v=${v}`  : '';
 
   const headerAv = document.getElementById('cp-header-avatar');
   if (headerAv) {
@@ -473,8 +475,9 @@ async function cpSave(andClose = false) {
     }
     const cpHeaderName = document.getElementById('cp-header-name');
     if (cpHeaderName) cpHeaderName.textContent = body.companion_name || 'Companion';
-    if (typeof syncStatusAvatar === 'function') syncStatusAvatar();
-    if (typeof heartbeatReload  === 'function') heartbeatReload();
+    // Note: syncStatusAvatar() intentionally NOT called here — avatar slots are
+    // managed directly via orb.setAvatar() above to keep orb and sidebar decoupled.
+    if (typeof heartbeatReload === 'function') heartbeatReload();
 
     if (typeof config !== 'undefined') {
       config.force_read_before_write = body.force_read_before_write;

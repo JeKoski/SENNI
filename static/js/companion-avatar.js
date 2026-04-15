@@ -112,15 +112,8 @@ function cpAvatarApply() {
   out.height = outH;
   const ctx  = out.getContext('2d');
 
-  // Clip to crop shape
-  ctx.beginPath();
-  if (isOrb) {
-    ctx.arc(outW/2, outH/2, outW/2 - 1, 0, Math.PI * 2);
-  } else {
-    const r = AV_SB_RR * (outW / AV_SB_W);
-    _avRR(ctx, 0, 0, outW, outH, r);
-  }
-  ctx.clip();
+  // No canvas clipping — CSS handles border-radius/circle shaping in the UI.
+  // Plain JPEG rectangle avoids black corners from transparent regions.
 
   // Map image from the canvas crop area to the output canvas
   const sc = outW / cropW;
@@ -272,7 +265,7 @@ function _avOnMove(e) {
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY,
     );
-    if (_avPinchDist !== null) cpAvatarZoom((d - _avPinchDist) * 0.004);
+    if (_avPinchDist !== null) cpAvatarZoom((d - _avPinchDist) * 0.001);
     _avPinchDist = d;
     return;
   }
@@ -286,7 +279,7 @@ function _avOnMove(e) {
 function _avOnUp()    { _avDrag = false; _avPinchDist = null; }
 function _avOnWheel(e) {
   e.preventDefault();
-  cpAvatarZoom(e.deltaY < 0 ? 0.1 : -0.1);
+  cpAvatarZoom(e.deltaY < 0 ? 0.025 : -0.025);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
