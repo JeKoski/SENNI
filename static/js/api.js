@@ -118,11 +118,14 @@ async function callModel(system, messages, abortSignal = null) {
           image_url: { url: `data:${img.mimeType};base64,${img.content}` }
         })),
         // Audio: only sent for the current message (always "once" — never re-sent).
-        // Format mirrors image_url. If llama-server rejects, try:
-        // { type: "input_audio", input_audio: { data: aud.content, format: "wav" } }
+        // llama-server format (PR #13714): type "input_audio", raw base64 (no data: prefix).
+        // Format string derived from mimeType: audio/webm → "webm", audio/ogg → "ogg", etc.
         ...(idx === lastUserIdx ? audios.map(aud => ({
-          type: "audio_url",
-          audio_url: { url: `data:${aud.mimeType};base64,${aud.content}` }
+          type: "input_audio",
+          input_audio: {
+            data:   aud.content,
+            format: aud.mimeType.split("/")[1]?.split(";")[0] || "webm"
+          }
         })) : [])
       ]
     };
