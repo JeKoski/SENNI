@@ -127,9 +127,9 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 - OS: Linux (primary) + Windows (also supported and tested)
 - GPU: Intel Arc A750
-- Models tested: Qwen3.5 9B Q4_K_M (primary), Gemma 4 on Vulkan
+- Models tested: Gemma 4 (primary), Qwen3.5 9B Q4_K_M
 - llama-server: SYCL build on Windows, oneAPI build on Linux
-- Temperature: 0.8 (critical — higher breaks tool call syntax)
+- Temperature: 0.8 (critical for Qwen — higher breaks tool call syntax)
 - `--reasoning-format deepseek` enabled (Qwen3 only — disable for Gemma 4)
 - Flash attention: auto-enabled by llama-server
 
