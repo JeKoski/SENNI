@@ -3,13 +3,15 @@
 //             _spSetDirty, _spClearDirty, spShowSavedToast, closeSettings, spLoad)
 
 // ── Avatar crop state ─────────────────────────────────────────────────────────
-let spCropImg       = null;
-let spCropX         = 0;
-let spCropY         = 0;
-let spCropScale     = 1;
-let spCropDragging  = false;
-let spCropDragStart = null;
-let spCropPosStart  = null;
+let spCropImg         = null;
+let spCropX           = 0;
+let spCropY           = 0;
+let spCropScale       = 1;
+let spCropDragging    = false;
+let spCropDragStart   = null;
+let spCropPosStart    = null;
+let _spAvatarChanged  = false;  // true if user cropped a new avatar this session
+let _spNewAvatarData  = null;   // data URL of newly cropped avatar
 
 // ── Populate ──────────────────────────────────────────────────────────────────
 // NOTE: The Settings panel companion tab only contains the companion list
@@ -26,8 +28,11 @@ function spPopulateCompanion() {
     const item     = document.createElement('div');
     const isActive = c.folder === spActiveFolder;
     item.className = 'sp-companion-item' + (isActive ? ' active-companion' : '');
-    const avatarHtml = c.avatar_data
-      ? `<img src="${c.avatar_data}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
+    const avSrc = c.avatar_url
+      ? (c.avatar_url.startsWith('data:') ? c.avatar_url : `${c.avatar_url}?v=${Date.now()}`)
+      : '';
+    const avatarHtml = avSrc
+      ? `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
       : '✦';
     item.innerHTML = `
       <div class="sp-mini-avatar">${avatarHtml}</div>
@@ -52,9 +57,6 @@ async function spSaveCompanion(andClose = false) {
   const nameEl = document.getElementById('sp-companion-name-input');
   const name   = nameEl?.value?.trim() || '';
 
-  const companions = spSettings.companions || [];
-  const avatarData = companions.find(c => c.folder === spActiveFolder)?.avatar_data || '';
-
   const frc      = document.getElementById('tog-force-read');
   const soulMode = document.getElementById('sp-soul-mode')?.value || 'locked';
 
@@ -76,7 +78,7 @@ async function spSaveCompanion(andClose = false) {
     body: JSON.stringify({
       folder:                  spActiveFolder,
       companion_name:          name,
-      avatar_data:             avatarData,
+      ...(_spAvatarChanged ? { avatar_data: _spNewAvatarData } : {}),
       soul_edit_mode:          soulMode,
       force_read_before_write: frc ? frc.classList.contains('on') : true,
       heartbeat:               hbPayload,
@@ -88,6 +90,15 @@ async function spSaveCompanion(andClose = false) {
     companionName = name;
     document.getElementById('companion-name').textContent = name;
     document.title = name;
+  }
+
+  if (_spAvatarChanged) {
+    // Update cached avatar_url to server URL now that save succeeded
+    const companions = spSettings?.companions || [];
+    const c = companions.find(x => x.folder === spActiveFolder);
+    if (c) c.avatar_url = _spNewAvatarData ? `/api/companion/${spActiveFolder}/avatar` : '';
+    _spAvatarChanged = false;
+    _spNewAvatarData = null;
   }
 
   _spClearDirty('companion');
@@ -261,9 +272,13 @@ function spCropApply() {
     sidebarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
   }
 
+  _spAvatarChanged = true;
+  _spNewAvatarData = dataUrl;
+
+  // Update cached avatar_url so spPopulateCompanion shows the new preview
   const companions = spSettings?.companions || [];
   const c = companions.find(x => x.folder === spActiveFolder);
-  if (c) c.avatar_data = dataUrl;
+  if (c) c.avatar_url = dataUrl; // temporary data URL for preview only
 
   spPopulateCompanion();
   document.getElementById('sp-crop-wrap').style.display = 'none';

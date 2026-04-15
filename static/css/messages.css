@@ -40,6 +40,15 @@
 }
 .bubble p { margin: 0 0 8px; }
 .bubble p:last-child { margin-bottom: 0; }
+.msg-img {
+  display: block;
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 8px;
+  margin-top: 8px;
+  cursor: zoom-in;
+  object-fit: cover;
+}
 .bubble code {
   font-family: 'DM Mono', monospace;
   font-size: 12.5px;

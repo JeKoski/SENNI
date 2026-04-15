@@ -148,6 +148,34 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-16
+
+**Image storage fixes — avatar extract + inline thumbnails.**
+
+### What changed
+
+- `scripts/config.py` — Added `write_avatar_file()`, `delete_avatar_files()`, `migrate_avatar()`. `list_companions()` now returns `avatar_url` (path string) instead of `avatar_data` (base64). Migration runs per-companion in `list_companions`.
+- `scripts/server.py` — `api_status`: runs `migrate_avatar` for active companion, returns `avatar_url` instead of `avatar_data`. `api_get_settings`: runs migration + injects `avatar_url` into `active_companion`. `api_save_companion_settings`: `avatar_data` in body → writes file, stores `avatar_path`; empty → deletes file. New route `GET /api/companion/{folder}/avatar` serves `avatar.jpg`. `api_new_companion`: uses `avatar_path` instead of `avatar_data`.
+- `static/js/chat.js` — `loadStatus`: uses `data.avatar_url` (URL) instead of `data.avatar_data` (base64). `sendMessage`: image attachments now get inline `<img class="msg-img" data-img-ref="img_001.jpg">` thumbnails in user bubble; filenames computed from image count in existing history to match `_stripImagesFromHistory` output.
+- `static/js/companion.js` — Added `_cpAvatarChanged` / `_cpNewAvatarData` tracking. Reset on `cpLoad`. `cpAvatarCrop` and `cpAvatarReset` set flags. `cpPopulate` uses `avatar_url`. `cpSave` conditionally sends `avatar_data` only when changed; post-save uses server URL with cache-buster.
+- `static/js/settings-companion.js` — Added `_spAvatarChanged` / `_spNewAvatarData` tracking. `spPopulateCompanion` uses `avatar_url`. `spCropApply` sets flags. `spSaveCompanion` conditionally sends `avatar_data`. Post-save resets to server URL.
+- `static/js/settings.js` — `spLoad` resets avatar tracking flags on reload.
+- `static/js/chat-tabs.js` — `_serializeMessages`: clones bubble, replaces `data:` src on `img[data-img-ref]` with `/api/history/media/` URL before storing in session.json. Prevents base64 blobs in session files.
+- `static/css/messages.css` — Added `.msg-img` styles (220px max, rounded, margin-top, cursor zoom-in).
+
+### Architecture notes
+
+- Avatar config format: `avatar_path: "avatar.jpg"` (filename relative to companion folder). Migration is idempotent and runs on read in `list_companions`, and on write in `api_status` / `api_get_settings`.
+- `avatar_url` is a plain path (`/api/companion/{folder}/avatar`). Frontend adds `?v=Date.now()` for cache-busting after a save.
+- Image thumbnails in bubbles: filename matches what `_stripImagesFromHistory` generates (sequential from 1, per session). Serialize replaces data URL with media route URL. Replay just uses baked-in URL from stored HTML.
+
+### Next session
+
+- **Sidebar redesign design conversation** — tools list → Settings, companion state card (larger avatar + mood + recent memory), memory viewer/editor. Needs dedicated design session before building.
+- **Image thumbnail click-to-expand** — `.msg-img` shows thumbnail. Click to view full size not yet implemented.
+
+---
+
 ## Session notes — 2026-04-15
 
 **Pill visual rework + streaming cursor fix + doc updates.**
@@ -166,8 +194,8 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### Next session
 
-- **Image storage fix** — two base64 leaks: (1) DOM replay messages save `bubble.innerHTML` including `<img src="data:...">` blobs; fix via `data-img-ref` on DOM image + server route for session files. (2) Avatar stored as base64 in `config.json`; extract to `avatar.jpg` in companion folder with auto-migration.
 - **Sidebar redesign design conversation** — tools list → Settings, companion state card (larger avatar + mood + recent memory), memory viewer/editor. Needs dedicated design session before building.
+- **Image thumbnail click-to-expand** — `.msg-img` shows thumbnail. Click to view full size not yet implemented.
 
 ---
 
