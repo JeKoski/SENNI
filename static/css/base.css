@@ -80,18 +80,27 @@ body::before {
 }
 
 .companion-header {
-  display: flex; align-items: center; gap: 14px;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
+.companion-header-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .avatar {
-  width: clamp(40px, calc(var(--sidebar-w) * 0.25), 64px);
-  height: clamp(40px, calc(var(--sidebar-w) * 0.25), 64px);
+  width: clamp(80px, calc(var(--sidebar-w) - 32px), 220px);
+  height: clamp(80px, calc(var(--sidebar-w) - 32px), 220px);
   border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #7c3aed);
   display: flex; align-items: center; justify-content: center;
-  font-size: clamp(16px, calc(var(--sidebar-w) * 0.1), 26px);
+  font-size: clamp(28px, calc(var(--sidebar-w) * 0.18), 64px);
   flex-shrink: 0;
   box-shadow: 0 0 0 2px rgba(129,140,248,0.25);
 }
@@ -105,7 +114,6 @@ body::before {
   font-size: 11px;
   color: var(--green);
   display: flex; align-items: center; gap: 5px;
-  margin-top: 2px;
 }
 .status-dot-svg {
   flex-shrink: 0;
