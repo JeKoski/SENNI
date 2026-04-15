@@ -7,17 +7,16 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 ## Orb / Presence / Mood
 
 - **Mood system UI** *(new `companion-mood.js`, new tab in `chat.html`)*
-  - Backend already done (`moods`, `active_mood` in config). UI not yet built.
-  - Visual: orb glow/color changes per mood (e.g. Playful = green, faster pulsing ring).
-  - Optional mood pill next to orb showing current mood name — toggleable, hidden by default. Pill background = effects color, pill edge = orb edge color.
-  - Users can define short descriptions per mood (injected into system prompt).
-  - Animation toggles already built and reusable for Mood.
+  - ~~Visual~~: orb glow/color changes per mood (e.g. Playful = green, faster pulsing ring).
+  - ~~Optional mood pill~~ next to orb showing current mood name — toggleable, hidden by default. Pill background = effects color, pill edge = orb edge color.
+  - ~~Users can define short descriptions per mood~~ (injected into system prompt).
+  - ~~Animation toggles~~.
   - "Reset to default" option for both Mood and Presence.
-  - `set_mood` tool for Qwenny — implement alongside Mood UI.
+  - ~~`set_mood` tool.~~
 
-- **Strip mode status bar** — strip layout mode is a placeholder. Needs a status bar showing thinking text and other state info.
+- **Strip mode status bar** — strip layout mode is a placeholder. Needs a status bar showing thinking text and other state info. (Retire idea if side bar redesign implements all this?)
 
-- **Presence & Mood: "Reset to default" option** — add reset buttons to both Presence and Mood settings.
+- **Presence & Mood: "Reset to default" option** — add reset buttons to both Presence and Mood settings. Reset all & Reset A Preset
 
 ### Recent additions
 - Ability to override only the intensity, transparency, brightness and/or saturation of the colors and effects/animations
@@ -31,8 +30,8 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 - **File upload visualization in chat** *(partially done)*
   - Images: thumbnail inline ✓ (`.msg-img`, `data-img-ref` safe serialization). Click to view full size — not yet.
-  - Audio: mini inline player — not yet.
-  - Text/other: format-relevant icon — not yet.
+  - Audio: mini inline player — ✓. (Needs details)
+  - Text/other: format-relevant icon — ✓. (Needs details)
 
 - ~~**Image storage — two base64 leaks**~~ — **Done.**
 
@@ -84,11 +83,13 @@ Items grouped by area. Items marked **(design needed)** have open questions that
   - ~~Global enable/disable toggle~~ — **Done.** Under Settings > Server.
   - ~~Streaming audio output~~ — **Done.**
   - CPU or GPU option — Intel Arc A750, no CUDA. Need to research if/how Kokoro runs on Arc (oneAPI/SYCL). Low priority until confirmed feasible.
-  - Mood integration: map moods to voice presets (null/neutral mood = companion default; each mood can override).
+  - ~~Mood integration: map moods to voice presets (null/neutral mood = companion default; each mood can override).~~
 
 ---
 
 ## Companion Creation Wizard *(design needed — large feature)*
+
+User has a more complete documentation available — ask when starting design session
 
 Key design points:
 
@@ -96,8 +97,8 @@ Key design points:
 - Visual grids for appearance/type selections; every option has a "Custom" free-text fallback.
 - Adult Content toggle early in the flow (step 1) — gates what is shown in subsequent steps.
 - Age slider: 18–90, custom field for non-human characters (validated 18–1M).
-- Closeness scale at creation — may later become a gamified relationship progression system.
-- Step 8 (Memory & Agency): show a visual graph of memory↔mind↔soul flow; graph updates live as agentic mode is changed.
+- (Deferred) Closeness scale at creation — may later become a gamified relationship progression system.
+- Step 8 (Memory & Agency): show a visual graph of ChromaDB↔mind↔soul flow; graph updates live as agentic mode is changed.
 - Heartbeat activity level presets map to existing heartbeat settings.
 - *Depends on Mood system being built first (mood/presence visuals are part of companion identity).*
 
@@ -107,13 +108,15 @@ Appearance sections (hair style, face shape, eyes, nose, outfit system, accessor
 
 ## Sidebar / UI *(design session needed)*
 
-- **Tools list → Settings** — move the static tool-pills list out of the sidebar and into Settings > Generation (or Companion Settings for per-companion toggles). Frees a full sidebar block for something more meaningful.
+- **Tools list → Settings** — move the static tool-pills list out of the sidebar and into Settings > Tools (Later on also Companion Settings>Tools for per-companion toggles). Frees a full sidebar block for something more meaningful.
 
 - **Companion state card** *(replaces tools section)* — live sidebar card showing:
   - Larger avatar image (prominent, above the name)
   - Current mood + orb state
   - Recently surfaced memory (title + timestamp) as passive feedback that the memory system is active
   - Design conversation needed before building — ties into the Main Chat UI redesign.
+
+- Buttons (restart server, settings etc.) into pill shape with (icon Name)
 
 - **Memory viewer / editor** — a panel or tab for browsing, editing, creating, and deleting memory notes directly. Scope:
   - **soul/ and mind/ markdown files** — read/edit/save via the existing `memory` tool backend
