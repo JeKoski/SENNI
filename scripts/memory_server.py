@@ -938,6 +938,39 @@ async def api_consolidate(request: Request):
     return {"ok": True, "message": f"Consolidation started (reason: {reason})"}
 
 
+@router.post("/api/memory/dedup")
+async def api_memory_dedup(request: Request, dry_run: bool = True):
+    """
+    Remove duplicate memory notes by exact content match.
+
+    Targets session_history ingestion duplicates caused by the session-id
+    bug (now fixed). Groups all notes by content, keeps the oldest
+    non-superseded note per group, deletes the rest.
+
+    Preferred: query param  POST /api/memory/dedup?dry_run=false
+    Also accepts JSON body:  { "dry_run": false }
+
+    dry_run defaults to True (safe) — pass dry_run=false to actually delete.
+    Returns: { checked, groups, duplicates, deleted }
+    """
+    err = _check_available()
+    if err:
+        return err
+
+    # JSON body overrides query param if present and parseable
+    try:
+        body = await request.json()
+        dry_run = bool(body.get("dry_run", dry_run))
+    except Exception:
+        pass  # no body or invalid JSON — use query param value
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None, lambda: _store.dedup_notes(dry_run=dry_run)
+    )
+    return result
+
+
 @router.post("/api/memory/reindex")
 async def api_memory_reindex(request: Request):
     """
