@@ -774,13 +774,13 @@ async function sendMessage() {
     }
   }
 
-  // Build display message — images get inline thumbnails with data-img-ref for safe serialization
+  // Build display message — each attachment type gets its own visual treatment in the bubble.
+  // Images → inline thumbnail (data-img-ref), audio → <audio> player (data-audio-ref),
+  // text files → doc chip. No text label in the bubble for these types.
   const imageAttachments = attachments.filter(a => a.type === 'image');
-  const otherAttachments = attachments.filter(a => a.type !== 'image');
-  const attachLabel = otherAttachments.length
-    ? ' ' + otherAttachments.map(a => `[${a.type}: ${a.name}]`).join(' ')
-    : '';
-  const userRow = appendMessage('user', (text || '') + attachLabel);
+  const audioAttachments = attachments.filter(a => a.type === 'audio');
+  const docAttachments   = attachments.filter(a => a.type === 'text');
+  const userRow = appendMessage('user', text || '');
   _attachMessageControls(userRow, 'user');
   if (text) _autoTitleTab(text);
 
@@ -807,13 +807,48 @@ async function sendMessage() {
     }
   }
 
-  // Build history content
+  if (audioAttachments.length) {
+    // Count audio already in conversationHistory for sequential filenames
+    let audOffset = 0;
+    for (const msg of conversationHistory) {
+      if (msg._attachments) audOffset += msg._attachments.filter(a => a.type === 'audio').length;
+    }
+    const bubble = userRow?.querySelector('.bubble');
+    if (bubble) {
+      audioAttachments.forEach((a, i) => {
+        const mType = (a.mimeType || 'audio/webm').split(';')[0];
+        const ext   = mType.includes('ogg') ? 'ogg' : mType.includes('mp4') ? 'mp4' : mType.includes('wav') ? 'wav' : mType.includes('mpeg') ? 'mp3' : 'webm';
+        const name  = `aud_${String(audOffset + i + 1).padStart(3, '0')}.${ext}`;
+        const aud   = document.createElement('audio');
+        aud.className = 'msg-audio';
+        aud.controls  = true;
+        aud.setAttribute('data-audio-ref', name);
+        aud.src = `data:${a.mimeType};base64,${a.content}`;
+        bubble.appendChild(aud);
+      });
+    }
+  }
+
+  if (docAttachments.length) {
+    const bubble = userRow?.querySelector('.bubble');
+    if (bubble) {
+      docAttachments.forEach(a => {
+        const chip = document.createElement('div');
+        chip.className   = 'msg-doc-chip';
+        chip.textContent = `📄 ${a.name}`;
+        bubble.appendChild(chip);
+      });
+    }
+  }
+
+  // Build history content (what the model sees — kept separate from display)
   let histContent = text || '';
   for (const a of attachments) {
     if (a.type === 'text') {
       histContent += '\n\n[File: ' + a.name + ']\n```\n' + a.content.slice(0, 8000) + '\n```';
     } else if (a.type === 'audio') {
-      histContent += '\n\n' + a.note;
+      // Text note for model fallback — audio also sent natively in content array (api.js)
+      histContent += '\n\n' + (a.note || `[Audio: ${a.name}]`);
     }
   }
 

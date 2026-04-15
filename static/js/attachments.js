@@ -205,6 +205,12 @@ function hideDropZone() {
 // ── API for sendMessage ───────────────────────────────────────────────────────
 function getAttachments() { return [..._attachments]; }
 
+function addAttachment(att) {
+  _attachments.push(att);
+  _renderStrip();
+  _updateSendBtn();
+}
+
 function clearAttachments() {
   _attachments = [];
   _renderStrip();

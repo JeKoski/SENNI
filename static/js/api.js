@@ -95,9 +95,12 @@ async function callModel(system, messages, abortSignal = null) {
   const msgs = messages.map((m, idx) => {
     if (!m._attachments?.length) return { role: m.role, content: m.content };
     const images = m._attachments.filter(a => a.type === "image");
-    if (!images.length) return { role: m.role, content: m.content };
+    const audios = m._attachments.filter(a => a.type === "audio");
+    if (!images.length && !audios.length) return { role: m.role, content: m.content };
 
     if (visionMode === "once" && idx !== lastUserIdx) {
+      // Non-final messages in once mode: substitute text placeholders for images.
+      // Audio text note is already in m.content (histContent), no extra needed.
       return {
         role: m.role,
         content: (m.content || "") + images.map(img =>
@@ -113,7 +116,14 @@ async function callModel(system, messages, abortSignal = null) {
         ...images.map(img => ({
           type: "image_url",
           image_url: { url: `data:${img.mimeType};base64,${img.content}` }
-        }))
+        })),
+        // Audio: included only for this message's own audio (always "once" — never re-sent).
+        // Format: audio_url, mirroring image_url. If llama-server rejects this format,
+        // try: { type: "input_audio", input_audio: { data: aud.content, format: "wav" } }
+        ...(idx === lastUserIdx ? audios.map(aud => ({
+          type: "audio_url",
+          audio_url: { url: `data:${aud.mimeType};base64,${aud.content}` }
+        })) : [])
       ]
     };
   });

@@ -49,6 +49,27 @@
   cursor: zoom-in;
   object-fit: cover;
 }
+.msg-audio {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  margin-top: 8px;
+  border-radius: 8px;
+  accent-color: var(--indigo);
+  outline: none;
+}
+.msg-doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(129,140,248,0.08);
+  border: 1px solid rgba(129,140,248,0.2);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--indigo-hi);
+  margin-top: 6px;
+}
 .bubble code {
   font-family: 'DM Mono', monospace;
   font-size: 12.5px;
