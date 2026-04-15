@@ -149,6 +149,8 @@ async function spLoad() {
     const res  = await fetch('/api/settings');
     spSettings = await res.json();
     spActiveFolder = spSettings.config?.companion_folder || 'default';
+    _spAvatarChanged = false;
+    _spNewAvatarData = null;
     spPopulateServer();
     spPopulateGeneration();
     spPopulateCompanion();

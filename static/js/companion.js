@@ -7,10 +7,12 @@
 // Mood logic will live in companion-mood.js (future).
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let cpSettings = null;   // loaded from /api/settings
-let cpFolder   = '';     // active companion folder
-let cpSoulFile = null;   // currently selected soul file name
-let cpDirty    = false;  // unsaved changes flag
+let cpSettings       = null;   // loaded from /api/settings
+let cpFolder         = '';     // active companion folder
+let cpSoulFile       = null;   // currently selected soul file name
+let cpDirty          = false;  // unsaved changes flag
+let _cpAvatarChanged = false;  // true if user picked/reset avatar this session
+let _cpNewAvatarData = null;   // data URL (new avatar) or '' (reset), null = no change
 
 // ── Dirty tracking ────────────────────────────────────────────────────────────
 function cpMarkDirty() {
@@ -96,6 +98,8 @@ async function cpLoad() {
     const res  = await fetch('/api/settings');
     cpSettings = await res.json();
     cpFolder   = cpSettings.config?.companion_folder || 'default';
+    _cpAvatarChanged = false;
+    _cpNewAvatarData = null;
     cpClearDirty();
     cpPopulate();
   } catch(e) { console.warn('cpLoad failed:', e); }
@@ -112,23 +116,26 @@ function cpPopulate() {
   // Update panel header
   const headerName = document.getElementById('cp-header-name');
   if (headerName) headerName.textContent = c.companion_name || 'Companion';
+  const avatarUrl = c.avatar_url || '';
+  const avatarSrc = avatarUrl ? `${avatarUrl}?v=${Date.now()}` : '';
+
   const headerAv = document.getElementById('cp-header-avatar');
   if (headerAv) {
-    headerAv.innerHTML = c.avatar_data
-      ? `<img src="${c.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+    headerAv.innerHTML = avatarSrc
+      ? `<img src="${avatarSrc}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
       : '✦';
   }
 
   const preview = document.getElementById('cp-avatar-preview');
-  if (c.avatar_data) {
-    preview.innerHTML = `<img src="${c.avatar_data}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+  if (avatarSrc) {
+    preview.innerHTML = `<img src="${avatarSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
   } else {
     preview.innerHTML = '✦';
   }
   document.getElementById('cp-crop-wrap').style.display = 'none';
 
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
-  if (resetWrap) resetWrap.style.display = c.avatar_data ? 'inline' : 'none';
+  if (resetWrap) resetWrap.style.display = avatarSrc ? 'inline' : 'none';
 
   const soulMode = c.soul_edit_mode || 'locked';
   document.querySelectorAll('#cp-soul-edit-mode input[name="cp-soul-edit"]').forEach(r => {
@@ -253,9 +260,15 @@ function cpAvatarLoad(file) {
 
 function cpAvatarCrop() {
   if (!_cpCropper) {
+    // No cropper — apply full image directly
     const preview = document.getElementById('cp-avatar-preview');
     if (preview && _cpAvatarFull) {
       preview.innerHTML = `<img src="${_cpAvatarFull}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+      _cpAvatarChanged = true;
+      _cpNewAvatarData = _cpAvatarFull;
+      const resetWrap = document.getElementById('cp-avatar-reset-wrap');
+      if (resetWrap) resetWrap.style.display = 'inline';
+      cpMarkDirty();
     }
     document.getElementById('cp-crop-wrap').style.display = 'none';
     return;
@@ -268,6 +281,8 @@ function cpAvatarCrop() {
   _cpCropper.destroy(); _cpCropper = null;
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
   if (resetWrap) resetWrap.style.display = 'inline';
+  _cpAvatarChanged = true;
+  _cpNewAvatarData = data;
   cpMarkDirty();
 }
 
@@ -276,6 +291,8 @@ function cpAvatarReset() {
   if (preview) preview.innerHTML = '✦';
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
   if (resetWrap) resetWrap.style.display = 'none';
+  _cpAvatarChanged = true;
+  _cpNewAvatarData = '';
   cpMarkDirty();
 }
 
@@ -392,13 +409,10 @@ async function cpSave(andClose = false) {
       },
     };
 
-    const avatarImg  = document.getElementById('cp-avatar-preview')?.querySelector('img');
-    const avatarData = avatarImg?.src || '';
-
     const body = {
       folder:                  cpFolder,
       companion_name:          document.getElementById('cp-companion-name')?.value.trim() || '',
-      avatar_data:             avatarData,
+      ...(_cpAvatarChanged ? { avatar_data: _cpNewAvatarData } : {}),
       generation:              g,
       soul_edit_mode:          document.querySelector('#cp-soul-edit-mode input[name="cp-soul-edit"]:checked')?.value || 'locked',
       force_read_before_write: document.getElementById('cp-force-read')?.classList.contains('on') ?? true,
@@ -421,7 +435,10 @@ async function cpSave(andClose = false) {
     if (cpSettings) {
       if (!cpSettings.active_companion) cpSettings.active_companion = {};
       cpSettings.active_companion.companion_name          = body.companion_name;
-      cpSettings.active_companion.avatar_data             = body.avatar_data;
+      if (_cpAvatarChanged) {
+        cpSettings.active_companion.avatar_path = _cpNewAvatarData ? 'avatar.jpg' : '';
+        cpSettings.active_companion.avatar_url  = _cpNewAvatarData ? `/api/companion/${cpFolder}/avatar` : '';
+      }
       cpSettings.active_companion.generation              = body.generation;
       cpSettings.active_companion.soul_edit_mode          = body.soul_edit_mode;
       cpSettings.active_companion.force_read_before_write = body.force_read_before_write;
@@ -450,18 +467,25 @@ async function cpSave(andClose = false) {
     // ── Update sidebar immediately ──
     const nameEl = document.getElementById('companion-name');
     if (nameEl) nameEl.textContent = body.companion_name || 'Companion';
-    const avatarEl = document.getElementById('companion-avatar');
-    if (avatarEl) {
-      avatarEl.innerHTML = body.avatar_data
-        ? `<img src="${body.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
-        : '✦';
+    if (_cpAvatarChanged) {
+      const newAvatarUrl = _cpNewAvatarData ? `/api/companion/${cpFolder}/avatar?v=${Date.now()}` : '';
+      const avatarEl = document.getElementById('companion-avatar');
+      if (avatarEl) {
+        avatarEl.innerHTML = newAvatarUrl
+          ? `<img src="${newAvatarUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+          : '✦';
+      }
+      const cpHeaderAv = document.getElementById('cp-header-avatar');
+      if (cpHeaderAv) {
+        cpHeaderAv.innerHTML = newAvatarUrl
+          ? `<img src="${newAvatarUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+          : '✦';
+      }
+      _cpAvatarChanged = false;
+      _cpNewAvatarData = null;
     }
     const cpHeaderName = document.getElementById('cp-header-name');
     if (cpHeaderName) cpHeaderName.textContent = body.companion_name || 'Companion';
-    const cpHeaderAv = document.getElementById('cp-header-avatar');
-    if (cpHeaderAv && body.avatar_data) {
-      cpHeaderAv.innerHTML = `<img src="${body.avatar_data}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
-    }
     if (typeof syncStatusAvatar === 'function') syncStatusAvatar();
     if (typeof heartbeatReload  === 'function') heartbeatReload();
 

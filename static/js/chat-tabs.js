@@ -64,26 +64,43 @@ function _makeSessionId() {
 
 // ── Disk save / load ──────────────────────────────────────────────────────────
 
-// Strip inline base64 image content from API history entries before saving.
-// Images are saved as separate files; the history entry keeps a path reference.
-// Pending image file extraction is handled by _pendingImages (set by chat.js
-// before calling saveTabs()).
-let _pendingImages = []; // [{name, data_url}] to flush on next save
+// Strip inline base64 image content from history entries before saving to disk.
+// Images are written as separate files; history entries keep path references.
+// Handles two formats:
+//   _attachments: [{type:'image', content: base64, mimeType, ...}]  ← chat.js format
+//   content: [{type:'image_url', image_url:{url:'data:...'}}]        ← API array format
+let _pendingImages = []; // [{name, data_url}] — flushed in _saveCurrentSessionToDisk
 
 function _stripImagesFromHistory(history) {
   return history.map(msg => {
-    if (!Array.isArray(msg.content)) return msg;
-    const stripped = msg.content.map(part => {
-      if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
-        // Save the file; return a reference instead of the blob
+    // ── _attachments format (how chat.js stores image attachments) ──
+    if (msg._attachments?.length) {
+      msg._attachments.filter(a => a.type === 'image').forEach(a => {
+        const dataUrl = `data:${a.mimeType};base64,${a.content}`;
         const name = `img_${String(_pendingImages.length + 1).padStart(3, '0')}` +
-                     _extFromDataUrl(part.image_url.url);
-        _pendingImages.push({ name, data_url: part.image_url.url });
-        return { type: 'image_ref', path: name };
-      }
-      return part;
-    });
-    return { ...msg, content: stripped };
+                     _extFromDataUrl(dataUrl);
+        _pendingImages.push({ name, data_url: dataUrl });
+      });
+      // Drop _attachments from saved history — no base64 on disk
+      const { _attachments, ...rest } = msg;
+      return rest;
+    }
+
+    // ── API array-format content (image_url parts) ──
+    if (Array.isArray(msg.content)) {
+      const stripped = msg.content.map(part => {
+        if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
+          const name = `img_${String(_pendingImages.length + 1).padStart(3, '0')}` +
+                       _extFromDataUrl(part.image_url.url);
+          _pendingImages.push({ name, data_url: part.image_url.url });
+          return { type: 'image_ref', path: name };
+        }
+        return part;
+      });
+      return { ...msg, content: stripped };
+    }
+
+    return msg;
   });
 }
 
@@ -105,8 +122,8 @@ async function _saveCurrentSessionToDisk() {
   const tab = _tabs.find(t => t.id === _activeTabId);
   if (!tab) return;
 
-  const images  = _pendingImages.splice(0); // consume pending images
-  const history = _stripImagesFromHistory(conversationHistory);
+  const history = _stripImagesFromHistory(conversationHistory); // populates _pendingImages
+  const images  = _pendingImages.splice(0);                     // consume what was just added
 
   try {
     await fetch('/api/history/save', {
@@ -436,7 +453,17 @@ function _serializeMessages() {
       const bubble = el.querySelector('.bubble');
       const time   = el.querySelector('.msg-time');
       if (bubble) {
-        const entry = { type: 'message', role, html: bubble.innerHTML, time: time?.textContent || '' };
+        // Clone bubble and replace data: URLs on image thumbnails with media route URLs.
+        // Keeps base64 blobs out of session.json.
+        const clone  = bubble.cloneNode(true);
+        const folder = (typeof config !== 'undefined' ? config.companion_folder : null) || 'default';
+        clone.querySelectorAll('img[data-img-ref]').forEach(img => {
+          if (img.src.startsWith('data:')) {
+            const ref = img.getAttribute('data-img-ref');
+            img.src = `/api/history/media/${folder}/${_activeTabId}/${_currentSessionId}/${ref}`;
+          }
+        });
+        const entry = { type: 'message', role, html: clone.innerHTML, time: time?.textContent || '' };
         if (el.classList.contains('heartbeat-msg')) entry.heartbeat = true;
         msgs.push(entry);
       }

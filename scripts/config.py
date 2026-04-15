@@ -9,6 +9,7 @@ Handles:
 - Resolving all paths relative to the project root (fully portable)
 """
 
+import base64
 import json
 import os
 import platform
@@ -520,9 +521,56 @@ def save_companion_config(companion_folder: str, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+def write_avatar_file(companion_folder: str, data_url: str) -> str:
+    """
+    Write a base64 data URL to disk as an avatar image file.
+    Returns the filename saved (e.g. 'avatar.jpg'), or '' on failure.
+    """
+    try:
+        header, b64 = data_url.split(',', 1)
+        mime = header.split(';')[0].split(':')[1] if ':' in header else 'image/jpeg'
+        if 'png'  in mime: ext = '.png'
+        elif 'gif' in mime: ext = '.gif'
+        elif 'webp' in mime: ext = '.webp'
+        else: ext = '.jpg'
+        filename = f"avatar{ext}"
+        (COMPANIONS_DIR / companion_folder / filename).write_bytes(base64.b64decode(b64))
+        return filename
+    except Exception:
+        return ""
+
+
+def delete_avatar_files(companion_folder: str) -> None:
+    """Delete all avatar image files for a companion folder."""
+    for ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+        p = COMPANIONS_DIR / companion_folder / f"avatar{ext}"
+        if p.exists():
+            try: p.unlink()
+            except Exception: pass
+
+
+def migrate_avatar(companion_folder: str, companion_cfg: dict) -> dict:
+    """
+    One-time migration: if config has avatar_data but no avatar_path,
+    extract the base64 to a file, update config on disk, and return
+    the updated config dict (without avatar_data).
+    Idempotent — safe to call on every load.
+    """
+    if companion_cfg.get("avatar_path") or not companion_cfg.get("avatar_data"):
+        return companion_cfg
+    filename = write_avatar_file(companion_folder, companion_cfg["avatar_data"])
+    if not filename:
+        return companion_cfg
+    cfg = {k: v for k, v in companion_cfg.items() if k != "avatar_data"}
+    cfg["avatar_path"] = filename
+    save_companion_config(companion_folder, cfg)
+    return cfg
+
+
 def list_companions() -> list[dict]:
     """
-    Return all companion folders as [{folder, name, avatar_data}].
+    Return all companion folders as [{folder, name, avatar_url}].
+    Migrates avatar_data → file for any companion that hasn't been migrated yet.
     """
     if not COMPANIONS_DIR.exists():
         return []
@@ -531,10 +579,11 @@ def list_companions() -> list[dict]:
         if not d.is_dir():
             continue
         cfg = load_companion_config(d.name)
+        cfg = migrate_avatar(d.name, cfg)
         result.append({
             "folder":      d.name,
             "name":        cfg.get("companion_name", d.name),
-            "avatar_data": cfg.get("avatar_data", ""),
+            "avatar_url":  f"/api/companion/{d.name}/avatar" if cfg.get("avatar_path") else "",
         })
     return result
 
