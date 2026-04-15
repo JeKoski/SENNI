@@ -260,9 +260,15 @@ function cpAvatarLoad(file) {
 
 function cpAvatarCrop() {
   if (!_cpCropper) {
+    // No cropper — apply full image directly
     const preview = document.getElementById('cp-avatar-preview');
     if (preview && _cpAvatarFull) {
       preview.innerHTML = `<img src="${_cpAvatarFull}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+      _cpAvatarChanged = true;
+      _cpNewAvatarData = _cpAvatarFull;
+      const resetWrap = document.getElementById('cp-avatar-reset-wrap');
+      if (resetWrap) resetWrap.style.display = 'inline';
+      cpMarkDirty();
     }
     document.getElementById('cp-crop-wrap').style.display = 'none';
     return;
