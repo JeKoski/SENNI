@@ -39,6 +39,10 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
   **Companion avatar:** `avatar_data` (base64 in config.json) replaced by `avatar_path` + file on disk. Server writes `avatar.jpg` on save, serves via `GET /api/companion/{folder}/avatar`. Auto-migration runs on page load for any companion still using the old format. `config.py` helpers: `write_avatar_file`, `delete_avatar_files`, `migrate_avatar`.
 
+- **Separate sidebar and orb avatars** — sidebar now uses a portrait 3:4 rounded rectangle; orb uses a small circle. These need separate image slots (`avatar_path` for orb, `sidebar_avatar_path` for sidebar). Someone may want a full-body portrait for the sidebar and a close face crop for the orb. Requires: separate upload/save flow in Companion Settings, and two avatar routes on the server.
+
+- **Avatar crop tool — portrait mode** — existing crop tool is square (designed for the circular orb avatar). Needs a 3:4 crop mode for the sidebar portrait avatar. Could be a mode toggle on the same crop UI, or a separate crop step per avatar slot.
+
 - **Animated avatars** *(wishlist — no design yet)*
   - Sprites, Live2D, or other — needs exploration. Document as future consideration only.
 

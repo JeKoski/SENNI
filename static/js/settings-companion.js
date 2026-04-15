@@ -269,7 +269,7 @@ function spCropApply() {
 
   const sidebarAvatar = document.getElementById('companion-avatar');
   if (sidebarAvatar) {
-    sidebarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`;
+    sidebarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover"/>`;
   }
 
   _spAvatarChanged = true;

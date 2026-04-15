@@ -20,28 +20,23 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-resize-handle" id="sidebar-handle"></div>
     <div class="companion-header">
-      <div class="companion-header-top">
-        <div class="companion-name" id="companion-name">…</div>
-        <button class="companion-gear-btn" onclick="openCompanionWindow()" title="Companion settings">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="8" cy="8" r="2.5"/>
-            <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42"/>
-          </svg>
-        </button>
-      </div>
       <div class="avatar" id="companion-avatar">✦</div>
-      <div class="companion-status">
-        <svg class="status-dot-svg" width="16" height="16" viewBox="0 0 16 16">
-          <circle cx="8" cy="8" r="3" fill="#6dd4a8">
-            <animate attributeName="fill-opacity" values="0.8;1;0.8" dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
-          </circle>
-          <circle cx="8" cy="8" r="3" fill="none" stroke="#6dd4a8" stroke-width="4">
-            <animate attributeName="r"            values="3;11"    dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.15 0 0.85 1"/>
-            <animate attributeName="stroke-width" values="4;0.5"   dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.15 0 0.85 1"/>
-            <animate attributeName="opacity"      values="0.35;0"  dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.2 0 1 1"/>
-          </circle>
-        </svg>
-        <span id="status-text">online</span>
+      <div class="companion-name" id="companion-name">…</div>
+      <div class="companion-status-row">
+        <div class="companion-status">
+          <svg class="status-dot-svg" width="16" height="16" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="3" fill="#6dd4a8">
+              <animate attributeName="fill-opacity" values="0.8;1;0.8" dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+            </circle>
+            <circle cx="8" cy="8" r="3" fill="none" stroke="#6dd4a8" stroke-width="4">
+              <animate attributeName="r"            values="3;11"    dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.15 0 0.85 1"/>
+              <animate attributeName="stroke-width" values="4;0.5"   dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.15 0 0.85 1"/>
+              <animate attributeName="opacity"      values="0.35;0"  dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.2 0 1 1"/>
+            </circle>
+          </svg>
+          <span id="status-text">online</span>
+        </div>
+        <button class="companion-gear-btn" onclick="openCompanionWindow()" title="Companion settings">⚙</button>
       </div>
     </div>
 

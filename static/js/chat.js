@@ -114,7 +114,7 @@ async function loadStatus() {
     if (avatarEl) {
       const avatarUrl = data.avatar_url || '';
       avatarEl.innerHTML = avatarUrl
-        ? `<img src="${avatarUrl}?v=${Date.now()}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+        ? `<img src="${avatarUrl}?v=${Date.now()}" style="width:100%;height:100%;object-fit:cover"/>`
         : '✦';
     }
     // Mirror avatar into the persistent companion orb
