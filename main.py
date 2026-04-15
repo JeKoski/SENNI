@@ -18,6 +18,10 @@ import sys
 import webbrowser
 from pathlib import Path
 
+# Ensure Unicode prints correctly on Windows terminals with non-UTF-8 codepages
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # ── Version guard ──────────────────────────────────────────────────────────────
 
 if sys.version_info < (3, 10):

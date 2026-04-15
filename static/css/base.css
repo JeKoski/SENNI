@@ -80,16 +80,19 @@ body::before {
 }
 
 .companion-header {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 28px;
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 24px;
   padding-bottom: 20px;
   border-bottom: 1px solid var(--border);
 }
 .avatar {
-  width: 40px; height: 40px; border-radius: 50%;
+  width: clamp(40px, calc(var(--sidebar-w) * 0.25), 64px);
+  height: clamp(40px, calc(var(--sidebar-w) * 0.25), 64px);
+  border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #7c3aed);
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; flex-shrink: 0;
+  font-size: clamp(16px, calc(var(--sidebar-w) * 0.1), 26px);
+  flex-shrink: 0;
   box-shadow: 0 0 0 2px rgba(129,140,248,0.25);
 }
 .companion-name {
@@ -154,35 +157,34 @@ body::before {
 /* ── Sidebar footer ───────────────────────────────────────────────────────── */
 .sidebar-footer {
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
-.sidebar-footer .icon-btn {
-  flex: 1 1 calc(33% - 6px);
-  min-width: 32px;
-}
-.icon-btn {
-  flex: 1;
+.footer-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border-radius: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 9px;
   color: var(--text-muted);
-  font-size: 16px;
-  padding: 9px;
-  cursor: pointer;
-  text-align: center;
-  transition: all .2s;
+  font-size: 12px;
   font-family: inherit;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+  overflow: hidden;
 }
-.icon-btn:hover {
+.footer-pill:hover {
   background: var(--surface2);
   border-color: var(--border-hi);
   color: var(--text);
 }
-.icon-btn title { display: none; }
 
 /* ── Main chat area ───────────────────────────────────────────────────────── */
 .chat-area {

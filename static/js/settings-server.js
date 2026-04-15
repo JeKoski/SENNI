@@ -495,7 +495,7 @@ async function spSaveServer(andClose = false) {
 // ── Restart ────────────────────────────────────────────────────────────────────
 async function restartServer() {
   const btn = document.getElementById('restart-btn');
-  btn.textContent = '…';
+  btn.textContent = '… Restarting';
   btn.disabled = true;
   try {
     const res  = await fetch('/api/boot', {
@@ -504,9 +504,9 @@ async function restartServer() {
       body:    JSON.stringify({ force: true }),
     });
     const data = await res.json();
-    if (data.ok) { btn.textContent = '↺'; btn.disabled = false; }
+    if (data.ok) { btn.textContent = '↺ Restart'; btn.disabled = false; }
   } catch (e) {
-    btn.textContent = '↺'; btn.disabled = false;
+    btn.textContent = '↺ Restart'; btn.disabled = false;
   }
 }
 
