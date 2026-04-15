@@ -201,6 +201,9 @@ async function loadTabs() {
     if (session) {
       activeTab.history  = session.history  || [];
       activeTab.messages = session.messages || [];
+      // Restore the original session ID so subsequent saves go to the same
+      // folder rather than creating a new one every page load.
+      if (session.session_id) _currentSessionId = session.session_id;
     }
   }
   if (activeTab) {
