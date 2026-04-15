@@ -68,6 +68,7 @@ Items grouped by area. Items marked **(design needed)** have open questions that
     - Do nothing — vision_mode `once` already handles "don't re-send" for the current session; across sessions the image is effectively gone from context, which may be acceptable
   - **Export update** — exporting a session should zip the whole session folder (images + JSON). Currently images not included in exports.
   - **Import update** — importing should handle the new session folder format.
+  - **History folder cleanup / pruning** — voice recordings are stored as uncompressed WAV files (`aud_001.wav` etc.) alongside images in session folders. Heavy voice use will bloat history folders significantly. Need a pruning strategy: auto-delete media files for sessions older than N days, or a manual "clean up old sessions" UI action. No design yet.
 
 - ~~**`mid_convo_k` config wiring**~~ — **Done.** UI in Companion Settings > Memory. Saves to `/api/settings/memory`, read back by `loadStatus()` into `config.memory.mid_convo_k`. Minor gap: change doesn't take live effect until reload (could mirror the `markdown_enabled` pattern to update `config.memory` immediately after save — low priority).
 
@@ -114,7 +115,12 @@ Appearance sections (hair style, face shape, eyes, nose, outfit system, accessor
   - Recently surfaced memory (title + timestamp) as passive feedback that the memory system is active
   - Design conversation needed before building — ties into the Main Chat UI redesign.
 
-- **Memory viewer / editor** — a panel or tab for browsing, editing, and saving memory notes directly (soul/, mind/, and ChromaDB episodic store). Useful for reviewing what Senni knows, correcting outdated notes, and writing entries without phrasing them as chat messages. Could live in Companion Settings or as a dedicated sidebar panel.
+- **Memory viewer / editor** — a panel or tab for browsing, editing, creating, and deleting memory notes directly. Scope:
+  - **soul/ and mind/ markdown files** — read/edit/save via the existing `memory` tool backend
+  - **ChromaDB episodic notes** — list, read, edit content, delete individual entries
+  - **Duplicate detection + cleanup** — the session-duplication bug (now fixed) generated hundreds of duplicate notes. Need a way to find and remove them — either a manual "deduplicate" action or an automated pass during consolidation. Could use embedding similarity to surface near-duplicates for human review.
+  - **Note health indicators** — surfaced count, last retrieved, superseded status
+  - Could live in Companion Settings as a dedicated Memory tab, or as a sidebar panel. Needs design conversation before building.
 
 ---
 
