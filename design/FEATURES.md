@@ -39,6 +39,10 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
   **Companion avatar:** `avatar_data` (base64 in config.json) replaced by `avatar_path` + file on disk. Server writes `avatar.jpg` on save, serves via `GET /api/companion/{folder}/avatar`. Auto-migration runs on page load for any companion still using the old format. `config.py` helpers: `write_avatar_file`, `delete_avatar_files`, `migrate_avatar`.
 
+- **Separate sidebar and orb avatars** — sidebar now uses a portrait 3:4 rounded rectangle; orb uses a small circle. These need separate image slots (`avatar_path` for orb, `sidebar_avatar_path` for sidebar). Someone may want a full-body portrait for the sidebar and a close face crop for the orb. Requires: separate upload/save flow in Companion Settings, and two avatar routes on the server.
+
+- **Avatar crop tool — portrait mode** — existing crop tool is square (designed for the circular orb avatar). Needs a 3:4 crop mode for the sidebar portrait avatar. Could be a mode toggle on the same crop UI, or a separate crop step per avatar slot.
+
 - **Animated avatars** *(wishlist — no design yet)*
   - Sprites, Live2D, or other — needs exploration. Document as future consideration only.
 
@@ -121,7 +125,8 @@ Appearance sections (hair style, face shape, eyes, nose, outfit system, accessor
 - **Memory viewer / editor** — a panel or tab for browsing, editing, creating, and deleting memory notes directly. Scope:
   - **soul/ and mind/ markdown files** — read/edit/save via the existing `memory` tool backend
   - **ChromaDB episodic notes** — list, read, edit content, delete individual entries
-  - **Duplicate detection + cleanup** — the session-duplication bug (now fixed) generated hundreds of duplicate notes. Need a way to find and remove them — either a manual "deduplicate" action or an automated pass during consolidation. Could use embedding similarity to surface near-duplicates for human review.
+  - **Duplicate detection + cleanup** — `POST /api/memory/dedup` endpoint already exists (exact-content dedup, used for session-id bug cleanup). UI should expose this as a button. Future: embedding-similarity pass for near-duplicates with human review.
+  - **Note breakdown by source** — `status` endpoint currently returns total count only. Add breakdown: how many are companion-written (`function_source` = T/S/N/F) vs system-ingested (`session_history`). Useful for understanding memory composition.
   - **Note health indicators** — surfaced count, last retrieved, superseded status
   - Could live in Companion Settings as a dedicated Memory tab, or as a sidebar panel. Needs design conversation before building.
 

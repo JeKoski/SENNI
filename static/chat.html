@@ -21,23 +21,13 @@
     <div class="sidebar-resize-handle" id="sidebar-handle"></div>
     <div class="companion-header">
       <div class="avatar" id="companion-avatar">✦</div>
-      <div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div class="companion-name" id="companion-name">…</div>
-          <button class="companion-gear-btn" onclick="openCompanionWindow()" title="Companion settings">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="8" cy="8" r="2.5"/>
-              <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42"/>
-            </svg>
-          </button>
-        </div>
+      <div class="companion-name" id="companion-name">…</div>
+      <div class="companion-status-row">
         <div class="companion-status">
           <svg class="status-dot-svg" width="16" height="16" viewBox="0 0 16 16">
-            <!-- Solid dot with gentle breathe -->
             <circle cx="8" cy="8" r="3" fill="#6dd4a8">
               <animate attributeName="fill-opacity" values="0.8;1;0.8" dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
             </circle>
-            <!-- Single radiating ring — thick bloom that dissolves outward -->
             <circle cx="8" cy="8" r="3" fill="none" stroke="#6dd4a8" stroke-width="4">
               <animate attributeName="r"            values="3;11"    dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.15 0 0.85 1"/>
               <animate attributeName="stroke-width" values="4;0.5"   dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.15 0 0.85 1"/>
@@ -46,6 +36,7 @@
           </svg>
           <span id="status-text">online</span>
         </div>
+        <button class="companion-gear-btn" onclick="openCompanionWindow()" title="Companion settings">⚙</button>
       </div>
     </div>
 
@@ -58,36 +49,15 @@
       <div id="tab-list"></div>
     </div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">Memory</div>
-      <div class="memory-item">
-        <div class="mem-folder"><div class="mem-dot" style="background:#a78bfa"></div>soul/</div>
-        <span class="mem-count" id="mem-soul">—</span>
-      </div>
-      <div class="memory-item">
-        <div class="mem-folder"><div class="mem-dot" style="background:#818cf8"></div>mind/</div>
-        <span class="mem-count" id="mem-mind">—</span>
-      </div>
-      <div class="memory-item">
-        <div class="mem-folder"><div class="mem-dot" style="background:#6dd4a8"></div>memory/</div>
-        <span class="mem-count" id="mem-memory">—</span>
-      </div>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="sidebar-label">Tools</div>
-      <div id="tool-pills"><span class="tool-pill">loading…</span></div>
-    </div>
 
     <div style="flex:1"></div>
 
     <div class="sidebar-footer">
-      <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
-      <button class="icon-btn" onclick="restartServer()" id="restart-btn" title="Restart model server">↺</button>
-      <button class="icon-btn" onclick="exportHistory()" title="Export chat history">↓</button>
-      <button class="icon-btn" onclick="importHistory()" title="Import chat history">↑</button>
-      <button class="icon-btn" id="hb-manual-btn" onclick="heartbeatManual()" title="Trigger heartbeat now" style="display:none">✦</button>
-
+      <button class="footer-pill" onclick="openSettings()">⚙ Settings</button>
+      <button class="footer-pill" onclick="restartServer()" id="restart-btn">↺ Restart</button>
+      <button class="footer-pill" onclick="exportHistory()">↓ Export</button>
+      <button class="footer-pill" onclick="importHistory()">↑ Import</button>
+      <button class="footer-pill" id="hb-manual-btn" onclick="heartbeatManual()" style="display:none">✦ Heartbeat</button>
     </div>
   </aside>
 
@@ -197,6 +167,7 @@
       <button class="cp-tab" data-tab="presence"   onclick="cpSwitchTab('presence')" style="color:rgba(167,139,250,0.7)">Presence ✦</button>
       <button class="cp-tab" data-tab="mood"       onclick="cpSwitchTab('mood')">Mood</button>
       <button class="cp-tab" data-tab="voice"      onclick="cpSwitchTab('voice')">Voice</button>
+      <button class="cp-tab" data-tab="tools"     onclick="cpSwitchTab('tools')">Tools</button>
     </div>
     <!-- Identity -->
     <div class="cp-tab-body" id="cp-tab-identity">
@@ -547,6 +518,15 @@
 
       </div>
     </div>
+
+    <!-- Tools tab -->
+    <div class="cp-tab-body" id="cp-tab-tools">
+      <div class="cp-section">Tools</div>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-top:8px">
+        Per-companion tool toggles coming soon — enable or disable individual tools for this companion here.
+      </p>
+    </div>
+
         <!-- Footer -->
     <!-- Colour picker overlay — centred modal, shared across all elements -->
     <div class="cp-color-overlay" id="cp-color-overlay" onclick="event.target===this&&_cpCloseColorPicker()">
@@ -586,6 +566,7 @@
       <button class="sp-tab"        data-tab="generation" onclick="spSwitchTab('generation')">Generation</button>
       <button class="sp-tab"        data-tab="companion"  onclick="spSwitchTab('companion')">Companion</button>
       <button class="sp-tab"        data-tab="about"      onclick="spSwitchTab('about')">About</button>
+      <button class="sp-tab"        data-tab="tools"      onclick="spSwitchTab('tools')">Tools</button>
     </div>
 
     <!-- Server tab -->
@@ -771,6 +752,14 @@
           ⊗ Factory reset
         </button>
       </div>
+    </div>
+
+    <!-- Tools tab -->
+    <div class="sp-body tab-body" id="tab-tools">
+      <div class="sp-section-label">Tools</div>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-top:8px">
+        Global tool settings coming soon — enable/disable individual tools and set per-tool defaults here.
+      </p>
     </div>
 
   </div>

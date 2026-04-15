@@ -122,7 +122,7 @@ function cpPopulate() {
   const headerAv = document.getElementById('cp-header-avatar');
   if (headerAv) {
     headerAv.innerHTML = avatarSrc
-      ? `<img src="${avatarSrc}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+      ? `<img src="${avatarSrc}" style="width:100%;height:100%;object-fit:cover"/>`
       : '✦';
   }
 
@@ -481,7 +481,7 @@ async function cpSave(andClose = false) {
       const avatarEl = document.getElementById('companion-avatar');
       if (avatarEl) {
         avatarEl.innerHTML = newAvatarUrl
-          ? `<img src="${newAvatarUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+          ? `<img src="${newAvatarUrl}" style="width:100%;height:100%;object-fit:cover"/>`
           : '✦';
       }
       const cpHeaderAv = document.getElementById('cp-header-avatar');

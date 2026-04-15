@@ -80,17 +80,26 @@ body::before {
 }
 
 .companion-header {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 28px;
-  padding-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
 .avatar {
-  width: 40px; height: 40px; border-radius: 50%;
+  width: calc(var(--sidebar-w) - 16px);
+  max-width: 320px;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
   background: linear-gradient(135deg, #6366f1, #7c3aed);
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(129,140,248,0.25);
+  font-size: clamp(28px, calc(var(--sidebar-w) * 0.18), 64px);
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 2px solid var(--orb-border, rgba(129,140,248,0.35));
+  box-shadow: 0 0 14px 2px var(--glow-color, rgba(129,140,248,0.2));
 }
 .companion-name {
   font-family: 'Lora', serif;
@@ -98,11 +107,15 @@ body::before {
   color: #eef0fb;
   line-height: 1.2;
 }
+.companion-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .companion-status {
   font-size: 11px;
   color: var(--green);
   display: flex; align-items: center; gap: 5px;
-  margin-top: 2px;
 }
 .status-dot-svg {
   flex-shrink: 0;
@@ -154,35 +167,34 @@ body::before {
 /* ── Sidebar footer ───────────────────────────────────────────────────────── */
 .sidebar-footer {
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
-.sidebar-footer .icon-btn {
-  flex: 1 1 calc(33% - 6px);
-  min-width: 32px;
-}
-.icon-btn {
-  flex: 1;
+.footer-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border-radius: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 9px;
   color: var(--text-muted);
-  font-size: 16px;
-  padding: 9px;
-  cursor: pointer;
-  text-align: center;
-  transition: all .2s;
+  font-size: 12px;
   font-family: inherit;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+  overflow: hidden;
 }
-.icon-btn:hover {
+.footer-pill:hover {
   background: var(--surface2);
   border-color: var(--border-hi);
   color: var(--text);
 }
-.icon-btn title { display: none; }
 
 /* ── Main chat area ───────────────────────────────────────────────────────── */
 .chat-area {
