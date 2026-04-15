@@ -112,15 +112,19 @@ async function loadStatus() {
 
     const avatarEl = document.getElementById('companion-avatar');
     if (avatarEl) {
-      // Sidebar uses its own portrait crop; falls back to orb avatar if none set
-      const sbUrl = data.sidebar_avatar_url || data.avatar_url || '';
-      avatarEl.innerHTML = sbUrl
-        ? `<img src="${sbUrl}?v=${Date.now()}" style="width:100%;height:100%;object-fit:cover"/>`
+      // Sidebar uses its own portrait crop; falls back to orb avatar if none set.
+      // sidebar_avatar_url already has ?slot=sidebar so cache-bust with & not ?
+      const _v      = Date.now();
+      const _sbBase = data.sidebar_avatar_url || data.avatar_url || '';
+      const _sbSep  = data.sidebar_avatar_url ? '&' : '?';
+      avatarEl.innerHTML = _sbBase
+        ? `<img src="${_sbBase}${_sbSep}v=${_v}" style="width:100%;height:100%;object-fit:cover"/>`
         : '✦';
     }
     // Set orb avatar directly from its own crop (may differ from sidebar)
     if (typeof orb !== 'undefined') {
-      orb.setAvatar(data.avatar_url ? `${data.avatar_url}?v=${Date.now()}` : '');
+      const _v = Date.now();
+      orb.setAvatar(data.avatar_url ? `${data.avatar_url}?v=${_v}` : '');
     }
 
     // Load and apply the active presence preset

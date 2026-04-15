@@ -53,6 +53,8 @@ Companion config lives in `companions/<folder>/config.json`.
 Global config in `config.json` at project root.
 
 Key companion config fields:
+- `avatar_path` — orb avatar filename (e.g. `"avatar.jpg"`), relative to companion folder
+- `sidebar_avatar_path` — sidebar portrait avatar filename (e.g. `"sidebar_avatar.jpg"`). Falls back to `avatar_path` if not set.
 - `presence_presets` — dict of preset name → per-state dict `{ thinking:{...}, idle:{...}, ... }`
 - `active_presence_preset` — which preset is active
 - `moods` — dict of mood name → mood definition (see `design/MOOD.md` for full schema)
@@ -104,7 +106,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 ### Chat
 
 - ~~**Streaming text visual (token-by-token appearance) regressed**~~ — **Fixed.** Cursor was being inserted after `</p>` (block element), making it appear below the text. Now inserted inside the last `<p>`. Also added inline cursor to streaming thinking content.
-- **Message loss on restart/refresh suspected** — likely improved by history system rework. Keep open until confirmed stable over several sessions.
+- ~~**Message loss on restart/refresh suspected**~~ — **Closed.** Not seen in days outside of dev/hacky flows. History system rework resolved it.
 
 ### llama-server / model
 
@@ -119,7 +121,10 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 ### UI / Layout
 
 - ~~**Tool and thinking pills have alignment/padding issues**~~ — **Fixed** as part of pill visual rework (see session notes 2026-04-15).
-- **Ghost bar appearing below tabs in companion settings** — a scrollbar-width bar flickers in on some openings. Pre-existing bug, tracked, not yet investigated.
+- ~~**Ghost bar appearing below tabs in companion settings**~~ — **Closed.** Not seen in a while; superseded by the tab highlight bug (now fixed).
+- ~~**Companion Settings: saving without visiting a tab resets that tab's data**~~ — **Fixed.** `cpSave()` now guards Moods, Memory, and Presence payloads behind their `_initDone` flags, mirroring the pattern TTS already used. Tabs that were never opened this session are simply omitted from the save body.
+- ~~**Companion Settings: active tab highlight broken on Presence tab**~~ — **Fixed.** Presence tab had an inline `style="color:..."` which overrode the `.active` CSS color. Moved to a `.cp-tab-special` CSS class declared before `.cp-tab.active` so active state always wins.
+- ~~**Settings & Companion Settings: panel height jumps between tabs**~~ — **Fixed.** Changed both panels from `max-height` to `height`. Tab content area has `flex: 1; overflow-y: auto` so it fills the fixed-height space and scrolls as needed.
 
 ---
 
@@ -148,6 +153,47 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - **CLAUDE.md** — operational instructions + active bugs + design folder index. Update at end of every session.
 - **design/*.md** — system docs and design decisions. Update when the relevant system is touched.
 - Rule: when we touch a system in a session, we document it in that session. Don't defer.
+
+---
+
+## Session notes — 2026-04-16 #6
+
+**Bug fixes + process naming + avatar slots and crop tool.**
+
+### Bugs fixed
+
+- **Companion Settings tab save guards** — `cpSave()` now guards Moods, Memory, and Presence payloads behind their `_initDone` flags. Same pattern TTS already used. Root cause: lazy-init means `_cpMoodData` etc. start as `{}` and only populate when the tab is clicked — calling `_cpGetMoodPayload()` without that guard returned empty data and overwrote saved moods on every save from another tab.
+- **Presence tab active highlight** — inline `style="color:..."` on the Presence button overrode `.cp-tab.active` color (inline > class specificity). Moved to `.cp-tab-special` CSS class declared before `.cp-tab.active` so the active rule wins.
+- **Panel height jumping between tabs** — `max-height` → `height` on both `.companion-panel` (88vh) and `.settings-panel` (90vh). Tab body has `flex: 1; overflow-y: auto` so it fills the space.
+
+### Process naming
+
+- `main.py` — sets process name to `"SENNI Bridge"` on startup via `_set_process_name()` helper.
+- `scripts/tts.py` — sets process name to `"SENNI Voice Server"` on startup.
+- Helper tries `setproctitle` (optional pip install), falls back to `sys.argv[0]`, and on Windows also sets console window title via `ctypes`. llama-server is a compiled binary and cannot be renamed.
+
+### Avatar slots + crop tool
+
+- **Two avatar slots:** `avatar_path` (orb, existing) and `sidebar_avatar_path` (sidebar, new). Sidebar falls back to orb if no sidebar-specific file is saved.
+- **New module `companion-avatar.js`** — canvas-based crop modal. No external library. Two modes with distinct overlay shapes:
+  - Orb: circle overlay (radius 150px), 256×256 JPEG output
+  - Sidebar: 3:4 portrait rounded-rect overlay (210×280px), 300×400 JPEG output
+  - Drag to pan, scroll/pinch to zoom, ± buttons for touchscreen
+  - Per-mode independent pan/zoom state (switch modes without losing position)
+  - Dark mask outside crop area via canvas `evenodd` fill rule
+  - Output is plain JPEG — no canvas clipping; CSS handles visual shaping (circle/rounding)
+  - Mode tab shows ✓ when that slot has been applied
+  - Click either slot preview to re-crop (if image already loaded this session)
+- **Server:** `GET /api/companion/{folder}/avatar?slot=orb|sidebar` — sidebar falls back to orb. Save endpoint handles `orb_avatar_data` + `sidebar_avatar_data` (also accepts legacy `avatar_data` for orb).
+- **`orb.setAvatar(src)`** added to orb.js public API so orb avatar can be set independently without syncing from the sidebar element.
+- **`syncStatusAvatar()` no longer called from companion.js post-save** — was overwriting the orb with the sidebar avatar. Orb and sidebar are now managed independently.
+- **URL bug fixed:** `sidebar_avatar_url` already contains `?slot=sidebar` — cache-buster must use `&v=` not `?v=`. Fixed in both `chat.js` and `companion.js cpPopulate`.
+
+### What's still pending
+
+- **Click-to-expand image thumbnails** — tracked in FEATURES.md
+- **Processing feedback** (memory/TTS background activity indicator) — not yet started
+- **llama-server args drift** — needs a pass against current llama.cpp
 
 ---
 

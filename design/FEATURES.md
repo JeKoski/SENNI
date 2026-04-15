@@ -29,7 +29,7 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 - ~~**Pill visual rework**~~ — **Done.** Thinking pill restyled to match memory-pill aesthetic (pill shape, DM Sans, indigo tint). Streaming state shows pulsing dots + inline cursor in think-content. Block collapses when response starts; auto-open-while-streaming is a toggle in Generation settings. Alignment fix for orb-inline mode. Streaming chat cursor now sits inline within the last `<p>` (was appearing below it).
 
 - **File upload visualization in chat** *(partially done)*
-  - Images: thumbnail inline ✓ (`.msg-img`, `data-img-ref` safe serialization). Click to view full size — not yet.
+  - Images: thumbnail inline ✓ (`.msg-img`, `data-img-ref` safe serialization). Click to view full size — **pending**.
   - Audio: mini inline player — ✓. (Needs details)
   - Text/other: format-relevant icon — ✓. (Needs details)
 
@@ -39,9 +39,9 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
   **Companion avatar:** `avatar_data` (base64 in config.json) replaced by `avatar_path` + file on disk. Server writes `avatar.jpg` on save, serves via `GET /api/companion/{folder}/avatar`. Auto-migration runs on page load for any companion still using the old format. `config.py` helpers: `write_avatar_file`, `delete_avatar_files`, `migrate_avatar`.
 
-- **Separate sidebar and orb avatars** — sidebar now uses a portrait 3:4 rounded rectangle; orb uses a small circle. These need separate image slots (`avatar_path` for orb, `sidebar_avatar_path` for sidebar). Someone may want a full-body portrait for the sidebar and a close face crop for the orb. Requires: separate upload/save flow in Companion Settings, and two avatar routes on the server.
+- ~~**Separate sidebar and orb avatars**~~ — **Done.** `avatar_path` (orb) and `sidebar_avatar_path` (sidebar) are separate config fields. Server serves both via `GET /api/companion/{folder}/avatar?slot=orb|sidebar`; sidebar falls back to orb if no sidebar-specific file. `chat.js` sets sidebar and orb independently. `orb.setAvatar(src)` added to orb.js public API so orb avatar can be set without syncing from the sidebar element.
 
-- **Avatar crop tool — portrait mode** — existing crop tool is square (designed for the circular orb avatar). Needs a 3:4 crop mode for the sidebar portrait avatar. Could be a mode toggle on the same crop UI, or a separate crop step per avatar slot.
+- ~~**Avatar crop tool — portrait mode**~~ — **Done.** New `companion-avatar.js` module: canvas-based crop modal with orb (circle overlay) and sidebar (3:4 portrait overlay) modes. Drag to pan, scroll/pinch/button zoom. Per-mode independent pan+zoom state. Apply per slot, both show ✓ when set. No external library. CSS handles visual clipping — output is always a plain JPEG rectangle.
 
 - **Animated avatars** *(wishlist — no design yet)*
   - Sprites, Live2D, or other — needs exploration. Document as future consideration only.
