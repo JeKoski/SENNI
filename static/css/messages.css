@@ -51,13 +51,15 @@
 }
 .msg-audio {
   display: block;
-  width: 100%;
-  max-width: 280px;
+  width: 280px;
+  max-width: 100%;
   margin-top: 8px;
   border-radius: 8px;
   accent-color: var(--indigo);
   outline: none;
 }
+/* Ensure bubble is wide enough to fit the audio player */
+.bubble:has(.msg-audio) { min-width: 290px; }
 .msg-doc-chip {
   display: inline-flex;
   align-items: center;
