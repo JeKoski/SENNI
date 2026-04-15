@@ -97,7 +97,7 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 - ~~**Orb edge color not applying from presence preset**~~ — **Fixed**
 - ~~**Heartbeat state uses idle values**~~ — **Fixed**
 - ~~**Orb reverts on companion settings save**~~ — **Fixed**. `cpSave()` in `companion.js` now reapplies active mood after applying presence preset.
-- **Presence settings changes don't apply live** — orb doesn't update to new presence preset values until page refresh. Needs investigation.
+- ~~**Presence settings changes don't apply live**~~ — **Fixed.** `cpSave()` now updates `config.presence_presets` and `config.active_presence_preset` before calling `_applyMoodToOrb`, so it reads fresh values instead of overwriting the orb with stale page-load data.
 
 ### Chat
 
@@ -173,7 +173,6 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ### Next session
 
-- **Presence settings live update bug** — orb doesn't apply presence preset changes until page refresh. Needs investigation in `companion-presence.js` / `cpSave` / `applyPresencePreset`.
 - **Sidebar redesign design conversation** — tools list → Settings, companion state card (larger avatar + mood + recent memory), memory viewer/editor. Needs dedicated design session before building.
 - **Image thumbnail click-to-expand** — `.msg-img` shows thumbnail. Click to view full size not yet implemented.
 

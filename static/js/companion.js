@@ -453,13 +453,22 @@ async function cpSave(andClose = false) {
       }
     }
 
+    // ── Update runtime config so _applyMoodToOrb reads fresh presence data ──
+    if (typeof config !== 'undefined') {
+      config.presence_presets       = body.presence_presets;
+      config.active_presence_preset = body.active_presence_preset;
+    }
+
     // ── Apply the active preset to the live orb right now ──
+    // _applyMoodToOrb below will also re-apply the preset, but calling this
+    // first ensures the orb updates even when there is no active mood.
     if (typeof applyPresencePreset === 'function') {
       const livePreset = _cpPresenceData[_cpActivePreset];
       if (livePreset) applyPresencePreset(livePreset);
     }
 
     // ── Reapply active mood so presence save doesn't clear it ──
+    // Uses config.presence_presets (just updated above) so it reads fresh values.
     if (typeof _applyMoodToOrb === 'function') {
       _applyMoodToOrb(body.active_mood || null);
     }
