@@ -109,11 +109,6 @@ async function callModel(system, messages, abortSignal = null) {
       };
     }
 
-    // Audio is not sent as a content part — llama-server does not support audio_url
-    // or any audio content type. The text note ([Voice recording: ...]) is already
-    // baked into m.content by sendMessage(), so the model still gets context.
-    if (!images.length) return { role: m.role, content: m.content };
-
     return {
       role: m.role,
       content: [
@@ -121,7 +116,14 @@ async function callModel(system, messages, abortSignal = null) {
         ...images.map(img => ({
           type: "image_url",
           image_url: { url: `data:${img.mimeType};base64,${img.content}` }
-        }))
+        })),
+        // Audio: only sent for the current message (always "once" — never re-sent).
+        // Format mirrors image_url. If llama-server rejects, try:
+        // { type: "input_audio", input_audio: { data: aud.content, format: "wav" } }
+        ...(idx === lastUserIdx ? audios.map(aud => ({
+          type: "audio_url",
+          audio_url: { url: `data:${aud.mimeType};base64,${aud.content}` }
+        })) : [])
       ]
     };
   });
