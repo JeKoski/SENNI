@@ -116,26 +116,29 @@ function cpPopulate() {
   // Update panel header
   const headerName = document.getElementById('cp-header-name');
   if (headerName) headerName.textContent = c.companion_name || 'Companion';
-  const avatarUrl = c.avatar_url || '';
-  const avatarSrc = avatarUrl ? `${avatarUrl}?v=${Date.now()}` : '';
+  const orbUrl = c.avatar_url         ? `${c.avatar_url}?v=${Date.now()}`         : '';
+  const sbUrl  = c.sidebar_avatar_url ? `${c.sidebar_avatar_url}?v=${Date.now()}` : '';
 
   const headerAv = document.getElementById('cp-header-avatar');
   if (headerAv) {
-    headerAv.innerHTML = avatarSrc
-      ? `<img src="${avatarSrc}" style="width:100%;height:100%;object-fit:cover"/>`
+    headerAv.innerHTML = orbUrl
+      ? `<img src="${orbUrl}" style="width:100%;height:100%;object-fit:cover"/>`
       : '✦';
   }
 
-  const preview = document.getElementById('cp-avatar-preview');
-  if (avatarSrc) {
-    preview.innerHTML = `<img src="${avatarSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-  } else {
-    preview.innerHTML = '✦';
-  }
-  document.getElementById('cp-crop-wrap').style.display = 'none';
+  // Populate both slot previews
+  const orbPrev = document.getElementById('cp-av-orb-prev');
+  if (orbPrev) orbPrev.innerHTML = orbUrl
+    ? `<img src="${orbUrl}" style="width:100%;height:100%;object-fit:cover">`
+    : '✦';
+
+  const sbPrev = document.getElementById('cp-av-sb-prev');
+  if (sbPrev) sbPrev.innerHTML = (sbUrl || orbUrl)
+    ? `<img src="${sbUrl || orbUrl}" style="width:100%;height:100%;object-fit:cover">`
+    : '✦';
 
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
-  if (resetWrap) resetWrap.style.display = avatarSrc ? 'inline' : 'none';
+  if (resetWrap) resetWrap.style.display = (orbUrl || sbUrl) ? 'inline' : 'none';
 
   const soulMode = c.soul_edit_mode || 'locked';
   document.querySelectorAll('#cp-soul-edit-mode input[name="cp-soul-edit"]').forEach(r => {
@@ -224,80 +227,31 @@ function cpSwitchTab(tab) {
 }
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
-let _cpCropper    = null;
-let _cpAvatarFull = null;
 
 function cpAvatarBrowse() {
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*';
-  inp.onchange = () => { if (inp.files[0]) cpAvatarLoad(inp.files[0]); };
+  inp.onchange = () => { if (inp.files[0]) cpAvatarModalOpen(inp.files[0]); };
   inp.click();
 }
 
 function cpAvatarDrop(e) {
   e.preventDefault();
   const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) cpAvatarLoad(file);
-}
-
-function cpAvatarLoad(file) {
-  const reader = new FileReader();
-  reader.onload = ev => {
-    _cpAvatarFull = ev.target.result;
-    const wrap = document.getElementById('cp-crop-wrap');
-    const img  = document.getElementById('cp-crop-img');
-    if (wrap && img) {
-      img.src = _cpAvatarFull;
-      wrap.style.display = 'block';
-      if (_cpCropper) { _cpCropper.destroy(); _cpCropper = null; }
-      if (typeof Cropper !== 'undefined') {
-        _cpCropper = new Cropper(img, { aspectRatio: 1, viewMode: 1, autoCropArea: 0.8 });
-      }
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-function cpAvatarCrop() {
-  if (!_cpCropper) {
-    // No cropper — apply full image directly
-    const preview = document.getElementById('cp-avatar-preview');
-    if (preview && _cpAvatarFull) {
-      preview.innerHTML = `<img src="${_cpAvatarFull}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-      _cpAvatarChanged = true;
-      _cpNewAvatarData = _cpAvatarFull;
-      const resetWrap = document.getElementById('cp-avatar-reset-wrap');
-      if (resetWrap) resetWrap.style.display = 'inline';
-      cpMarkDirty();
-    }
-    document.getElementById('cp-crop-wrap').style.display = 'none';
-    return;
-  }
-  const canvas = _cpCropper.getCroppedCanvas({ width: 256, height: 256 });
-  const data   = canvas.toDataURL('image/jpeg', 0.85);
-  const preview = document.getElementById('cp-avatar-preview');
-  if (preview) preview.innerHTML = `<img src="${data}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-  document.getElementById('cp-crop-wrap').style.display = 'none';
-  _cpCropper.destroy(); _cpCropper = null;
-  const resetWrap = document.getElementById('cp-avatar-reset-wrap');
-  if (resetWrap) resetWrap.style.display = 'inline';
-  _cpAvatarChanged = true;
-  _cpNewAvatarData = data;
-  cpMarkDirty();
+  if (file && file.type.startsWith('image/')) cpAvatarModalOpen(file);
 }
 
 function cpAvatarReset() {
-  const preview = document.getElementById('cp-avatar-preview');
-  if (preview) preview.innerHTML = '✦';
+  if (typeof cpAvatarModalReset === 'function') cpAvatarModalReset();
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
   if (resetWrap) resetWrap.style.display = 'none';
   _cpAvatarChanged = true;
-  _cpNewAvatarData = '';
+  _cpNewAvatarData = '';   // '' signals "cleared" to cpSave
   cpMarkDirty();
 }
 
 function cpAvatarFile(input) {
-  if (input.files[0]) cpAvatarLoad(input.files[0]);
+  if (input.files[0]) cpAvatarModalOpen(input.files[0]);
 }
 
 // ── Soul files ────────────────────────────────────────────────────────────────
@@ -412,17 +366,31 @@ async function cpSave(andClose = false) {
     const body = {
       folder:                  cpFolder,
       companion_name:          document.getElementById('cp-companion-name')?.value.trim() || '',
-      ...(_cpAvatarChanged ? { avatar_data: _cpNewAvatarData } : {}),
+      // Avatar: send per-slot data if changed, or empty strings if cleared
+      ...(() => {
+        if (!_cpAvatarChanged) return {};
+        if (_cpNewAvatarData === '') return { orb_avatar_data: '', sidebar_avatar_data: '' };
+        const orbD = typeof cpAvatarGetOrbData     === 'function' ? cpAvatarGetOrbData()     : null;
+        const sbD  = typeof cpAvatarGetSidebarData === 'function' ? cpAvatarGetSidebarData() : null;
+        return {
+          ...(orbD !== null ? { orb_avatar_data: orbD } : {}),
+          ...(sbD  !== null ? { sidebar_avatar_data: sbD } : {}),
+        };
+      })(),
       generation:              g,
       soul_edit_mode:          document.querySelector('#cp-soul-edit-mode input[name="cp-soul-edit"]:checked')?.value || 'locked',
       force_read_before_write: document.getElementById('cp-force-read')?.classList.contains('on') ?? true,
       heartbeat:               hb,
-      ..._cpGetPresencePayload(),   // from companion-presence.js
-      ...(typeof _cpGetMemoryPayload === 'function' ? _cpGetMemoryPayload() : {}),
+      // Only include presence payload if the Presence tab was opened this session.
+      ...(_cpPresenceInitDone ? _cpGetPresencePayload() : {}),
+      // Only include memory payload if the Memory tab was opened this session.
+      ...(typeof _cpGetMemoryPayload === 'function' && _cpMemoryInitDone ? _cpGetMemoryPayload() : {}),
       // Only include TTS payload if slots have been populated — guards against
       // overwriting saved TTS config when the Voice tab was never opened.
       ...(typeof _cpGetTtsPayload === 'function' && _cpTtsSlots.length > 0 ? _cpGetTtsPayload() : {}),
-      ...(typeof _cpGetMoodPayload === 'function' ? _cpGetMoodPayload() : {}),
+      // Only include mood payload if the Moods tab was opened this session — guards against
+      // overwriting saved moods with empty state when the tab was never visited.
+      ...(typeof _cpGetMoodPayload === 'function' && _cpMoodInitDone ? _cpGetMoodPayload() : {}),
     };
 
     const res = await fetch('/api/settings/companion', {
@@ -477,17 +445,27 @@ async function cpSave(andClose = false) {
     const nameEl = document.getElementById('companion-name');
     if (nameEl) nameEl.textContent = body.companion_name || 'Companion';
     if (_cpAvatarChanged) {
-      const newAvatarUrl = _cpNewAvatarData ? `/api/companion/${cpFolder}/avatar?v=${Date.now()}` : '';
+      const v       = Date.now();
+      const cleared = _cpNewAvatarData === '';
+      const orbUrl  = cleared ? '' : `/api/companion/${cpFolder}/avatar?v=${v}`;
+      const sbUrl   = cleared ? '' : `/api/companion/${cpFolder}/avatar?slot=sidebar&v=${v}`;
+
+      // Sidebar portrait element (prefers sidebar avatar, falls back to orb)
       const avatarEl = document.getElementById('companion-avatar');
       if (avatarEl) {
-        avatarEl.innerHTML = newAvatarUrl
-          ? `<img src="${newAvatarUrl}" style="width:100%;height:100%;object-fit:cover"/>`
+        const url = sbUrl || orbUrl;
+        avatarEl.innerHTML = url
+          ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover"/>`
           : '✦';
       }
+      // Orb avatar — set directly so it uses the orb-specific crop
+      if (typeof orb !== 'undefined') orb.setAvatar(orbUrl);
+
+      // Panel header (shows orb crop)
       const cpHeaderAv = document.getElementById('cp-header-avatar');
       if (cpHeaderAv) {
-        cpHeaderAv.innerHTML = newAvatarUrl
-          ? `<img src="${newAvatarUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
+        cpHeaderAv.innerHTML = orbUrl
+          ? `<img src="${orbUrl}" style="width:100%;height:100%;object-fit:cover"/>`
           : '✦';
       }
       _cpAvatarChanged = false;

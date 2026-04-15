@@ -22,6 +22,25 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# ── Process name ───────────────────────────────────────────────────────────────
+# Makes this process identifiable in task manager / ps / htop.
+# setproctitle is optional — install with: pip install setproctitle
+
+def _set_process_name(name: str) -> None:
+    try:
+        import setproctitle
+        setproctitle.setproctitle(name)
+    except ImportError:
+        sys.argv[0] = name          # fallback — visible in some process viewers
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleTitleW(name)
+        except Exception:
+            pass
+
+_set_process_name("SENNI Bridge")
+
 # ── Version guard ──────────────────────────────────────────────────────────────
 
 if sys.version_info < (3, 10):

@@ -521,10 +521,12 @@ def save_companion_config(companion_folder: str, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-def write_avatar_file(companion_folder: str, data_url: str) -> str:
+def write_avatar_file(companion_folder: str, data_url: str, slot: str = 'orb') -> str:
     """
     Write a base64 data URL to disk as an avatar image file.
-    Returns the filename saved (e.g. 'avatar.jpg'), or '' on failure.
+    slot: 'orb'     → avatar.ext
+          'sidebar' → sidebar_avatar.ext
+    Returns the filename saved, or '' on failure.
     """
     try:
         header, b64 = data_url.split(',', 1)
@@ -533,7 +535,8 @@ def write_avatar_file(companion_folder: str, data_url: str) -> str:
         elif 'gif' in mime: ext = '.gif'
         elif 'webp' in mime: ext = '.webp'
         else: ext = '.jpg'
-        filename = f"avatar{ext}"
+        prefix   = 'avatar' if slot == 'orb' else 'sidebar_avatar'
+        filename = f"{prefix}{ext}"
         (COMPANIONS_DIR / companion_folder / filename).write_bytes(base64.b64decode(b64))
         return filename
     except Exception:
@@ -541,12 +544,13 @@ def write_avatar_file(companion_folder: str, data_url: str) -> str:
 
 
 def delete_avatar_files(companion_folder: str) -> None:
-    """Delete all avatar image files for a companion folder."""
-    for ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
-        p = COMPANIONS_DIR / companion_folder / f"avatar{ext}"
-        if p.exists():
-            try: p.unlink()
-            except Exception: pass
+    """Delete all avatar image files for a companion folder (both slots)."""
+    for prefix in ('avatar', 'sidebar_avatar'):
+        for ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+            p = COMPANIONS_DIR / companion_folder / f"{prefix}{ext}"
+            if p.exists():
+                try: p.unlink()
+                except Exception: pass
 
 
 def migrate_avatar(companion_folder: str, companion_cfg: dict) -> dict:
