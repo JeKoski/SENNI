@@ -24,6 +24,22 @@ import io
 import json
 import sys
 import numpy as np
+
+# ── Process name ───────────────────────────────────────────────────────────────
+def _set_process_name(name: str) -> None:
+    try:
+        import setproctitle
+        setproctitle.setproctitle(name)
+    except ImportError:
+        sys.argv[0] = name
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleTitleW(name)
+        except Exception:
+            pass
+
+_set_process_name("SENNI Voice Server")
 from contextlib import redirect_stderr, redirect_stdout, contextmanager
 
 # ── Dependency check ───────────────────────────────────────────────────────────
