@@ -196,10 +196,16 @@ High water mark (`_hwStep`, `_hwSubStep`) tracks furthest progress for fast-trav
 - [x] Named step labels on nav dots (Type, Appearance, Outfit…)
 - [x] Live portrait description with fade — all appearance fields included, correct prose
 - [x] Custom… chip → inline text input
-- [ ] Sliders: remove auto-defaults (undefined until touched), reset button, `onchange` not `oninput`
-- [ ] True age field for supernatural species (2a Foundation)
-- [ ] Custom SVG icons (currently emoji)
+- [x] Sliders: no auto-defaults, reset button (↺), `onchange`/`oninput` split, all sliders use unified `SLIDER_CFG` component
+- [x] True age field for supernatural species (2a Foundation)
+- [x] Steps 3–8 — Outfit, Personality, Closeness, Adult (gated), You, Memory & Agency
+- [x] Generic chip handler — `data-target` + `data-array` support, `_initChipGrids(root)`
+- [x] Body sliders gender-neutral: Slender↔Broad, Soft↔Muscular
+- [x] Additional details textarea on 2b Body, 2c Face, 2e Details, Adult
+- [x] Memory step expanded: Memory Depth + Heartbeat Frequency chips with defaults
+- [x] Compile sequence animation — overlay, staggered lines, final state, `wizOpenCompanion()` stub
+- [x] File renamed `wizard.html` → `companion-wizard.html`, route `/wizard` → `/companion-wizard`
+- [ ] Custom SVG icons (currently emoji throughout)
 - [ ] Morphing body silhouette (SVG bilinear interpolation, lives in 2b Body)
-- [ ] Steps 3–8 HTML
-- [ ] Compile sequence animation
-- [ ] Backend endpoints (`/wizard`, `/api/wizard/compile`, `/api/wizard/export/{folder}`)
+- [ ] Backend endpoints (`POST /api/wizard/compile`, `GET /api/wizard/export/{folder}`)
+- [ ] Wire `wizOpenCompanion()` to backend redirect on compile success
