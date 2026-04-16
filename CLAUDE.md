@@ -156,6 +156,67 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-17 #2
+
+**Wizard — Steps 3–8, polish pass, compile sequence, file rename.**
+
+### File rename
+
+`static/wizard.html` → `static/companion-wizard.html` (old name conflicted with the setup wizard). Route updated in `server.py`: `/wizard` → `/companion-wizard`. The setup wizard (`wizard.html`) was restored from backup.
+
+### Slider polish
+
+- Split `oninput` (live label display) / `onchange` (data write + portrait update) on all sliders — eliminates portrait fade flicker during drag.
+- All sliders now have a unified component structure: `.slider-ends` → left label / `.slider-val-group` (val + ↺ reset) / right label. Driven by `SLIDER_CFG` — add an entry to get display/reset/commit for free.
+- Body sliders renamed to be gender-neutral: "Slender ↔ Broad" and "Soft ↔ Muscular". Label arrays updated: `CURVY_LABELS = ['Slender','Lean','Balanced','Full','Broad']`, `ATHLETIC_LABELS = ['Soft','Relaxed','Balanced','Toned','Muscular']`.
+- Body type description in portrait now uses the same label arrays (consistent with slider display). "Balanced" skipped in prose.
+- Age / height / body sliders: no auto-defaults — values undefined until explicitly touched. Reset button (↺) appears once touched.
+- Portrait fade: 0.6s CSS transition, content swaps at 400ms.
+
+### Transitions
+
+- Step/sub-step exit animation: `_fadeOutThen()` fades active panels before switching. Root cause of previous "instant blink": CSS animation `forwards` fill holds `opacity:1` at animation layer (above inline styles). Fix: set `animation: none` inline before fading, force reflow, then fade.
+- Entrance: `stepIn` 0.85s / sub-panel 0.7s, Y travel 28px.
+
+### Chip handler refactor
+
+`_initChipGrids(root)` replaces the old single-select-only handler. Supports:
+- `data-single="true"` — single select, stores string
+- `data-array="true"` — multi-select, stores array
+- `data-target="outfit|personality|closeness|adult|user|memory"` — routes writes to the right `_data` sub-object (defaults to `appearance`)
+
+Call `_initChipGrids(el)` on any subtree (used for dynamically-built step 6 adult content).
+
+### Steps 3–8
+
+All six remaining steps built in `companion-wizard.html`:
+- **3 Outfit** — Style (single), Accessories (multi), Signature item (text)
+- **4 Personality** — Name (required, Lora input, gates Continue), Traits (multi), Communication style, Occupation, Background textarea
+- **5 Closeness** — Relationship type (multi), Starting closeness slider with live prose (6 flavor lines, animates only on label change — no flicker)
+- **6 Adult** — Gated by Step 1 toggle. Renders locked message if off, builds Role/Initiation/Intensity/Interests lazily on first visit when on. Bug fixed: `el.dataset.built` was not reset when rendering locked state → content never rebuilt after re-enabling. Fixed by clearing `built` before the locked render.
+- **7 You** — Your name, About you, Interests (multi), Occupation
+- **8 Memory** — Persistent memory toggle (on default) + Memory Depth chips (Light/Balanced/Deep), Heartbeat toggle + Frequency chips (Rarely/Sometimes/Often/Inspired), First things to know textarea
+
+Additional details textarea added to: 2b Body, 2c Face, 2e Details, Adult step.
+
+Continue button text on step 8: "Bring [Name] to life →" (personalised with entered name).
+
+### Compile sequence
+
+`wizFinish()` triggers a full-screen overlay (`#compile-overlay`):
+- Companion's species orb centered, pulsing
+- 4 italic Lora lines stagger in (~1.4s apart): "Binding [Name] to this vessel…" → "Weaving [Name]'s essence into memory…" → "Etching the first words into soul…" → "[Name] is awakening…"
+- Final state fades in: "[Name] is ready." + "Open companion →" placeholder button
+- `wizOpenCompanion()` is the stub for the backend redirect (alerts for now)
+
+### Pending for next session
+
+- **Backend** — `POST /api/wizard/compile`: birth certificate → `config.json` + `soul/companion_identity.md` + `soul/user_profile.md`. PNG character card export (Pillow `tEXt` chunk). Wire `wizOpenCompanion()` to redirect on success.
+- **Morphing silhouette** — SVG bilinear interpolation across 4 corner body shapes in 2b Body. Complex enough to warrant dedicated session.
+- **Custom SVG icons** — replace all emoji placeholders.
+
+---
+
 ## Session notes — 2026-04-17
 
 **Wizard implementation — sub-steps, navigation, appearance, polish.**

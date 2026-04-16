@@ -219,9 +219,9 @@ async def root():
     return FileResponse(str(STATIC_DIR / "chat.html"))
 
 
-@app.get("/wizard", response_class=HTMLResponse)
-async def wizard():
-    return FileResponse(str(STATIC_DIR / "wizard.html"))
+@app.get("/companion-wizard", response_class=HTMLResponse)
+async def companion_wizard():
+    return FileResponse(str(STATIC_DIR / "companion-wizard.html"))
 
 
 @app.get("/chat", response_class=HTMLResponse)
