@@ -224,7 +224,7 @@ function cpPresenceInit() {
   cpPresenceSelectPreset(_cpActivePreset);
   _cpSyncStateChips(_cpEditingState);
 
-  const avSrc = document.querySelector('#companion-avatar img')?.src;
+  const avSrc = document.querySelector('#orb-icon img')?.src;
   const previewIcon = document.getElementById('cpp-icon');
   if (previewIcon && avSrc) {
     previewIcon.innerHTML = `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
