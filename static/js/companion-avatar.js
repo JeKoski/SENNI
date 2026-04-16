@@ -89,7 +89,8 @@ function cpAvatarModalReset() {
 }
 
 function cpAvatarZoom(delta) {
-  _avSt[_avMode].s = Math.max(0.1, Math.min(10, _avSt[_avMode].s + delta));
+  // Multiplicative zoom so each step is a fixed % regardless of current zoom level
+  _avSt[_avMode].s = Math.max(0.1, Math.min(10, _avSt[_avMode].s * (1 + delta)));
   _avDraw();
 }
 
@@ -265,7 +266,7 @@ function _avOnMove(e) {
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY,
     );
-    if (_avPinchDist !== null) cpAvatarZoom((d - _avPinchDist) * 0.0005);
+    if (_avPinchDist !== null) cpAvatarZoom((d - _avPinchDist) * 0.003);
     _avPinchDist = d;
     return;
   }
@@ -279,7 +280,7 @@ function _avOnMove(e) {
 function _avOnUp()    { _avDrag = false; _avPinchDist = null; }
 function _avOnWheel(e) {
   e.preventDefault();
-  cpAvatarZoom(e.deltaY < 0 ? 0.0125 : -0.0125);
+  cpAvatarZoom(e.deltaY < 0 ? 0.07 : -0.07);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
