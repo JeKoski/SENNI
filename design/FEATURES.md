@@ -91,22 +91,19 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 ---
 
-## Companion Creation Wizard *(design needed — large feature)*
+## Companion Creation Wizard *(in progress — see design/WIZARD.md)*
 
-User has a more complete documentation available — ask when starting design session
+**Status:** Architecture locked, mockup started. `static/wizard.html` has Steps 1–2 working (type selection + appearance chips/sliders). Full design decisions in `design/WIZARD.md`.
 
-Key design points:
+**Format:** CharacterAI V2 character card spec. Output is a PNG with companion JSON embedded in the `tEXt` chunk (key `chara`), importable by SillyTavern and the broader ecosystem. SENNI-specific data lives in `extensions.senni`.
 
-- Sliders for personality traits (Creativity↔Logic, Formal↔Casual, Verbose↔Concise) — open question: map to model params (temperature, top_p) in addition to or instead of prompt templates?
-- Visual grids for appearance/type selections; every option has a "Custom" free-text fallback.
-- Adult Content toggle early in the flow (step 1) — gates what is shown in subsequent steps.
-- Age slider: 18–90, custom field for non-human characters (validated 18–1M).
-- (Deferred) Closeness scale at creation — may later become a gamified relationship progression system.
-- Step 8 (Memory & Agency): show a visual graph of ChromaDB↔mind↔soul flow; graph updates live as agentic mode is changed.
-- Heartbeat activity level presets map to existing heartbeat settings.
-- *Depends on Mood system being built first (mood/presence visuals are part of companion identity).*
-
-Appearance sections (hair style, face shape, eyes, nose, outfit system, accessories, etc.) are marked **design needs expanding on** — flesh these out before wizard implementation begins.
+**Next up:**
+- Appearance sub-steps (Foundation → Hair → Face → Body) with secondary mini-indicator
+- Custom SVG icons replacing emoji throughout
+- Morphing body silhouette (SVG bilinear interpolation across 4 corner body shapes)
+- Steps 3–8 (Outfit, Personality, Closeness, Adult, User, Memory & Agency)
+- The compile / reincarnation sequence UI
+- Backend: `/wizard` route, compile endpoint, PNG character card export with EXIF embedding
 
 ---
 
