@@ -578,7 +578,7 @@ function cpPresenceUpdatePreview(s, state) {
   if (icon) {
     icon.style.color    = dotColor;
     icon.style.fontSize = Math.round((s.orbSize || 52) * 0.42) + 'px';
-    const avSrc = document.querySelector('#companion-avatar img')?.src;
+    const avSrc = document.querySelector('#orb-icon img')?.src;
     if (avSrc && !icon.querySelector('img')) {
       icon.innerHTML = `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
     }
