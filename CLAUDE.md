@@ -156,6 +156,65 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-17
+
+**Wizard implementation — sub-steps, navigation, appearance, polish.**
+
+### What changed
+
+- `static/wizard.html` — major iteration. All changes are in this single self-contained file.
+
+### Navigation architecture
+
+Replaced scattered imperative DOM manipulation with a single-source-of-truth pattern:
+- `_goto(step, subStep)` — only entry point for all navigation. Updates `_step`/`_subStep`, tracks high water marks, calls `_applyStepState()` + `_updateNav()`.
+- `_applyStepState()` — derives all DOM state from `_step`/`_subStep`. Deactivates all panels, activates only the current one. Can never drift.
+- `_hwStep` / `_hwSubStep` — high water marks track furthest progress. All visited dots (forward AND back) are green and clickable, enabling fast-travel in both directions. Sub-step dots under step-2 nav dot are also clickable when visited.
+- `wizBack()` without subStep override restores last sub-step visited in step 2 (going back from step 3 lands on 2e, not 2a).
+- To add/remove a main step: change `TOTAL_STEPS` + `STEP_LABELS` + add HTML panel. To add/remove a sub-step: edit `SUB_META` + add HTML `sub-panel`. No nav logic to touch.
+
+### Step 1 changes
+
+- Adult Content toggle moved from inside type-grid to footer left slot. Mutually exclusive with Back button (step 1 → toggle, step 2+ → Back). 38% opacity when off, full opacity + indigo tint when on.
+- Type-grid is now clean 4 cards only.
+
+### Step 2 sub-step order
+
+Foundation (2a) → Body (2b) → Face (2c) → Hair (2d) → Details (2e).
+Rationale: morphing silhouette lives in 2b Body and stays hairless; height no longer appears in description before meaningful selections; Body naturally precedes facial and hair detail.
+
+### Named step dots + sub-dots in nav
+
+- Each main step dot now has a label below it (Type, Appearance, Outfit…). Nav height increased to 82px.
+- Step 2 dot has 5 sub-dots beneath it that advance with sub-step progress.
+- Footer uses CSS grid (1fr auto 1fr) so the step label is always truly centered.
+
+### Portrait description
+
+- Fixed: missing `else if (a['eye-shape'])` branch — eye-shape now shows alone if color is cleared.
+- Added: face-shape, eyebrows, nose to description.
+- Fixed: height now uses prose forms ("above average height", "very short" etc.) via `HEIGHT_PROSE` array.
+- Added: "soft" body descriptor for low athletic values.
+- Portrait text and emoji now cross-fade on change (opacity transition, ~80ms out + fade back).
+- Description order: age → species → gender → skin → body build → height → face → eyebrows → nose → eyes → hair.
+
+### Custom… chip
+
+Clicking "Custom…" in any chip grid opens an inline text input (styled as a chip). Enter confirms, Esc cancels, blur confirms. Re-clicking an existing custom chip pre-fills the input with the current value.
+
+### Pending items (from end of session, for next time)
+
+- **Slider defaults** — sliders should NOT auto-initialize `_data.appearance` values. Values stay `undefined` until user explicitly touches a slider. Need a reset button/affordance for sliders so users can go back to "unset". Currently age/height are initialized to 30/Average even if untouched.
+- **Slider flicker** — portrait update should use `onchange` (on release) instead of `oninput` (on drag) to avoid rapid fade flicker. Portrait fade duration should also be longer/slower (more aesthetic).
+- **Supernatural "true age"** — apparent age slider (18–90) is fine for how they look. Add an optional "True age" free-text field that appears in 2a Foundation only when a supernatural species is selected (elf, vampire, spirit, fae, demon, angel, orc). Apparent age → portrait description. True age → lore/background, not description.
+- **Continue validation** — Step 1 type (done). Step 4 name (when built). Appearance fully optional — no gates.
+- **Custom SVG icons** — emoji placeholders throughout.
+- **Morphing silhouette** — SVG bilinear interpolation in 2b Body.
+- **Steps 3–8** — not yet built.
+- **Backend** — `/wizard` route, compile endpoint, PNG export.
+
+---
+
 ## Session notes — 2026-04-16 #7
 
 **Avatar fixes + Wizard design + wizard.html mockup.**
