@@ -7,7 +7,7 @@ Search for it using project knowledge before doing anything else.
 
 ## Session Flow
 1. Start session with CLAUDE.md
-2. We'll figure out what we're doing this session. Often listed on this doc.
+2. We'll figure out what we're doing this session. Often listed on this doc and/or design/FEATURES.
 3. Surgical work happens (Claude reads files directly — no uploads needed)
 
 ---
