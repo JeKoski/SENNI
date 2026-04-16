@@ -1,6 +1,6 @@
 # Companion Creation Wizard — Design Doc
 
-Last updated: 2026-04-16 #7
+Last updated: 2026-04-17
 
 ---
 
@@ -124,11 +124,15 @@ Sub-steps use a secondary mini dot indicator within the step (e.g. `● ● ○ 
 
 | Sub-step | Content |
 |----------|---------|
-| 2a — Foundation | Gender, Species/Ethnicity, Age |
-| 2b — Hair | Color, Style |
+| 2a — Foundation | Gender, Species/Ethnicity, Apparent Age (18–90 slider) + True Age text field (supernatural species only) |
+| 2b — Body | Skin tone, Body type sliders (Slender-Curvy, Soft-Athletic), Height |
 | 2c — Face | Eye color, Eye shape, Eyebrows, Nose, Face shape |
-| 2d — Body | Body type sliders (Slender-Curvy, Soft-Athletic), Height, Skin tone |
+| 2d — Hair | Color, Style |
 | 2e — Details | Makeup, tattoos, piercings (+ Adult body options if enabled) |
+
+**Sub-step order rationale:** Body before Face before Hair so the morphing silhouette (2b) stays hairless — hair doesn't need to be on the body morph graphic. Height appears after Body so it doesn't show in the description before the user has set anything meaningful.
+
+**Apparent vs True age:** The 18–90 slider is *apparent* age (how they look visually) and drives the portrait description. A free-text "True age" input appears below the slider when a supernatural species is selected (elf, vampire, spirit, fae, demon, angel, orc). True age goes into lore/background, not the appearance description. If apparent age slider is at default and user hasn't touched it, it stays undefined — only appears in description if explicitly set.
 
 ---
 
@@ -137,7 +141,10 @@ Sub-steps use a secondary mini dot indicator within the step (e.g. `● ● ○ 
 ### Live portrait (appearance steps)
 - Sticky left column: 180px animated orb with icon that shifts per species selection
 - Below orb: italic Lora prose building up as chips are selected
-  - e.g. *"24 year old elf, fair skin, auburn wavy hair, violet almond eyes."*
+  - e.g. *"24 year old elf, fair skin, curvy build, above average height, oval face, arched eyebrows, almond violet eyes, auburn wavy hair."*
+- Description order: age → species → gender → skin → body build → height → face shape → eyebrows → nose → eyes → hair
+- Portrait text and emoji fade smoothly on change (opacity cross-fade, ~400ms)
+- Sliders update description on release (`onchange`) not on drag, to avoid flicker
 - Corner ambient orb icon also tracks species
 
 ### Morphing body silhouette (Step 2d)
@@ -155,8 +162,19 @@ Sub-steps use a secondary mini dot indicator within the step (e.g. `● ● ○ 
 - Hair/eye chips: tiny representative silhouettes per option
 
 ### Navigation shell
-- Top: SENNI logo | step dots (01-08, active=indigo, done=green) | Cancel
-- Bottom: Back (text) | "Step N of 8" (DM Mono) | Continue (gradient pill, locked on Step 1 until type selected)
+- Top nav: SENNI logo | step dots with labels (01 Type … 08 Memory, active=indigo, visited=green) | Cancel
+  - Step 2 dot has 5 sub-dots beneath it showing sub-step progress
+  - All visited dots (forward AND back) are green and clickable — enables fast-travel in any direction
+  - Sub-dots also clickable when visited, jump directly to that sub-step of step 2
+- Bottom footer: grid layout (1fr auto 1fr) — left | step label | right
+  - Step 1: left slot shows Adult Content toggle (dim when off, bright when on)
+  - Step 2+: left slot shows Back button
+  - Continue locked until required fields met (Step 1: type must be selected; Step 4+: name required; appearance fully optional)
+
+### Navigation architecture
+Single source of truth: `_step` + `_subStep` are the only state. `_goto(step, subStep)` is the only way to change them. `_applyStepState()` always re-derives DOM from state — no drift possible.
+
+High water mark (`_hwStep`, `_hwSubStep`) tracks furthest progress for fast-travel dot enabling. `wizBack()` without a subStep override restores the sub-step you left from (going back to step 2 from step 3 lands on the last sub-step, not Foundation).
 
 ---
 
@@ -172,10 +190,16 @@ Sub-steps use a secondary mini dot indicator within the step (e.g. `● ● ○ 
 ## Status
 
 - [x] Architecture locked (V2 format, Birth Certificate, appearance data model, user_profile location)
-- [x] `static/wizard.html` — Steps 1-2 interactive (type cards, adult toggle, appearance chips + sliders, live portrait text, species icon tracking)
-- [ ] Appearance sub-steps + secondary indicator
-- [ ] Custom SVG icons
-- [ ] Morphing body silhouette (SVG bilinear interpolation)
-- [ ] Steps 3-8
+- [x] Step 1 — Type cards + adult content toggle (in footer, dims when off)
+- [x] Step 2 — Appearance sub-steps 2a–2e with secondary nav indicator
+- [x] Navigation — `_goto` / `_applyStepState` single-source-of-truth, high water mark fast-travel, sub-dot clickability
+- [x] Named step labels on nav dots (Type, Appearance, Outfit…)
+- [x] Live portrait description with fade — all appearance fields included, correct prose
+- [x] Custom… chip → inline text input
+- [ ] Sliders: remove auto-defaults (undefined until touched), reset button, `onchange` not `oninput`
+- [ ] True age field for supernatural species (2a Foundation)
+- [ ] Custom SVG icons (currently emoji)
+- [ ] Morphing body silhouette (SVG bilinear interpolation, lives in 2b Body)
+- [ ] Steps 3–8 HTML
 - [ ] Compile sequence animation
-- [ ] Backend endpoints
+- [ ] Backend endpoints (`/wizard`, `/api/wizard/compile`, `/api/wizard/export/{folder}`)
