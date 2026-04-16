@@ -24,9 +24,9 @@ const AV_SB_W    = 210;   // sidebar rect width in canvas px
 const AV_SB_H    = 280;   // sidebar rect height  (3:4)
 const AV_SB_RR   = 14;    // sidebar rect corner radius
 
-const AV_OUT_ORB  = 256;  // orb output image size (square)
-const AV_OUT_SB_W = 300;  // sidebar output width
-const AV_OUT_SB_H = 400;  // sidebar output height (3:4)
+const AV_OUT_ORB  = 512;  // orb output image size (square)
+const AV_OUT_SB_W = 768;  // sidebar output width
+const AV_OUT_SB_H = 1024; // sidebar output height (3:4)
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -265,7 +265,7 @@ function _avOnMove(e) {
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY,
     );
-    if (_avPinchDist !== null) cpAvatarZoom((d - _avPinchDist) * 0.001);
+    if (_avPinchDist !== null) cpAvatarZoom((d - _avPinchDist) * 0.0005);
     _avPinchDist = d;
     return;
   }
@@ -279,7 +279,7 @@ function _avOnMove(e) {
 function _avOnUp()    { _avDrag = false; _avPinchDist = null; }
 function _avOnWheel(e) {
   e.preventDefault();
-  cpAvatarZoom(e.deltaY < 0 ? 0.025 : -0.025);
+  cpAvatarZoom(e.deltaY < 0 ? 0.0125 : -0.0125);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

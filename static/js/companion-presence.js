@@ -55,14 +55,14 @@ function _cpSliderToSecs(val, minS, maxS) {
   return parseFloat((maxS - t * (maxS - minS)).toFixed(2));
 }
 
-// Stored px (32–80) → 0–100 display value
+// Stored px (32–160) → 0–100 display value
 function _cpSizeToSlider(px) {
-  return Math.round(Math.max(0, Math.min(1, (px - 32) / 48)) * 100);
+  return Math.round(Math.max(0, Math.min(1, (px - 32) / 128)) * 100);
 }
 
 // 0–100 slider → stored px
 function _cpSliderToSize(val) {
-  return Math.round(32 + (Math.max(0, Math.min(100, val)) / 100) * 48);
+  return Math.round(32 + (Math.max(0, Math.min(100, val)) / 100) * 128);
 }
 
 // Stored px (4–36) → 0–100 display value
