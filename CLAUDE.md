@@ -156,6 +156,48 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-16 #7
+
+**Avatar fixes + Wizard design + wizard.html mockup.**
+
+### Avatar / presence fixes
+
+- **Avatar output resolutions** — `companion-avatar.js`: orb output 256→512px, sidebar 300×400→768×1024px.
+- **Zoom normalization** — switched from additive (`s + delta`) to multiplicative (`s * (1 + delta)`) zoom so each step is a fixed percentage regardless of zoom level. Scroll: ±7%, buttons: ±8%, pinch: 0.3%/px. Old absolute deltas were too slow when zoomed in, too fast when zoomed out.
+- **Orb max size doubled** — `companion-presence.js` size slider range 32–80px → 32–160px. Existing presets (52px) map to ~16% on new scale — may want to nudge defaults in future.
+- **Presence preview showing sidebar avatar** — `companion-presence.js` had `#companion-avatar img` in TWO places: `cpPresenceUpdatePreview()` (line fixed first, missed) and `cpPresenceInit()` (the real culprit — runs after `cpPresenceSelectPreset` and overwrites). Both now read from `#orb-icon img`.
+
+### Wizard — design session
+
+Key architecture decisions locked:
+
+- **Format:** CharacterAI V2 character card spec. PNG output with BC JSON in `tEXt` chunk (key `chara`). Importable by SillyTavern, Chub.ai, the whole ecosystem. SENNI-specific data in `extensions.senni`.
+- **Birth Certificate:** `birth_certificate.json` is the master artifact. Compile step writes `config.json` (appearance block + settings), `soul/companion_identity.md` (narrative synopsis), `soul/user_profile.md` (from Step 7).
+- **Appearance data:** full structured block in `config.json` + narrative prose compiled into `companion_identity.md`.
+- **User profile:** wizard Step 7 pre-populates `soul/user_profile.md` — same file, same injection, same `memory` tool writes later. Zero new infrastructure.
+- **Module framing:** wizard is effectively its own standalone product. Clean URL (`/wizard`), self-contained JS, only SENNI backend dependency is the compile endpoint.
+
+Full design decisions in `design/WIZARD.md`. Step flow, V2 schema, Birth Certificate architecture, appearance sub-steps, morphing silhouette plan all documented there.
+
+### wizard.html
+
+- `static/wizard.html` created — Steps 1–2 fully interactive
+- Step 1: 4 type cards (Assistant / Friend / Companion / Role-play), Adult Content toggle, Continue locked until type selected
+- Step 2: Two-column layout — sticky portrait orb (left) with live prose description building as chips are selected; chip grids + sliders (right) for gender, species, age, hair, eyes, skin, body type, height
+- Species chip updates orb icon and corner ambient orb icon
+- Navigation: step dots (01–08), Back/Continue footer, stepIn animation
+
+### What's next (wizard)
+
+- Appearance sub-steps (2a Foundation → 2b Hair → 2c Face → 2d Body → 2e Details) with secondary mini-indicator
+- Custom SVG icons replacing emoji throughout
+- Morphing body silhouette (SVG bilinear interpolation across 4 corner shapes, both sliders)
+- Steps 3–8 HTML
+- Compile sequence animation ("Binding [Name] to this vessel...")
+- Backend: `/wizard` route, compile endpoint, PNG character card export
+
+---
+
 ## Session notes — 2026-04-16 #6
 
 **Bug fixes + process naming + avatar slots and crop tool.**
@@ -536,6 +578,7 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 | `design/COMPANION_STACK.md` | Cognitive function stack format, O+J axis pairing, charge as directionality, stack position as probability. Updated 2026-04-06. |
 | `design/ORB_DESIGN.md` | Orb positioning, layout modes, CSS variable documentation |
 | `design/MOOD.md` | Mood system — full design + implementation notes. Config schema, default moods, orb schema translation, tool hook pending. Updated 2026-04-13 #4. |
+| `design/WIZARD.md` | Companion Creation Wizard — V2 character card format, Birth Certificate architecture, step flow, appearance sub-steps, morphing silhouette plan. Updated 2026-04-16 #7. |
 
 When starting a session that touches any of these systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
 
