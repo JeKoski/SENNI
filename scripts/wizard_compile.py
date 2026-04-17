@@ -26,6 +26,15 @@ log = logging.getLogger("wizard_compile")
 
 TEMP_MAP = {"measured": 0.5, "balanced": 0.8, "expressive": 1.1}
 
+# Memory depth → (session_start_k, mid_convo_k interval)
+# session_start_k: notes surfaced at session start
+# mid_convo_k: turns between associative retrieval triggers (lower = more frequent)
+DEPTH_MAP = {
+    "light":    {"session_start_k": 3,  "mid_convo_k": 6},
+    "balanced": {"session_start_k": 6,  "mid_convo_k": 4},
+    "deep":     {"session_start_k": 10, "mid_convo_k": 2},
+}
+
 # Kokoro voice presets per wizard voice style.
 # af_heart / af_bella are confirmed present; am_adam / af_sky / af_nova are
 # standard Kokoro voices expected in a full install. Falls back to af_heart.
@@ -121,6 +130,10 @@ def _build_config(data: dict, avatar_filename: str = "") -> dict:
         },
     }
 
+    # Memory depth
+    depth     = m.get("memoryDepth", "balanced")
+    depth_cfg = DEPTH_MAP.get(depth, DEPTH_MAP["balanced"])
+
     # Cognitive stack
     stack = p.get("cognitiveStack") or {
         "slots": [
@@ -160,6 +173,7 @@ def _build_config(data: dict, avatar_filename: str = "") -> dict:
             "pitch": 1.0,
         },
         "heartbeat":            hb,
+        "memory":               depth_cfg,
         "moods":                {},
         "active_mood":          None,
         "last_consolidated_at": None,

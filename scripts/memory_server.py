@@ -1063,10 +1063,15 @@ async def api_memory_init(request: Request):
         reason = "memory_disabled" if _memory_disabled else "memory_unavailable"
         return {"ok": False, "reason": reason, "available": False}
 
+    # Per-companion session_start_k takes precedence over global config
+    companion_mem  = _load_companion_config(companion_folder).get("memory", {})
+    global_mem     = _load_config().get("memory", {})
+    session_k      = companion_mem.get("session_start_k") or global_mem.get("session_start_k", 6)
+
     # Get session-start context for system prompt injection
     context = await loop.run_in_executor(
         None,
-        lambda: get_session_start_context(mood=mood)
+        lambda: get_session_start_context(mood=mood, k=session_k)
     )
 
     return {
