@@ -1728,6 +1728,30 @@ function _renderStep6() {
     </div>`;
   // wire up newly created chips
   _initChipGrids(el);
+
+  // Restore adult selections from _data (handles import)
+  const adultSrc = _data.adult || {};
+  el.querySelectorAll('.chip-grid[data-group]').forEach(grid => {
+    const group      = grid.dataset.group;
+    const val        = adultSrc[group];
+    if (val === undefined || val === null) return;
+    const staticVals = [...grid.querySelectorAll('.chip:not(.custom-chip)[data-val]')].map(c => c.dataset.val);
+    grid.querySelectorAll('.chip[data-val]').forEach(chip => {
+      const hit = Array.isArray(val) ? val.includes(chip.dataset.val) : chip.dataset.val === String(val);
+      chip.classList.toggle('selected', hit);
+    });
+    const customChip = grid.querySelector('.custom-chip');
+    if (customChip) {
+      if (Array.isArray(val)) {
+        const cv = val.find(v => !staticVals.includes(v));
+        if (cv) { customChip.classList.add('selected'); customChip.dataset.val = cv; customChip.textContent = cv; }
+      } else if (!staticVals.includes(String(val))) {
+        customChip.classList.add('selected'); customChip.dataset.val = val; customChip.textContent = val;
+      }
+    }
+  });
+  const notesEl = el.querySelector('textarea');
+  if (notesEl && adultSrc.notes) notesEl.value = adultSrc.notes;
 }
 
 function toggleFeature(key) {
@@ -1897,11 +1921,17 @@ function _openCustomInput(grid, chip) {
     chip.style.display = '';
     input.remove();
     if (val) {
+      const oldVal = chip.dataset.val !== 'custom' ? chip.dataset.val : null;
       chip.classList.add('selected');
       chip.dataset.val = val;
       chip.textContent = val;
       if (isArray) {
         if (!target[group]) target[group] = [];
+        // Remove old custom value if editing an existing entry
+        if (oldVal && oldVal !== val) {
+          const oi = target[group].indexOf(oldVal);
+          if (oi >= 0) target[group].splice(oi, 1);
+        }
         if (!target[group].includes(val)) target[group].push(val);
       } else {
         // single: deselect others first
@@ -2006,24 +2036,28 @@ async function _handleImportFile(file) {
   const zone = document.getElementById('import-zone');
   zone?.classList.add('importing');
   try {
-    const buf = await file.arrayBuffer();
-    let card = null;
+    const buf  = await file.arrayBuffer();
+    let   card = null;
     if (file.name.toLowerCase().endsWith('.json')) {
       card = JSON.parse(new TextDecoder().decode(buf));
+      if (!card || card.spec !== 'chara_card_v2') {
+        alert('Could not read a V2 character card from this file.'); return;
+      }
+      _importCard(card);
     } else {
       card = _extractCharaFromPng(buf);
-      if (card) {
-        // Use the PNG image itself as the avatar
-        const reader = new FileReader();
-        reader.onload = e => { _data.review.avatarData = e.target.result; };
-        reader.readAsDataURL(new Blob([buf], { type: 'image/png' }));
+      if (!card || card.spec !== 'chara_card_v2') {
+        alert('Could not read a V2 character card from this file.'); return;
       }
+      // Use the PNG image itself as the avatar — set _data before calling _importCard
+      // so _restoreUI can show it in the step-9 preview immediately.
+      const reader = new FileReader();
+      reader.onload = e => {
+        _data.review.avatarData = e.target.result;
+        _importCard(card);
+      };
+      reader.readAsDataURL(new Blob([buf], { type: 'image/png' }));
     }
-    if (!card || card.spec !== 'chara_card_v2') {
-      alert('Could not read a V2 character card from this file.');
-      return;
-    }
-    _importCard(card);
   } catch (e) {
     alert('Import failed: ' + e.message);
   } finally {
@@ -2072,9 +2106,33 @@ function _restoreUI() {
     if (m) card.classList.toggle('selected', m[1] === _data.type);
   });
 
+  // Cognitive archetype cards
+  const arch = _data.personality?.archetype;
+  document.querySelectorAll('.archetype-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.archetype === arch);
+  });
+
   // Adult toggle
   document.getElementById('adult-pill')?.classList.toggle('on', !!_data.adultContent);
   document.getElementById('adult-toggle')?.classList.toggle('adult-on', !!_data.adultContent);
+
+  // Memory + heartbeat toggles
+  const mem = !!_data.memory?.memoryEnabled;
+  document.getElementById('toggle-memory')?.classList.toggle('on', mem);
+  document.getElementById('toggle-memory-pill')?.classList.toggle('on', mem);
+  const hb = !!_data.memory?.heartbeat;
+  document.getElementById('toggle-heartbeat')?.classList.toggle('on', hb);
+  document.getElementById('toggle-heartbeat-pill')?.classList.toggle('on', hb);
+  const hbSettings = document.getElementById('heartbeat-settings');
+  if (hbSettings) hbSettings.style.display = hb ? 'block' : 'none';
+
+  // Avatar preview (step 9)
+  if (_data.review?.avatarData) {
+    const img  = document.getElementById('review-avatar-img');
+    const icon = document.getElementById('review-avatar-icon');
+    if (img)  { img.src = _data.review.avatarData; img.style.display = 'block'; }
+    if (icon) icon.style.display = 'none';
+  }
 
   // All chip grids
   document.querySelectorAll('.chip-grid[data-group]').forEach(grid => {
@@ -2088,6 +2146,17 @@ function _restoreUI() {
       const hit = Array.isArray(val) ? val.includes(chip.dataset.val) : chip.dataset.val === String(val);
       chip.classList.toggle('selected', hit);
     });
+    // Custom chip — set if stored value doesn't match any static chip
+    const customChip = grid.querySelector('.custom-chip');
+    if (customChip) {
+      const staticVals = [...grid.querySelectorAll('.chip:not(.custom-chip)[data-val]')].map(c => c.dataset.val);
+      if (Array.isArray(val)) {
+        const customVal = val.find(v => !staticVals.includes(v));
+        if (customVal) { customChip.classList.add('selected'); customChip.dataset.val = customVal; customChip.textContent = customVal; }
+      } else if (!staticVals.includes(String(val))) {
+        customChip.classList.add('selected'); customChip.dataset.val = val; customChip.textContent = val;
+      }
+    }
   });
 
   // Sliders — pass raw stored value; height needs idx→slider conversion
