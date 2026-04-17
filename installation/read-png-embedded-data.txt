@@ -1,0 +1,5 @@
+# Run read_card.py path\to\character_card.png e.g. companions\<companion folder>\character_card.png
+python read_card.py companions\SENNI\character_card.png
+
+# Example
+python read_card.py companions\senni\character_card.png
