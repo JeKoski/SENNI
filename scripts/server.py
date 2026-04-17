@@ -845,6 +845,25 @@ async def api_delete_companion(folder: str):
         return {"ok": False, "error": str(e)}
 
 
+# ── Wizard compile ────────────────────────────────────────────────────────────
+
+@app.post("/api/wizard/compile")
+async def api_wizard_compile(request: Request):
+    """
+    Compile wizard birth certificate data into a companion folder.
+    Switches the active companion to the newly created one on success.
+    """
+    from wizard_compile import compile_companion
+    body   = await request.json()
+    result = compile_companion(body)
+    if result.get("ok"):
+        cfg = load_config()
+        cfg["companion_folder"] = result["folder"]
+        save_config(cfg)
+        get_companion_paths(result["folder"])
+    return result
+
+
 # ── Factory reset ──────────────────────────────────────────────────────────────
 
 @app.post("/api/factory-reset")
