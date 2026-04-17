@@ -167,10 +167,13 @@
   .portrait-orb {
     width: 180px; height: 180px; border-radius: 50%;
     background: var(--orb-bg); border: 2px solid var(--orb-border);
-    display: flex; align-items: center; justify-content: center; font-size: 56px; position: relative; overflow: visible;
+    display: flex; align-items: center; justify-content: center; font-size: 56px; position: relative; overflow: hidden;
     animation: orbGlow var(--glow-speed) ease-in-out infinite, orbBreath var(--breath-speed) ease-in-out infinite;
   }
   .portrait-orb-ring { position: absolute; inset: 0; border-radius: 50%; border: 1px solid var(--ring-color); pointer-events: none; animation: ringPulse var(--ring-speed) ease-out infinite; }
+  .wiz-silhouette { display: block; color: var(--indigo); }
+  .portrait-orb .wiz-silhouette { width: 155px; height: auto; opacity: 0.45; }
+  .wiz-orb .wiz-silhouette      { width: 64px;  height: auto; opacity: 0.7; margin-top: 6px; }
   .portrait-orb-ring-2 { animation-delay: 1.75s; }
   .portrait-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: var(--text-dim); text-transform: uppercase; }
   .portrait-text { font-family: 'Lora', serif; font-style: italic; font-size: 14px; color: var(--text-muted); line-height: 1.75; text-align: center; max-width: 210px; min-height: 72px; transition: opacity 0.6s ease; }
@@ -280,7 +283,7 @@
   .step-gate-link:hover { color: var(--indigo-hi); }
 
   /* ── Ambient orb (corner) ── */
-  .wiz-orb { position: fixed; bottom: 104px; right: 48px; z-index: 5; width: var(--orb-size); height: var(--orb-size); border-radius: 50%; background: var(--orb-bg); border: 1.5px solid var(--orb-border); display: flex; align-items: center; justify-content: center; opacity: 0.65; pointer-events: none; animation: orbGlow var(--glow-speed) ease-in-out infinite, orbBreath var(--breath-speed) ease-in-out infinite; }
+  .wiz-orb { position: fixed; bottom: 104px; right: 48px; z-index: 5; width: var(--orb-size); height: var(--orb-size); border-radius: 50%; background: var(--orb-bg); border: 1.5px solid var(--orb-border); display: flex; align-items: center; justify-content: center; opacity: 0.65; pointer-events: none; overflow: hidden; animation: orbGlow var(--glow-speed) ease-in-out infinite, orbBreath var(--breath-speed) ease-in-out infinite; }
   .wiz-orb-ring { position: absolute; inset: 0; border-radius: 50%; border: 1px solid var(--ring-color); animation: ringPulse var(--ring-speed) ease-out infinite; }
   .wiz-orb-icon { font-size: 22px; color: var(--indigo); opacity: 0.7; }
 
@@ -453,13 +456,13 @@
       </div>
       <div class="type-card" onclick="selectType(this,'companion')">
         <div class="type-card-check">&#x2713;</div>
-        <div class="type-card-icon"><svg class="type-card-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="22" x2="12" y2="13"/><path d="M12 17C10 15 7 13 6 9C9 9 12 13 12 17Z"/><path d="M12 17C14 15 17 13 18 9C15 9 12 13 12 17Z"/><path d="M12 13C11.5 10 12 6 12 6C12 6 12.5 10 12 13"/></svg></div>
+        <div class="type-card-icon"><svg class="type-card-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="13"/><path d="M12 17C10 15 7 13 6 9C9 9 12 13 12 17Z"/><path d="M12 17C14 15 17 13 18 9C15 9 12 13 12 17Z"/><path d="M12 13C11.5 10 12 6 12 6C12 6 12.5 10 12 13"/><ellipse cx="12" cy="22" rx="2.5" ry="2"/></svg></div>
         <div class="type-card-name">Companion</div>
         <div class="type-card-desc">A deeper bond &mdash; someone who knows you and grows with you over time.</div>
       </div>
       <div class="type-card" onclick="selectType(this,'roleplay')">
         <div class="type-card-check">&#x2713;</div>
-        <div class="type-card-icon"><svg class="type-card-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21L5 19L15 9L13 11Z" fill="currentColor" stroke-width="1" stroke-linejoin="round"/><path d="M16 2L17.2 5L20 6L17.2 7L16 10L14.8 7L12 6L14.8 5Z"/><circle cx="22" cy="17" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r="1" fill="currentColor" stroke="none"/></svg></div>
+        <div class="type-card-icon"><svg class="type-card-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20L5 23L17 11L14 8Z" fill="currentColor" stroke="none"/><path d="M16 2L17.2 5L20 6L17.2 7L16 10L14.8 7L12 6L14.8 5Z" fill="currentColor" stroke="none"/><path d="M21 11L21.5 12.5L23 13L21.5 13.5L21 15L20.5 13.5L19 13L20.5 12.5Z" fill="currentColor" stroke="none"/><circle cx="22" cy="18" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r="1" fill="currentColor" stroke="none"/></svg></div>
         <div class="type-card-name">Role-play</div>
         <div class="type-card-desc">A character in a world you define, shaped by story and imagination.</div>
       </div>
@@ -469,7 +472,7 @@
     <label class="import-zone" id="import-zone">
       <input type="file" id="import-file-input" accept=".png,.json" style="display:none"
         onchange="_handleImportFile(this.files[0]); this.value=''">
-      <div class="import-zone-icon">&#x2B06;</div>
+      <div class="import-zone-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 19h16"/></svg></div>
       <div class="import-zone-label">Drop a character card here, or click to browse</div>
       <div class="import-zone-note">V2 character card PNG &middot; birth_certificate.json</div>
     </label>
@@ -1168,7 +1171,7 @@
   <div class="wiz-footer-left">
     <div class="wiz-back" id="wiz-back" onclick="wizBack()">&#x2190; Back</div>
     <div class="adult-toggle-wrap" id="adult-toggle" onclick="toggleAdult()">
-      <div class="adult-toggle-icon">&#x1F51E;</div>
+      <div class="adult-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div>
       <div class="adult-toggle-label">Adult Content</div>
       <div class="toggle-pill" id="adult-pill"></div>
     </div>
@@ -1228,16 +1231,22 @@ const SPECIES_EMOJI = { elf:'🌿', vampire:'🌑', orc:'⚔️', spirit:'✨', 
 // Head+hair: wider envelope to suggest hair volume.
 // Visible neck segment, shoulders sweep to near orb edge.
 // Gender-neutral until gender/species chips drive body variants.
-const _SILHOUETTE_LG = `<svg viewBox="0 0 100 100" fill="currentColor" style="width:170px;height:170px;color:var(--indigo);opacity:0.45" aria-hidden="true">
-  <path d="M16 8Q14 1 50 1Q86 1 84 8Q90 20 84 36Q78 50 50 52Q22 50 16 36Q10 20 16 8Z"/>
-  <path d="M43 50L43 63Q43 66 50 66Q57 66 57 63L57 50Z"/>
-  <path d="M43 63Q36 67 22 76Q10 85 8 100L92 100Q90 85 78 76Q64 67 57 63Z"/>
-</svg>`;
-const _SILHOUETTE_SM = `<svg viewBox="0 0 100 100" fill="currentColor" style="width:44px;height:44px;color:var(--indigo);opacity:0.7" aria-hidden="true">
-  <path d="M16 8Q14 1 50 1Q86 1 84 8Q90 20 84 36Q78 50 50 52Q22 50 16 36Q10 20 16 8Z"/>
-  <path d="M43 50L43 63Q43 66 50 66Q57 66 57 63L57 50Z"/>
-  <path d="M43 63Q36 67 22 76Q10 85 8 100L92 100Q90 85 78 76Q64 67 57 63Z"/>
-</svg>`;
+const _SILHOUETTE_PATH = "M 77.354968 34.57205 C 74.004047 34.532747 70.305336 35.452735 67.031051 37.340873 C 55.835681 43.796762 51.588932 50.859551 49.611442 66.313265 C 48.706362 73.386271 48.414481 75.173399 47.752641 77.690348 C 46.565821 82.203812 44.360782 86.751627 41.107052 91.396488 C 37.012602 97.2415 36.923132 104.62116 40.899312 108.53756 C 42.228102 109.84637 43.091599 109.99979 41.870829 108.71016 C 39.142539 105.82799 38.6852 100.83228 40.76237 96.608057 C 41.033508 96.056634 41.227229 95.718048 41.268282 95.713021 L 41.268799 95.713021 L 41.269316 95.713021 L 41.269832 95.713021 C 41.270011 95.713066 41.271212 95.713474 41.271383 95.713538 L 41.271899 95.714054 L 41.272416 95.714054 L 41.272933 95.714571 L 41.27345 95.715088 L 41.273966 95.715605 C 41.2796 95.725066 41.275046 95.757461 41.258464 95.814307 C 40.185144 99.493227 40.442182 102.66774 42.201042 107.45597 C 43.694362 111.52131 42.381427 115.23721 37.715527 120.15236 C 33.974737 124.09298 32.664237 126.42051 32.244027 129.87063 C 32.037527 131.56604 32.485299 131.48508 32.927189 129.74712 C 33.444069 127.71419 34.54126 125.93807 36.65461 123.71441 C 38.29448 121.98894 38.4331 121.89177 37.76617 122.9341 C 35.62627 126.27843 34.098166 129.96613 33.600016 132.98826 C 33.432916 134.00201 33.120789 134.45992 31.497819 136.07128 C 27.872959 139.67022 26.148425 144.64873 25.004675 154.81639 C 24.857355 156.12607 24.559283 158.68592 24.342183 160.50493 C 24.125093 162.32394 23.945792 164.31824 23.944792 164.9367 C 23.942492 166.06118 23.942735 166.06118 78.050016 166.06118 C 132.15625 166.06118 132.15627 166.06119 132.15627 165.33358 C 132.15568 164.9334 131.98254 163.53441 131.7718 162.22472 C 131.56106 160.91503 131.26066 158.77191 131.10414 157.46222 C 129.71235 145.81718 128.18943 139.65559 126.02332 136.90275 C 124.68984 135.20806 119.04636 131.99315 116.51589 131.48706 C 115.80198 131.34428 115.72481 131.24348 115.86838 130.63544 C 116.91933 126.18459 116.00317 120.24704 113.39618 114.61574 C 112.79391 113.31482 112.35256 112.30278 112.41536 112.36678 C 112.77006 112.72795 115.76221 117.41079 116.20893 118.30389 C 117.86221 121.60899 118.40664 126.10853 117.47293 128.75493 C 116.87947 130.43702 117.00792 130.87612 117.74423 129.68097 C 120.35033 125.45097 119.43118 119.01854 115.49476 113.93826 C 113.56912 111.45307 112.64663 110.08788 111.90738 108.62903 C 111.07899 106.99416 111.08261 106.70046 111.91772 107.75983 C 112.61614 108.64582 115.22482 110.49868 115.77381 110.49868 C 115.95423 110.49868 115.26887 109.67093 114.25091 108.659 C 110.03752 104.4706 109.60068 101.21357 112.59881 96.343473 C 116.97419 89.236174 116.79966 81.330473 112.10479 73.986182 C 108.75106 68.739889 107.69122 65.730417 106.60796 58.375765 C 104.4003 43.386792 97.584176 35.90979 88.368766 38.367684 C 86.781266 38.791094 86.780921 38.790889 85.590641 37.558431 C 83.708701 35.609817 80.70589 34.611352 77.354968 34.57205 z";
+const _MALE_PATH = "m 446.05468,226.06257 c -17.4326,-1.09292 -39.4332,1.97577 -52.6934,8.11329 -3.6212,1.67611 -6.8896,3.04973 -7.2637,3.05273 -6.2814,0.0515 -24.4881,15.66221 -27.9199,23.93945 -0.8107,1.95519 -3.0264,6.08008 -4.9238,9.16602 -7.9831,12.98395 -8.8239,55.97222 -1.4688,75.07617 0.9094,2.3621 0.7806,2.72469 -1.0664,3 -15.4698,2.30592 -3.3329,60.8125 12.6153,60.8125 3.1651,0 3.3012,0.1744 4.4883,5.75 2.6337,12.37079 6.2312,23.33485 9.2441,28.18164 3.7234,5.98899 3.697,16.08385 -0.0898,34.35742 -3.9726,19.17032 -8.2383,22.37229 -64.05864,48.08594 -5.80919,2.67601 -33.21669,12.71952 -37.5,13.74219 -18.87284,4.50602 -36.43813,15.27376 -42.90039,26.30078 -2.6008,4.43792 -2.59961,4.43979 -2.59961,89.51172 v 85.07031 h 204.50004 204.49996 v -93.77734 c 0,-88.52984 -0.1001,-93.86212 -1.7735,-95.29493 -8.8883,-7.61042 -22.5281,-14.08829 -46.4238,-22.04687 -9.8465,-3.27941 -22.0435,-8.00467 -27.1035,-10.5 -5.0601,-2.49534 -13.9242,-6.56683 -19.6992,-9.04687 -5.775,-2.48006 -16.1694,-7.41117 -23.0977,-10.95899 -6.9284,-3.54781 -14.1983,-6.70993 -16.1543,-7.02734 -3.3736,-0.54745 -3.7873,-1.07312 -8.06046,-10.21289 -8.5699,-18.32971 -9.4162,-31.29693 -2.6993,-41.35547 4.5228,-6.77296 6.05836,-11.80661 8.48826,-27.82813 0.4938,-3.25608 0.8163,-3.55078 3.9004,-3.55078 10.0045,0 18.2972,-18.66998 19.2774,-43.40039 0.5504,-13.88478 -0.3807,-16.4182 -6.7344,-18.33008 -1.4069,-0.42334 -1.3339,-1.46732 0.6621,-9.58203 8.4803,-34.47818 1.7279,-69.52114 -15.0449,-78.07812 -6.19456,-3.16029 -7.02376,-3.94462 -8.33206,-7.88086 -2.499,-7.51905 -14.0482,-16.93649 -24.1855,-19.72266 -3.0358,-0.83436 -7.7452,-2.2045 -10.4649,-3.04492 -4.3028,-1.32959 -9.6071,-2.15718 -15.4179,-2.52149 z";
+const _NEUTRAL_PATH = "M 397.51172 233.03125 C 352.89993 235.843 314.04043 255.82997 274.71875 295.16602 C 204.27258 365.63779 179.97812 407.18226 173.2832 468.62305 C 168.09834 516.20572 158.21915 537.63888 133.78516 554.32031 L 128.79883 557.72461 L 134.32422 557.72461 C 145.33842 557.72461 154.65623 553.96035 166.27148 544.81836 C 168.24375 543.26605 169.60895 542.36069 169.76953 542.4668 L 169.77148 542.46875 L 169.77344 542.4707 L 169.77539 542.47266 L 169.77734 542.47461 L 169.7793 542.47656 C 169.79941 542.51399 169.75949 542.60629 169.64844 542.75195 C 132.4718 591.51598 135.05709 672.54098 175.24023 717.97461 C 180.95543 724.43659 181.66407 723.95304 178.32812 715.86328 C 173.29596 703.66014 170.99555 690.96078 171.06055 675.74609 C 171.11647 662.65986 173.04763 650.54931 173.2168 662.22461 C 173.55178 685.34426 186.12632 712.44807 209.46484 740.35156 C 238.18941 774.69461 239.74573 811.53317 213.07227 825.75 C 206.80316 829.0914 206.80322 829.09268 210.28711 830.60938 C 225.70031 837.31941 250.25078 826.91497 259.26758 809.85156 C 261.85178 804.96093 261.8809 808.02114 259.3457 817.93359 C 256.3468 829.6593 251.71287 838.09083 243.42188 846.9043 C 235.31892 855.51777 235.33359 855.54336 246.77148 852.71875 C 262.16188 848.91805 276.81225 839.57278 286.40625 827.43555 C 291.04895 821.56209 291.56106 823.33552 288.28516 833.94141 C 285.06326 844.37266 278.13345 853.83093 269.24805 859.92188 C 266.77175 861.61938 266.77133 861.61937 270.86133 861.67188 C 282.15923 861.81676 301.99834 853.48331 311.90234 844.43164 C 318.64024 838.27358 318.38891 837.69719 315.72461 853.22461 C 302.53001 930.12257 288.1376 943.09042 184.77148 971.20312 C 179.27148 972.69897 171.39648 974.95196 167.27148 976.21094 C 163.14648 977.46993 156.39648 979.49221 152.27148 980.70508 C 83.506438 1000.9241 43.710711 1031.8157 29.863281 1075.7246 C 28.909291 1078.7496 27.754538 1082.1246 27.298828 1083.2246 C 19.958488 1100.9426 9.0789912 1170.6241 3.8007812 1233.7246 C 2.9496613 1243.8996 1.9801644 1254.5871 1.6464844 1257.4746 L 1.0410156 1262.7246 L 424.97461 1262.7246 L 848.91016 1262.7246 L 848.13867 1255.4746 C 846.33447 1238.5082 842.86678 1211.5755 839.80078 1190.7246 C 839.03248 1185.4996 837.90422 1177.3996 837.29492 1172.7246 C 834.47122 1151.0566 827.1801 1106.4901 824.125 1092.2246 C 816.4103 1056.201 811.62221 1046.0206 794.25391 1028.7246 C 774.25561 1008.8096 749.22168 997.77241 690.77148 983.09766 C 586.82488 957.00044 562.79408 944.48871 547.64648 908.57227 C 538.54408 886.98974 529.81936 832.8331 536.25586 837.86914 C 555.24966 852.73045 574.94272 860.67814 592.85352 860.71094 C 603.30802 860.73006 603.619 860.15853 595.3125 856.17773 C 586.9465 852.16847 577.94327 843.33991 573.25977 834.55273 C 571.46847 831.19109 570.62532 828.80718 571.38672 829.25391 C 572.14802 829.70064 574.57148 831.2793 576.77148 832.76172 C 594.22498 844.5223 616.83788 850.02913 632.39648 846.30859 C 641.92468 844.03009 642.07283 843.68515 635.49023 839.04297 C 625.49153 831.9917 619.84378 823.28446 616.14648 809.22461 C 613.21738 798.08602 613.78404 796.48279 617.80664 804.52344 C 622.13214 813.1697 630.1363 820.86163 639 824.89258 C 647.7932 828.89152 648.42496 828.45857 642.53516 822.47461 C 623.42866 803.06257 627.77522 766.99587 653.01172 735.54883 C 673.85802 709.57242 683.22756 686.29398 683.47266 659.86523 C 683.58106 648.17605 685.37158 654.58592 686.01758 668.97461 C 686.81678 686.7751 683.44383 702.96848 676.11133 716.52148 C 671.09963 725.78504 682.50091 714.71122 692.53711 700.56836 C 725.14811 654.61321 727.53365 600.7769 699.49805 543.47461 C 696.33615 537.01211 693.90244 531.72461 694.08984 531.72461 C 694.27714 531.72461 697.11874 534.41172 700.40234 537.69531 C 706.79934 544.09234 717.61598 550.1329 724.77148 551.30469 L 728.77148 551.96094 L 724.18359 547.09375 C 717.40199 539.89792 712.93495 533.9536 709.24805 527.22461 C 707.43985 523.92461 705.37325 520.31974 704.65625 519.21289 C 702.74645 516.26515 694.56962 497.47547 691.16992 488.22461 C 683.71412 467.93653 678.18955 447.76624 673.78125 424.72461 C 653.61705 319.33039 585.44653 251.94862 513.79883 266.59375 C 504.82553 268.42794 504.82473 268.42704 502.98633 266.08984 C 493.19023 253.63619 465.82068 239.54615 444.27148 235.86328 C 427.89296 233.0641 412.38232 232.094 397.51172 233.03125 z";
+
+function _getSilhouette() {
+  const gender = _data.appearance?.gender;
+  if (gender === 'male')                         return `<svg viewBox="265 198 340 420" fill="currentColor" class="wiz-silhouette" aria-hidden="true"><path d="${_MALE_PATH}"/></svg>`;
+  if (gender === 'non-binary' || gender === 'neutral') return `<svg viewBox="0 195 848 960" fill="currentColor" class="wiz-silhouette" aria-hidden="true"><path d="${_NEUTRAL_PATH}"/></svg>`;
+  return `<svg viewBox="20 20 115 154" fill="currentColor" class="wiz-silhouette" aria-hidden="true"><path d="${_SILHOUETTE_PATH}"/></svg>`;
+}
+
+const _SILHOUETTE_SVG = `<svg viewBox="20 20 115 154" fill="currentColor" class="wiz-silhouette" aria-hidden="true"><path d="${_SILHOUETTE_PATH}"/></svg>`;
+const _SILHOUETTE_LG  = _SILHOUETTE_SVG;
+const _SILHOUETTE_SM  = _SILHOUETTE_SVG;
+document.getElementById('portrait-emoji').innerHTML = _SILHOUETTE_LG;
+document.getElementById('wiz-orb-icon').innerHTML   = _SILHOUETTE_SM;
 const HEIGHT_LABELS   = ['Very short','Short','Below average','Average','Above average','Tall','Very tall'];
 const HEIGHT_PROSE    = ['very short','short','below average height','average height','above average height','tall','very tall'];
 const CURVY_LABELS    = ['Slender','Lean','Balanced','Full','Broad'];
@@ -1691,7 +1700,7 @@ function _renderStep6() {
     el.dataset.built = ''; // reset so content rebuilds if adult is re-enabled later
     el.innerHTML = `
       <div class="step-gate">
-        <div class="step-gate-icon">&#x1F512;</div>
+        <div class="step-gate-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="36" height="36"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
         <p class="step-gate-text">Adult content is turned off.<br>You can enable it on the first step.</p>
         <div class="step-gate-link" onclick="wizGoToStep(1)">&#x2190; Back to Step 1</div>
       </div>`;
@@ -1912,8 +1921,8 @@ function _updatePortrait() {
       const s = parts.join(', ');
       el.textContent = s.charAt(0).toUpperCase() + s.slice(1) + '.';
     }
-    emojiEl.innerHTML = newEmoji === '\u2736' ? _SILHOUETTE_LG : newEmoji;
-    document.getElementById('wiz-orb-icon').innerHTML = newEmoji === '\u2736' ? _SILHOUETTE_SM : newEmoji;
+    emojiEl.innerHTML = newEmoji === '\u2736' ? _getSilhouette() : newEmoji;
+    document.getElementById('wiz-orb-icon').innerHTML = newEmoji === '\u2736' ? _getSilhouette() : newEmoji;
     el.style.opacity      = '1';
     emojiEl.style.opacity = '1';
   }, 400);

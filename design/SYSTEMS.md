@@ -48,7 +48,7 @@ Mood overrides are **additive** on top of the active Presence preset. Each overr
 - Ring color/alpha fully independent from glow ✓
 - Animation toggles implemented and driven from registry ✓
 - Presence tab redesigned — element-grouped accordion ✓
-- Mood system: backend done (`moods`, `active_mood` in config), UI not yet built
+- Mood system: fully built — backend + UI complete ✓ (see Mood system section below)
 
 ### Presence tab UI architecture
 
@@ -71,9 +71,23 @@ Built around `CP_ELEMENTS` in `companion-presence.js` — a data-driven config a
 
 - `companion.js` — coordinator: open/close, load, populate, tab switching, avatar, soul files, heartbeat, generation, save, toast, **dirty tracking**
 - `companion-presence.js` — all Presence tab logic: presets, state editor, preview orb, layout toggle, `_cpGetPresencePayload()`
-- `companion-mood.js` — future: Mood tab UI (not yet built)
+- `companion-mood.js` — Mood tab UI (complete ✓)
 
 `CP_STATE_DEFAULTS` and `CP_ELEMENTS` live in `companion-presence.js` and will be referenced by `companion-mood.js`.
+
+---
+
+## Mood system
+
+- Moods stored in `config.moods` (dict of name → definition), `config.active_mood` (name or null) ✓
+- `companion-mood.js` — full Mood tab in Companion Settings: card list, per-property toggles, group master toggles, colour picker overlay, TTS section, pill visibility segmented toggle, new/delete mood ✓
+- `companion-color-picker.js` — standalone overlay colour picker module used by both Mood and Presence tabs ✓
+- `tools/set_mood.py` — auto-discovered tool. Writes `active_mood` to companion config ✓
+- `chat.js` `_applyMoodToOrb(moodName)` — single canonical bridge: translates config schema to orb.js flat format, calls `orb.applyPreset()`, updates mood pill ✓
+- Mood hook wired to `set_mood` tool call completing — instant orb/pill update, no polling ✓
+- `cpMoodSetActive()` in `companion-mood.js` also calls `_applyMoodToOrb()` — live update when activating from panel ✓
+- Mood TTS overrides: schema-ready, UI not yet built (see BACKLOG.md)
+- Pill visibility: `mood_pill_visibility` in config — `"always"` | `"fade"` | `"hide"` ✓
 
 ---
 

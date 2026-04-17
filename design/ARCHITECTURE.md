@@ -24,6 +24,8 @@ When creating a new module, it should:
 - `static/js/companion-color-picker.js` — colour picker overlay extracted from companion-presence.js ✓
 - `static/js/mood-pill.js` — mood pill IIFE module ✓
 - `static/js/companion-mood.js` — Mood tab UI ✓
+- `static/js/companion-avatar.js` — canvas crop modal (orb + sidebar portrait modes) ✓
+- `static/js/voice-input.js` — MediaRecorder voice input, WAV transcode, auto-send ✓
 
 ---
 
@@ -39,6 +41,7 @@ When creating a new module, it should:
 tool-parser.js              ← no deps
 api.js                      ← needs tool-parser.js
 attachments.js
+voice-input.js              ← needs attachments.js (addAttachment)
 orb.js
 message-renderer.js         ← no deps
 chat-ui.js                  ← needs message-renderer.js, orb.js, appendMemoryPill()
@@ -47,6 +50,8 @@ chat-controls.js
 chat.js
 heartbeat.js
 tts.js                      ← needs api.js (onTtsToken), no DOM deps at load time
+companion-avatar.js         ← canvas crop modal; no deps, loaded before companion.js
+                               exports cpAvatarInit(), cpAvatarCrop(), cpAvatarReset()
 companion.js                ← coordinator, loads before presence/tts/memory/mood
 companion-presence.js       ← needs companion.js (cpSettings, cpMarkDirty), orb.js
                                exports CP_SWATCHES, CP_ELEMENTS, CP_SPEED_RANGES,
@@ -97,6 +102,25 @@ cpPickerHexInput(val)   // called by oninput on overlay hex field in chat.html
 `companion-mood.js` calls `cpOpenColorPicker()` directly.
 
 `cpPresenceOverlayHexInput()` is kept as a one-liner bridge in `companion-presence.js` for backward compatibility with the `oninput` attribute in `chat.html` — it delegates to `cpPickerHexInput()`.
+
+---
+
+## Companion Creation Wizard
+
+A self-contained page at `/companion-wizard` (`static/companion-wizard.html`). All JS is inline — no external module dependencies on the chat.html module tree. Served by `server.py`.
+
+**Backend compile module:** `scripts/wizard_compile.py`
+- Entry point: `compile_companion(data)` — called by `POST /api/wizard/compile`
+- Writes: `companions/<slug>/config.json`, `soul/companion_identity.md`, `soul/user_profile.md`, `birth_certificate.json`, `character_card.png` (if avatar + Pillow available)
+- Export route: `GET /api/wizard/export/{folder}` — serves `character_card.png`
+- Imported as `from scripts.wizard_compile import compile_companion` (relative import pattern)
+
+**Key wizard internals (inline JS):**
+- `_data` — single source of truth for all wizard state
+- `_goto(step, subStep)` — only entry point for navigation
+- `_getSilhouette()` — returns gender-appropriate SVG bust string, reads `_data.appearance.gender`
+- `_initChipGrids(root)` — wires chip click handlers for any subtree; supports single/array/custom modes
+- `_importCard(card)` — restores SENNI V2 card from `extensions.senni.wizard_selections`; best-effort for foreign V2 cards
 
 ---
 
