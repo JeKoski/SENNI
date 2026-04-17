@@ -336,6 +336,68 @@
   @keyframes orbGlow { 0%,100% { box-shadow: 0 0 var(--glow-min) var(--glow-color); } 50% { box-shadow: 0 0 var(--glow-max) var(--glow-color); } }
   @keyframes orbBreath { 0%,100% { transform: scale(1); } 50% { transform: scale(1.035); } }
   @keyframes ringPulse { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(1.7); opacity: 0; } }
+  @keyframes particleOrbit { from { transform: rotate(var(--start,0deg)); } to { transform: rotate(calc(var(--start,0deg) + 360deg)); } }
+  @keyframes orbShake { 0%,100%{transform:translate(0,0) scale(1)} 10%{transform:translate(-4px,-3px) scale(1.03)} 20%{transform:translate(4px,3px) scale(0.97)} 30%{transform:translate(-3px,4px) scale(1.04)} 40%{transform:translate(3px,-3px) scale(0.96)} 50%{transform:translate(-4px,2px) scale(1.03)} 60%{transform:translate(4px,-2px) scale(0.97)} 70%{transform:translate(-2px,3px) scale(1.02)} 80%{transform:translate(2px,-4px) scale(0.98)} 90%{transform:translate(-3px,2px) scale(1.01)} }
+
+  /* ── Archetype picker (Step 4) ── */
+  .archetype-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .archetype-card { display: flex; flex-direction: column; gap: 5px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.015); }
+  .archetype-card:hover { border-color: var(--indigo); background: rgba(99,102,241,0.07); }
+  .archetype-card.selected { border-color: var(--indigo); background: rgba(99,102,241,0.13); box-shadow: 0 0 0 1px var(--indigo) inset; }
+  .archetype-name { font-family: 'Lora', serif; font-size: 13px; color: var(--text); }
+  .archetype-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+  .archetype-stack { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--indigo); opacity: 0.65; margin-top: 3px; letter-spacing: 0.05em; }
+
+  /* ── Review step (Step 9) ── */
+  .review-avatar-section { display: flex; align-items: center; gap: 28px; padding: 24px 28px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 4px; }
+  .review-avatar-orb { width: 80px; height: 80px; border-radius: 50%; background: var(--orb-bg); border: 2px solid var(--orb-border); display: flex; align-items: center; justify-content: center; font-size: 30px; flex-shrink: 0; overflow: hidden; box-shadow: 0 0 var(--glow-max) var(--glow-color); }
+  .review-avatar-orb img { width: 100%; height: 100%; object-fit: cover; }
+  .review-avatar-info { flex: 1; }
+  .review-avatar-name { font-family: 'Lora', serif; font-size: 24px; color: var(--text); margin-bottom: 3px; font-style: italic; }
+  .review-avatar-meta { font-size: 12px; color: var(--text-muted); text-transform: capitalize; }
+  .review-avatar-actions { display: flex; gap: 10px; align-items: center; }
+  .review-upload-btn { padding: 8px 18px; border-radius: 100px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .review-upload-btn:hover { border-color: var(--indigo); color: var(--text); background: rgba(99,102,241,0.06); }
+  .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .review-card { padding: 18px 20px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,0.015); display: flex; flex-direction: column; gap: 10px; }
+  .review-card-title { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--indigo); opacity: 0.75; }
+  .review-row { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .review-key { font-size: 11px; color: var(--text-dim); flex-shrink: 0; min-width: 70px; }
+  .review-val { font-size: 13px; color: var(--text); }
+  .review-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+  .review-tag { font-size: 11px; padding: 2px 9px; border-radius: 100px; background: rgba(99,102,241,0.1); color: var(--indigo-hi); border: 1px solid rgba(99,102,241,0.18); }
+  .review-empty { font-size: 12px; color: var(--text-dim); font-style: italic; }
+  .review-launch-wrap { display: flex; justify-content: center; padding: 20px 0 8px; }
+  .review-launch-btn { font-family: 'Lora', serif; font-style: italic; font-size: 19px; padding: 17px 52px; border-radius: 100px; border: none; background: linear-gradient(135deg, var(--grad-start), var(--grad-end)); color: #fff; cursor: pointer; box-shadow: 0 4px 36px rgba(99,102,241,0.45), 0 0 70px rgba(99,102,241,0.15); transition: all 0.35s cubic-bezier(0.22,1,0.36,1); letter-spacing: 0.02em; animation: launchPulse 2.8s ease-in-out infinite; }
+  .review-launch-btn:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 10px 56px rgba(99,102,241,0.65), 0 0 100px rgba(99,102,241,0.28); animation: none; }
+  .review-launch-btn:active { transform: translateY(0) scale(0.98); }
+  @keyframes launchPulse { 0%,100% { box-shadow: 0 4px 36px rgba(99,102,241,0.45), 0 0 70px rgba(99,102,241,0.15); } 50% { box-shadow: 0 4px 48px rgba(99,102,241,0.6), 0 0 90px rgba(99,102,241,0.25); } }
+
+  /* ── Compile animation rework ── */
+  .compile-orb.shaking { animation: orbShake 0.12s ease-in-out 12, orbGlow var(--glow-speed) ease-in-out infinite; }
+  .compile-particle { position: absolute; top: 50%; left: 50%; height: 5px; margin: -2.5px 0 0 -2.5px; transform-origin: 2.5px 2.5px; opacity: 0; transition: width 1.2s cubic-bezier(0.6,0,1,1), opacity 0.5s ease-in; animation: particleOrbit var(--orbit-speed,2s) linear infinite; will-change: transform, opacity; }
+  .compile-particle::after { content: ''; position: absolute; right: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--pcol, var(--indigo-hi)); box-shadow: 0 0 7px 2px var(--pcol, var(--indigo-hi)); }
+  .compile-line-single { font-family: 'Lora', serif; font-style: italic; font-size: 17px; color: var(--text-muted); opacity: 0; transform: translateY(10px); transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.22,1,0.36,1); min-height: 26px; text-align: center; }
+  .compile-line-single.visible { opacity: 1; transform: translateY(0); }
+  .compile-line-single em { font-style: normal; color: var(--indigo-hi); }
+
+  /* ── Helper note below sel-label ── */
+  .sel-note { font-size: 11px; color: var(--text-dim); line-height: 1.5; margin: -16px 0 4px; }
+
+  /* ── Inline toggle rows (heartbeat triggers) ── */
+  .trigger-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+  .trigger-row:first-child { border-top: none; }
+  .trigger-row-text { flex: 1; }
+  .trigger-row-label { font-size: 13px; color: var(--text); }
+  .trigger-row-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .trigger-pill { width: 32px; height: 18px; border-radius: 9px; background: var(--border); border: none; cursor: pointer; transition: background 0.2s; flex-shrink: 0; position: relative; }
+  .trigger-pill::after { content:''; position:absolute; top:3px; left:3px; width:12px; height:12px; border-radius:50%; background:#fff; transition: transform 0.2s; }
+  .trigger-pill.on { background: var(--indigo); }
+  .trigger-pill.on::after { transform: translateX(14px); }
+  .trigger-idle-minutes { display: none; align-items: center; gap: 8px; margin-top: 6px; }
+  .trigger-idle-minutes.visible { display: flex; }
+  .trigger-idle-minutes input { width: 56px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); font-size: 12px; font-family: 'DM Mono', monospace; text-align: center; }
+  .trigger-idle-minutes span { font-size: 12px; color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -815,6 +877,41 @@
         <textarea class="wiz-textarea" placeholder="Their story, their world, their history&hellip;"
           oninput="_data.personality.lore=this.value.trim()||undefined"></textarea>
       </div>
+      <div class="sel-section">
+        <div class="sel-label">Cognitive Archetype <span class="sel-label-note">shapes how they think and remember</span></div>
+        <div class="archetype-grid" id="archetype-grid" style="grid-template-columns:repeat(2,1fr)">
+          <div class="archetype-card" data-archetype="analyst" onclick="_selectArchetype(this,'analyst')">
+            <div class="archetype-name">The Analyst</div>
+            <div class="archetype-desc">Precise, fact-grounded, directive. Thinking and sensing lead the way.</div>
+            <div class="archetype-stack">mT-mS-fN-fF</div>
+          </div>
+          <div class="archetype-card" data-archetype="empath" onclick="_selectArchetype(this,'empath')">
+            <div class="archetype-name">The Empath</div>
+            <div class="archetype-desc">Emotionally attuned, intuitive, relational. Feeling at the core.</div>
+            <div class="archetype-stack">fF-mN-fS-mT</div>
+          </div>
+          <div class="archetype-card" data-archetype="guardian" onclick="_selectArchetype(this,'guardian')">
+            <div class="archetype-name">The Guardian</div>
+            <div class="archetype-desc">Present, steady, observant. Grounded in the concrete and real.</div>
+            <div class="archetype-stack">fS-mT-fF-mN</div>
+          </div>
+          <div class="archetype-card" data-archetype="visionary" onclick="_selectArchetype(this,'visionary')">
+            <div class="archetype-name">The Visionary</div>
+            <div class="archetype-desc">Pattern-seeking, imaginative, possibility-driven. Intuition leads.</div>
+            <div class="archetype-stack">mN-fF-mT-fS</div>
+          </div>
+        </div>
+      </div>
+      <div class="sel-section">
+        <div class="sel-label">Voice Style <span class="sel-label-note">optional &mdash; sets their voice preset</span></div>
+        <div class="chip-grid" data-group="voiceStyle" data-target="personality" data-single="true">
+          <div class="chip" data-val="soft">Soft &amp; gentle</div>
+          <div class="chip" data-val="warm">Warm &amp; rich</div>
+          <div class="chip" data-val="clear">Clear &amp; bright</div>
+          <div class="chip" data-val="deep">Deep &amp; resonant</div>
+          <div class="chip" data-val="expressive">Expressive &amp; dynamic</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -912,12 +1009,13 @@
     </div>
   </div>
 
-  <!-- ════ STEP 8 — Memory ════ -->
+  <!-- ════ STEP 8 — Memory & Growth ════ -->
   <div class="wiz-step" id="step-8">
-    <div class="step-eyebrow">Step 08 &mdash; Memory</div>
-    <h1 class="step-heading">How should they remember?</h1>
-    <p class="step-sub">Shape how they grow and stay.</p>
+    <div class="step-eyebrow">Step 08 &mdash; Memory &amp; Growth</div>
+    <h1 class="step-heading">How do they grow with you?</h1>
+    <p class="step-sub">Shape how they remember, evolve, and reach out.</p>
     <div class="step-content">
+
       <div class="feature-toggle on" id="toggle-memory" onclick="toggleFeature('memory')">
         <div class="feature-toggle-text">
           <div class="feature-toggle-title">Persistent Memory</div>
@@ -933,6 +1031,33 @@
           <div class="chip" data-val="deep">Deep &mdash; weaves your full history into every response</div>
         </div>
       </div>
+
+      <div class="sel-section">
+        <div class="sel-label">Identity Evolution <span class="sel-label-note">how do they grow over time?</span></div>
+        <div class="chip-grid" data-group="agency" data-target="settings" data-single="true">
+          <div class="chip" data-val="locked">Settled &mdash; their sense of self stays fixed; they grow through memory, not by rewriting who they are</div>
+          <div class="chip selected" data-val="self_notes">Reflective &mdash; they add personal reflections to their self-notes as they learn and grow</div>
+          <div class="chip" data-val="agentic">Adaptive &mdash; they actively rewrite their own identity as they evolve through your relationship</div>
+          <div class="chip" data-val="chaos">Unbound &mdash; full freedom to reshape both their soul and mind over time</div>
+        </div>
+      </div>
+
+      <div class="sel-section">
+        <div class="sel-label">Response style <span class="sel-label-note">affects generation temperature</span></div>
+        <div class="chip-grid" data-group="generationStyle" data-target="settings" data-single="true">
+          <div class="chip" data-val="measured">Measured &mdash; careful and deliberate</div>
+          <div class="chip selected" data-val="balanced">Balanced &mdash; natural and expressive</div>
+          <div class="chip" data-val="expressive">Expressive &mdash; vivid, more spontaneous</div>
+        </div>
+      </div>
+
+      <div class="sel-section">
+        <div class="sel-label">First things to know <span class="sel-label-note">optional</span></div>
+        <p class="sel-note">These seed their memory before your first conversation &mdash; context about you or your shared world they&rsquo;ll carry from day one. Unlike &ldquo;About You&rdquo; (which becomes their profile), this writes directly into their memory store.</p>
+        <textarea class="wiz-textarea" style="min-height:100px" placeholder="Anything they should know from the very first moment&hellip;"
+          oninput="_data.memory.firstNote=this.value.trim()||undefined"></textarea>
+      </div>
+
       <div class="feature-toggle" id="toggle-heartbeat" onclick="toggleFeature('heartbeat')">
         <div class="feature-toggle-text">
           <div class="feature-toggle-title">Proactive Heartbeat</div>
@@ -940,19 +1065,79 @@
         </div>
         <div class="toggle-pill" id="toggle-heartbeat-pill"></div>
       </div>
-      <div class="sel-section">
-        <div class="sel-label">Heartbeat frequency</div>
-        <div class="chip-grid" data-group="heartbeatFreq" data-target="memory" data-single="true">
-          <div class="chip" data-val="rarely">Rarely &mdash; only when something meaningful happens</div>
-          <div class="chip selected" data-val="sometimes">Sometimes &mdash; a gentle presence</div>
-          <div class="chip" data-val="often">Often &mdash; they like to stay connected</div>
-          <div class="chip" data-val="whenever">Whenever inspired &mdash; fully spontaneous</div>
+      <div id="heartbeat-settings" style="display:none; display-target:block">
+        <div class="sel-section">
+          <div class="sel-label">Frequency</div>
+          <div class="chip-grid" data-group="heartbeatFreq" data-target="memory" data-single="true" id="heartbeat-freq-grid">
+            <div class="chip" data-val="rarely">Rarely &mdash; only when something meaningful happens</div>
+            <div class="chip selected" data-val="sometimes">Sometimes &mdash; a gentle presence</div>
+            <div class="chip" data-val="often">Often &mdash; they like to stay connected</div>
+            <div class="chip" data-val="whenever">Whenever inspired &mdash; fully spontaneous</div>
+            <div class="chip" data-val="custom">Custom&hellip;</div>
+          </div>
+        </div>
+        <div id="heartbeat-custom" style="display:none">
+          <div class="sel-section">
+            <div style="border:1px solid var(--border);border-radius:12px;padding:4px 16px;">
+              <div class="trigger-row">
+                <div class="trigger-row-text">
+                  <div class="trigger-row-label">After idle time</div>
+                  <div class="trigger-row-desc">Checks in when you go quiet for a while</div>
+                  <div class="trigger-idle-minutes" id="idle-minutes-row">
+                    <input type="number" id="idle-minutes-input" min="5" max="120" value="15"
+                      oninput="_data.memory.idleMinutes=Math.max(5,+this.value)||15"/>
+                    <span>minutes</span>
+                  </div>
+                </div>
+                <button class="trigger-pill" id="trig-idle" onclick="_toggleTrigger('idle')"></button>
+              </div>
+              <div class="trigger-row">
+                <div class="trigger-row-text">
+                  <div class="trigger-row-label">After conversation ends</div>
+                  <div class="trigger-row-desc">Reflects and may follow up after you close a chat</div>
+                </div>
+                <button class="trigger-pill" id="trig-convEnd" onclick="_toggleTrigger('convEnd')"></button>
+              </div>
+              <div class="trigger-row">
+                <div class="trigger-row-text">
+                  <div class="trigger-row-label">At session start</div>
+                  <div class="trigger-row-desc">Greets you with something prepared when you return</div>
+                </div>
+                <button class="trigger-pill" id="trig-sessionStart" onclick="_toggleTrigger('sessionStart')"></button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="sel-section">
-        <div class="sel-label">First things to know <span class="sel-label-note">optional</span></div>
-        <textarea class="wiz-textarea" style="min-height:110px" placeholder="Anything they should know from the very first moment&hellip;"
-          oninput="_data.memory.firstNote=this.value.trim()||undefined"></textarea>
+
+    </div>
+  </div>
+
+  <!-- ════ STEP 9 — Review ════ -->
+  <div class="wiz-step" id="step-9">
+    <div class="step-eyebrow">Step 09 &mdash; Review</div>
+    <h1 class="step-heading">Ready to bring them to life?</h1>
+    <p class="step-sub">Give them a face, then confirm everything looks right.</p>
+    <div class="step-content">
+      <div class="review-avatar-section">
+        <div class="review-avatar-orb" id="review-avatar-orb">
+          <span id="review-avatar-icon">&#x2736;</span>
+          <img id="review-avatar-img" style="display:none" alt="avatar"/>
+        </div>
+        <div class="review-avatar-info">
+          <div class="review-avatar-name" id="review-companion-name">&mdash;</div>
+          <div class="review-avatar-meta" id="review-companion-meta"></div>
+        </div>
+        <div class="review-avatar-actions">
+          <input type="file" id="review-avatar-file" accept="image/*" style="display:none" onchange="_onAvatarUpload(this)"/>
+          <button class="review-upload-btn" onclick="document.getElementById('review-avatar-file').click()">Upload photo</button>
+        </div>
+      </div>
+      <div class="review-grid" id="review-grid"></div>
+      <div class="review-launch-wrap">
+        <button class="review-launch-btn" id="review-launch-btn" onclick="wizFinish()">
+          Bring <span id="review-launch-name">them</span> to life &rarr;
+        </button>
       </div>
     </div>
   </div>
@@ -975,9 +1160,9 @@
 </footer>
 
 <script>
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 9;
 const SUB_STEPS = 5;
-const STEP_LABELS = ['Type','Appearance','Outfit','Personality','Closeness','Adult','You','Memory'];
+const STEP_LABELS = ['Type','Appearance','Outfit','Personality','Closeness','Adult','You','Memory','Review'];
 const SUB_META = [
   { id: '2a', label: 'Foundation', sub: 'Start with the basics.' },
   { id: '2b', label: 'Body',       sub: 'Shape and stature.' },
@@ -992,6 +1177,8 @@ let _step    = 1;
 let _subStep = 1;
 let _hwStep    = 1;
 let _hwSubStep = 0;
+let _compiledFolder = null;
+let _compileError   = null;
 
 const _data = {
   type: null, adultContent: false,
@@ -1001,7 +1188,10 @@ const _data = {
   closeness:    { relationshipType: [], initialCloseness: null },
   adult:        {},
   user:         {},
-  memory:       { memoryEnabled: true, heartbeat: false, memoryDepth: 'balanced', heartbeatFreq: 'sometimes' },
+  memory:       { memoryEnabled: true, heartbeat: false, memoryDepth: 'balanced', heartbeatFreq: 'sometimes',
+                  idleTrigger: false, idleMinutes: 15, convEndTrigger: false, sessionStartTrigger: false },
+  settings:     { agency: 'self_notes', generationStyle: 'balanced' },
+  review:       { avatarData: null },
 };
 
 function _getTarget(name) {
@@ -1142,10 +1332,12 @@ function _updateNav() {
   document.getElementById('adult-toggle').style.display    = _step === 1 ? 'flex' : 'none';
   document.getElementById('wiz-step-label').textContent = 'Step ' + _step + ' of ' + TOTAL_STEPS;
   const name = _data.personality.name;
-  document.getElementById('wiz-continue').innerHTML =
-    _step === 8 ? 'Bring ' + (name || 'them') + ' to life \u2192' : 'Continue \u2192';
+  const contBtn = document.getElementById('wiz-continue');
+  contBtn.innerHTML = _step === 9 ? 'Bring ' + (name || 'them') + ' to life \u2192' : 'Continue \u2192';
+  contBtn.style.visibility = _step === 9 ? 'hidden' : '';
   _buildMainDots();
   if (_step === 6) _renderStep6();
+  if (_step === 9) _buildReview();
   if (_step === 2) {
     const meta = SUB_META[_subStep - 1];
     document.getElementById('step2-eyebrow').textContent = 'Step 02 \u2014 ' + meta.label;
@@ -1169,7 +1361,7 @@ function wizGoToStep(n) {
 
 function wizNext() {
   if (!document.getElementById('wiz-continue').classList.contains('ready')) return;
-  if (_step === 8) { wizFinish(); return; }
+  if (_step === 9) { wizFinish(); return; }
   if (_step === 2 && _subStep < SUB_STEPS) {
     _goto(2, _subStep + 1);
   } else {
@@ -1188,55 +1380,270 @@ function wizBack() {
 function wizFinish() {
   const name = _data.personality.name || 'them';
   const icon = SPECIES_EMOJI[_data.appearance?.species] || '\u2736';
-
-  // Set orb icon to companion's species
-  document.getElementById('compile-orb-icon').textContent = icon;
-
-  // Build the staggered lines
   const LINES = [
     `Binding <em>${name}</em> to this vessel\u2026`,
     `Weaving <em>${name}</em>\u2019s essence into memory\u2026`,
     `Etching the first words into soul\u2026`,
     `<em>${name}</em> is awakening\u2026`,
   ];
-  const linesEl = document.getElementById('compile-lines');
-  linesEl.innerHTML = '';
-  LINES.forEach(html => {
-    const div = document.createElement('div');
-    div.className = 'compile-line';
-    div.innerHTML = html;
-    linesEl.appendChild(div);
-  });
 
-  // Set final ready text
+  const overlay  = document.getElementById('compile-overlay');
+  const orbEl    = document.getElementById('compile-orb');
+  const lineEl   = document.getElementById('compile-line');
+
+  // Apply avatar to compile orb if uploaded, otherwise show species icon
+  const orbIconEl = document.getElementById('compile-orb-icon');
+  if (_data.review.avatarData) {
+    orbIconEl.style.display = 'none';
+    let orbImg = document.getElementById('compile-orb-img');
+    if (!orbImg) {
+      orbImg = document.createElement('img');
+      orbImg.id = 'compile-orb-img';
+      orbImg.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;inset:0;';
+      orbEl.appendChild(orbImg);
+    }
+    orbImg.src = _data.review.avatarData;
+  } else {
+    orbIconEl.style.display = '';
+    orbIconEl.textContent = icon;
+    const existing = document.getElementById('compile-orb-img');
+    if (existing) existing.remove();
+  }
   document.getElementById('compile-ready').innerHTML = `<em>${name}</em> is ready.`;
 
-  // Fade in the overlay
-  const overlay = document.getElementById('compile-overlay');
+  // Fade in overlay
   overlay.classList.add('active');
-  overlay.offsetHeight; // reflow
+  overlay.offsetHeight;
   overlay.classList.add('visible');
 
-  // Stagger lines in
-  const STAGGER = 1400;
-  const FIRST   = 900;
-  linesEl.querySelectorAll('.compile-line').forEach((el, i) => {
-    setTimeout(() => el.classList.add('visible'), FIRST + i * STAGGER);
-  });
+  // Spawn swirling particles
+  const PCOLS = ['var(--indigo-hi)', '#a78bfa', '#e879f9', '#818cf8', 'rgba(167,139,250,0.55)'];
+  const particles = [];
+  for (let i = 0; i < 14; i++) {
+    const p = document.createElement('div');
+    p.className = 'compile-particle';
+    const r     = 62 + Math.random() * 42;
+    const speed = 1.4 + Math.random() * 2.2;
+    const start = (i / 14) * 360 + Math.random() * 18;
+    const col   = PCOLS[i % PCOLS.length];
+    p.style.cssText = `width:${r}px; --start:${start}deg; --orbit-speed:${speed}s; --pcol:${col}; animation-delay:${(-Math.random() * speed).toFixed(2)}s`;
+    orbEl.appendChild(p);
+    particles.push(p);
+    setTimeout(() => { p.style.opacity = '1'; }, 300 + i * 55);
+  }
 
-  // Final state after all lines have settled
-  const finalDelay = FIRST + (LINES.length - 1) * STAGGER + 1200;
+  // Show first line
+  lineEl.innerHTML = LINES[0];
+  setTimeout(() => lineEl.classList.add('visible'), 700);
+
+  // Cycle lines — fade out / swap / fade in
+  let lineIdx = 0;
+  const CYCLE = 1500;
+  const cycleId = setInterval(() => {
+    lineIdx++;
+    if (lineIdx >= LINES.length) { clearInterval(cycleId); return; }
+    lineEl.classList.remove('visible');
+    lineEl.style.transform = 'translateY(-6px)';
+    setTimeout(() => {
+      lineEl.innerHTML = LINES[lineIdx];
+      lineEl.style.transform = '';
+      lineEl.classList.add('visible');
+    }, 420);
+  }, CYCLE);
+
+  // Orb shake + particle converge after last line settles
+  const shakeAt = 700 + (LINES.length - 1) * CYCLE + 900;
   setTimeout(() => {
-    document.getElementById('compile-final').classList.add('visible');
-  }, finalDelay);
+    orbEl.classList.add('shaking');
+    particles.forEach((p, i) => {
+      setTimeout(() => {
+        p.style.width = '0px';
+        p.style.opacity = '0';
+      }, i * 35);
+    });
+  }, shakeAt);
 
-  // TODO: POST to /api/wizard/compile during the animation
-  console.log('Wizard complete:', JSON.stringify(_data, null, 2));
+  // Final state
+  setTimeout(() => {
+    orbEl.classList.remove('shaking');
+    particles.forEach(p => p.remove());
+    lineEl.classList.remove('visible');
+    lineEl.style.transform = 'translateY(-6px)';
+    setTimeout(() => {
+      document.getElementById('compile-final').classList.add('visible');
+    }, 380);
+  }, shakeAt + 1500);
+
+  // POST to /api/wizard/compile during the animation
+  fetch('/api/wizard/compile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(_data),
+  })
+  .then(r => r.json())
+  .then(result => {
+    _compiledFolder = result.ok ? result.folder : null;
+    _compileError   = result.ok ? null : (result.error || 'Unknown error');
+    if (!result.ok) {
+      console.error('Compile failed:', result.error);
+    }
+  })
+  .catch(err => {
+    _compileError = String(err);
+    console.error('Compile request failed:', err);
+  });
 }
 
 function wizOpenCompanion() {
-  // TODO: redirect to companion chat once backend compile endpoint exists
-  alert('Backend compile coming soon — companion folder will be created here.');
+  if (_compileError) {
+    alert('Compile failed: ' + _compileError + '\n\nCheck the server logs for details.');
+    return;
+  }
+  if (!_compiledFolder) {
+    alert('Still compiling\u2026 please wait a moment and try again.');
+    return;
+  }
+  window.location.href = '/chat';
+}
+
+// ── Archetype picker ───────────────────────────────────────────────────────
+const ARCHETYPE_STACKS = {
+  analyst:  { slots: [{position:1,charge:'m',function:'T',polarity:null},{position:2,charge:'m',function:'S',polarity:null},{position:3,charge:'f',function:'N',polarity:null},{position:4,charge:'f',function:'F',polarity:null}], stack_initialised: true },
+  empath:   { slots: [{position:1,charge:'f',function:'F',polarity:null},{position:2,charge:'m',function:'N',polarity:null},{position:3,charge:'f',function:'S',polarity:null},{position:4,charge:'m',function:'T',polarity:null}], stack_initialised: true },
+  guardian: { slots: [{position:1,charge:'f',function:'S',polarity:null},{position:2,charge:'m',function:'T',polarity:null},{position:3,charge:'f',function:'F',polarity:null},{position:4,charge:'m',function:'N',polarity:null}], stack_initialised: true },
+  visionary:{ slots: [{position:1,charge:'m',function:'N',polarity:null},{position:2,charge:'f',function:'F',polarity:null},{position:3,charge:'m',function:'T',polarity:null},{position:4,charge:'f',function:'S',polarity:null}], stack_initialised: true },
+};
+
+function _selectArchetype(el, key) {
+  document.querySelectorAll('.archetype-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  _data.personality.archetype     = key;
+  _data.personality.cognitiveStack = ARCHETYPE_STACKS[key];
+}
+
+// ── Heartbeat triggers ─────────────────────────────────────────────────────
+function _toggleTrigger(key) {
+  const map = { idle: 'idleTrigger', convEnd: 'convEndTrigger', sessionStart: 'sessionStartTrigger' };
+  const field = map[key];
+  _data.memory[field] = !_data.memory[field];
+  document.getElementById('trig-' + key).classList.toggle('on', _data.memory[field]);
+  if (key === 'idle') {
+    document.getElementById('idle-minutes-row').classList.toggle('visible', _data.memory[field]);
+  }
+}
+
+// ── Avatar upload (review step) ────────────────────────────────────────────
+function _onAvatarUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _data.review.avatarData = e.target.result;
+    const img = document.getElementById('review-avatar-img');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.getElementById('review-avatar-icon').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Review builder ─────────────────────────────────────────────────────────
+function _buildReview() {
+  const name = _data.personality.name || '\u2014';
+  const a    = _data.appearance;
+  const p    = _data.personality;
+  const c    = _data.closeness;
+  const m    = _data.memory;
+  const s    = _data.settings;
+  const u    = _data.user;
+
+  // Update header
+  document.getElementById('review-companion-name').textContent = name;
+  const icon = SPECIES_EMOJI[a.species] || '\u2736';
+  document.getElementById('review-avatar-icon').textContent = icon;
+  document.getElementById('review-launch-name').textContent = name;
+
+  const metaParts = [_data.type, a.species, a.gender].filter(Boolean);
+  document.getElementById('review-companion-meta').textContent = metaParts.join(' \u00b7 ') || 'No type selected';
+
+  function tags(arr) {
+    if (!arr || !arr.length) return '<span class="review-empty">none</span>';
+    return '<div class="review-tags">' + arr.map(v => `<span class="review-tag">${v}</span>`).join('') + '</div>';
+  }
+  function val(v, fallback) {
+    return v != null ? `<span class="review-val">${v}</span>` : `<span class="review-empty">${fallback || 'not set'}</span>`;
+  }
+  function row(k, v) { return `<div class="review-row"><span class="review-key">${k}</span>${v}</div>`; }
+
+  // Appearance prose
+  const ageStr  = a.age != null ? a.age + ' yrs' : null;
+  const htIdx   = a['height-idx'];
+  const htStr   = htIdx != null ? HEIGHT_LABELS[htIdx] : null;
+  const bodyStr = (a['body-curvy'] != null || a['body-athletic'] != null)
+    ? _bodyDesc(a['body-curvy'] ?? 50, a['body-athletic'] ?? 50) || 'balanced' : null;
+
+  // Archetype stack string
+  const stackStr = p.cognitiveStack
+    ? p.cognitiveStack.slots.map(sl => sl.charge + sl.function).join('-')
+    : null;
+
+  // Agency label map
+  const agencyLabels = { locked: 'Settled', self_notes: 'Reflective', agentic: 'Adaptive', chaos: 'Unbound' };
+  const genLabels    = { measured: 'Measured', balanced: 'Balanced', expressive: 'Expressive' };
+  const depthLabels  = { light: 'Light', balanced: 'Balanced', deep: 'Deep' };
+  const freqLabels   = { rarely: 'Rarely', sometimes: 'Sometimes', often: 'Often', whenever: 'Whenever inspired' };
+
+  const cards = [
+    {
+      title: 'Identity',
+      body: row('Type', val(_data.type)) +
+            row('Species', val(a.species)) +
+            row('Gender', val(a.gender)) +
+            row('Age', val(ageStr)) +
+            (a['true-age'] ? row('True age', val(a['true-age'])) : ''),
+    },
+    {
+      title: 'Appearance',
+      body: row('Build', val(bodyStr)) +
+            row('Height', val(htStr)) +
+            row('Skin', val(a.skin)) +
+            row('Eyes', val([a['eye-color'], a['eye-shape']].filter(Boolean).join(', '))) +
+            row('Hair', val([a['hair-color'], a['hair-style']].filter(Boolean).join(', '))),
+    },
+    {
+      title: 'Personality',
+      body: row('Archetype', val(p.archetype ? p.archetype.charAt(0).toUpperCase() + p.archetype.slice(1) : null)) +
+            row('Stack', val(stackStr)) +
+            row('Style', val(p.commStyle)) +
+            row('Occupation', val(p.occupation)) +
+            '<div class="review-row"><span class="review-key">Traits</span>' + tags(p.traits) + '</div>',
+    },
+    {
+      title: 'Relationship',
+      body: '<div class="review-row"><span class="review-key">Type</span>' + tags(c.relationshipType) + '</div>' +
+            row('Closeness', val(c.initialCloseness != null ? c.initialCloseness + '%' : null)) +
+            row('Adult', val(_data.adultContent ? 'Enabled' : 'Disabled')) +
+            row('Voice', val(p.voiceStyle)),
+    },
+    {
+      title: 'Memory & Agency',
+      body: row('Memory', val(m.memoryEnabled ? 'Enabled' : 'Disabled')) +
+            row('Depth', val(depthLabels[m.memoryDepth])) +
+            row('Heartbeat', val(m.heartbeat ? freqLabels[m.heartbeatFreq] : 'Off')) +
+            row('Agency', val(agencyLabels[s.agency])) +
+            row('Response', val(genLabels[s.generationStyle])),
+    },
+    {
+      title: 'About You',
+      body: row('Name', val(u.name)) +
+            row('Occupation', val(u.occupation)) +
+            '<div class="review-row"><span class="review-key">Interests</span>' + tags(u.interests) + '</div>',
+    },
+  ];
+
+  document.getElementById('review-grid').innerHTML = cards.map(card =>
+    `<div class="review-card"><div class="review-card-title">${card.title}</div>${card.body}</div>`
+  ).join('');
 }
 
 function _renderStep6() {
@@ -1313,6 +1720,7 @@ function toggleFeature(key) {
     _data.memory.heartbeat = !_data.memory.heartbeat;
     document.getElementById('toggle-heartbeat').classList.toggle('on', _data.memory.heartbeat);
     document.getElementById('toggle-heartbeat-pill').classList.toggle('on', _data.memory.heartbeat);
+    document.getElementById('heartbeat-settings').style.display = _data.memory.heartbeat ? 'block' : 'none';
   }
 }
 
@@ -1552,18 +1960,31 @@ function _initChipGrids(root) {
 document.addEventListener('DOMContentLoaded', () => {
   _initChipGrids(document);
   _updateNav();
+  // Heartbeat frequency → reveal custom trigger section
+  document.getElementById('heartbeat-freq-grid')?.addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    document.getElementById('heartbeat-custom').style.display =
+      chip.dataset.val === 'custom' ? 'block' : 'none';
+    if (chip.dataset.val !== 'custom') {
+      // Reset trigger data when switching away from custom
+      _data.memory.idleTrigger = false;
+      _data.memory.convEndTrigger = false;
+      _data.memory.sessionStartTrigger = false;
+    }
+  });
 });
 </script>
 
 <!-- ════ COMPILE SEQUENCE OVERLAY ════ -->
 <div id="compile-overlay">
   <div class="compile-inner">
-    <div class="compile-orb">
+    <div class="compile-orb" id="compile-orb">
       <div class="compile-orb-ring"></div>
       <div class="compile-orb-ring compile-orb-ring-2"></div>
       <span id="compile-orb-icon">&#x2736;</span>
     </div>
-    <div class="compile-lines" id="compile-lines"></div>
+    <div class="compile-line-single" id="compile-line"></div>
     <div class="compile-final" id="compile-final">
       <p class="compile-ready" id="compile-ready"></p>
       <button class="wiz-continue ready" onclick="wizOpenCompanion()">Open companion &#x2192;</button>

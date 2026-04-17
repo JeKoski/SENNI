@@ -156,6 +156,65 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-17 #3
+
+**Wizard — UX refinements, backend compile, archetype fix.**
+
+### Cognitive archetypes
+
+Reduced from 8 to 4 valid archetypes (one per dominant function). Constraint: pos1+pos4 same functional axis (T-F or S-N), pos2+pos3 the other axis, opposite charges within each pair.
+
+| Archetype | Stack |
+|---|---|
+| Analyst | mT-mS-fN-fF |
+| Empath | fF-mN-fS-mT |
+| Guardian | fS-mT-fF-mN |
+| Visionary | mN-fF-mT-fS |
+
+### Step 8 restructure
+
+- Renamed to "Memory & Growth"
+- New order: Memory → Identity Evolution → Response Style → First things to know → Heartbeat (last)
+- Heartbeat settings collapse behind the toggle — hidden until enabled
+- Heartbeat frequency: Rarely/Sometimes/Often/Whenever/Custom — Custom reveals individual trigger toggles (idle+minutes, conv end, session start)
+- Agency mode renamed to "Identity Evolution" with thematic chip labels: Settled/Reflective/Adaptive/Unbound
+- "First things to know" now has a clarifying note (seeds ChromaDB memory, not the profile)
+
+### Review step (Step 9)
+
+- Avatar upload wired to compile animation orb (species emoji if no avatar)
+- Summary cards auto-populate from `_data` when step 9 is entered
+- Animated glowing launch button (pulses, hover lifts)
+
+### Backend compile
+
+New file: `scripts/wizard_compile.py` — fully self-contained compile module:
+- `compile_companion(data)` — main entry point
+- Unique slug folder generation with conflict handling
+- Writes `config.json` (all settings mapped: temp, voice, stack, heartbeat, soul_edit_mode)
+- Writes `soul/companion_identity.md` (narrative prose)
+- Writes `soul/user_profile.md` (from Step 7, skipped if empty)
+- Writes `birth_certificate.json` (full V2 card data)
+- Writes `character_card.png` if avatar uploaded + Pillow available
+- `POST /api/wizard/compile` in server.py — switches active companion on success
+- `wizOpenCompanion()` redirects to /chat; surfaces error if compile failed
+
+### Key compile-time mappings
+
+- Response style → temperature: measured=0.5, balanced=0.8, expressive=1.1
+- Heartbeat freq → idle_minutes + trigger enables (see `FREQ_CONFIG` in wizard_compile.py)
+- Identity Evolution → soul_edit_mode: Settled=locked, Reflective=self_notes, Adaptive=agentic, Unbound=chaos
+- Voice style → Kokoro voice_blend
+
+### Pending for next session
+
+- **Memory depth → per-companion config** — mid_convo_k/session_start_k are currently global only. Need per-companion memory settings before this mapping can be wired.
+- **Morphing body silhouette** — SVG bilinear interpolation, 2b Body. Complex, own session.
+- **Custom SVG icons** — emoji placeholders throughout.
+- **PNG export route** — `GET /api/wizard/export/{folder}` not yet added (PNG written at compile if conditions met).
+
+---
+
 ## Session notes — 2026-04-17 #2
 
 **Wizard — Steps 3–8, polish pass, compile sequence, file rename.**
