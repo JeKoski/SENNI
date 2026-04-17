@@ -5,6 +5,16 @@ Update at end of each session. Completed items get deleted, not struck through.
 
 ---
 
+## High Priority
+
+- Making installation and updating easy (design session needed)
+  - We need to prioritize actually getting the app out ther
+  - Main app is functional, Wizard is functional etc.
+  - We'll figure out any UX quirks while we do this (start-up wizard probably needs a redo as well, or perhaps we'll move its functionality to the installer/launcher)
+  - Launcher? Wrapper? No clue. App should have a standard installer for installing everything so that regular people can start using it.
+
+---
+
 ## Housekeeping
 
 - **Docs audit** — go through all `design/*.md` docs to prune stale content and move any buried to-dos into BACKLOG.md. WIZARD.md still needs looking through.
@@ -13,6 +23,7 @@ Update at end of each session. Completed items get deleted, not struck through.
 ---
 
 ## Quick Wins
+
 *Ready to build — no design conversation needed.*
 
 - **Species color-shifting** — tint silhouettes per species via CSS `color` (vampire=charcoal, demon=dark red, elf=forest green etc.). Lookup table only, ~10 min.
@@ -33,11 +44,13 @@ Update at end of each session. Completed items get deleted, not struck through.
 ---
 
 ## Needs looking into
+
 - **Companion Mood activation** — Companions use moods inconsistently or not at all. How are we instructing mood tool usage? Something we should change?
 
 ---
 
 ## Design Sessions Needed
+
 *Too open-ended to task out. Need a dedicated design conversation first.*
 
 - **Main Chat UI redesign** — "smoother, fuller, cozier". Known starting points: sidebar companion state card (mood, recent memory), memory viewer/editor panel. Wizard has established the visual language — good time to apply it. See `design/FEATURES.md` → Sidebar/UI section.
@@ -49,6 +62,7 @@ Update at end of each session. Completed items get deleted, not struck through.
 ---
 
 ## Wizard Backlog
+
 *Implementation-ready items specific to `static/companion-wizard.html` and `scripts/wizard_compile.py`.*
 
 - **`first_mes` / `system_prompt` / `post_history_instructions`** — see Quick Wins above, wizard is the compile source
@@ -59,6 +73,7 @@ Update at end of each session. Completed items get deleted, not struck through.
 ---
 
 ## On Hold
+
 *Waiting on external factor before proceeding.*
 
 - **Layered avatar / character creator system** — full design session needed, but asset creation is blocked on new PC + OmniSVG experiments. OmniSVG (8.5GB) fits comfortably on RTX 5060 Ti 16GB. See `design/CHARA_CARD.md` → Appearance sections.
