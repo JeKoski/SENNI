@@ -53,6 +53,7 @@ from scripts.config import (
     write_avatar_file,
 )
 from scripts.tool_loader import get_tool, load_tools
+from wizard_compile import compile_companion
 
 log = logging.getLogger(__name__)
 
@@ -853,7 +854,6 @@ async def api_wizard_compile(request: Request):
     Compile wizard birth certificate data into a companion folder.
     Switches the active companion to the newly created one on success.
     """
-    from wizard_compile import compile_companion
     body   = await request.json()
     result = compile_companion(body)
     if result.get("ok"):
