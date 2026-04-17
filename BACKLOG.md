@@ -7,7 +7,7 @@ Update at end of each session. Completed items get deleted, not struck through.
 
 ## Housekeeping
 
-- **Docs audit** — go through all `design/*.md` docs to prune stale content and move any buried to-dos into BACKLOG.md. FEATURES.md, WIZARD.md, TTS.md, SYSTEMS.md are the most likely candidates.
+- **Docs audit** — go through all `design/*.md` docs to prune stale content and move any buried to-dos into BACKLOG.md. WIZARD.md still needs looking through.
 - **SYSTEMS.md freshen-up** — lists mood system and companion-mood.js as "not yet built" but both were completed 2026-04-13. Needs a pass to reflect current state.
 
 ---
@@ -32,10 +32,15 @@ Update at end of each session. Completed items get deleted, not struck through.
 
 ---
 
+## Needs looking into
+- **Companion Mood activation** — Companions use moods inconsistently or not at all. How are we instructing mood tool usage? Something we should change?
+
+---
+
 ## Design Sessions Needed
 *Too open-ended to task out. Need a dedicated design conversation first.*
 
-- **Main Chat UI redesign** — "smoother, fuller, cozier". Known starting points: sidebar companion state card (larger avatar, mood, recent memory), tools list → Settings, buttons → pill shape, memory viewer/editor panel. Wizard has established the visual language — good time to apply it. See `design/FEATURES.md` → Sidebar/UI section.
+- **Main Chat UI redesign** — "smoother, fuller, cozier". Known starting points: sidebar companion state card (mood, recent memory), memory viewer/editor panel. Wizard has established the visual language — good time to apply it. See `design/FEATURES.md` → Sidebar/UI section.
 - **Memory viewer/editor** — browse/edit/delete soul/, mind/, and ChromaDB notes. Duplicate dedup UI. Can roll into chat UI design session. See `design/FEATURES.md` → Memory section.
 - **Closeness/relationship progression** — may become gamified (develop closeness over time). Wizard closeness step is partially blocked on this.
 - **Companion Templates rework** — templates need redesigning to fit memory system + Wizard + Mood. See `design/FEATURES.md` → Companion section.
@@ -60,5 +65,6 @@ Update at end of each session. Completed items get deleted, not struck through.
 - **Silhouette morphing** — shelved in favour of layered avatar system. Revisit after layered avatar design session.
 - **Species silhouette variants** — deferred with silhouette morphing. Short-term: use color-shifting (see Quick Wins).
 - **TTS upgrade** — newer realistic TTS models (Qwen Audio etc.) worth evaluating once new PC is up. Kokoro on CPU is too slow on current i5-7600K; CUDA on 5060 Ti should be near-instant.
+- **App Sounds** — Just an idea right now. App has only TTS, no other audio. Would add a lot of ambiance and polish.
 - **Cozy Mode** — full sensory layer (lighting, ambient sounds, warm orb). Wishlist, needs visual/interaction design. See `design/FEATURES.md` → Cozy Mode.
 - **Standalone Wizard / Tauri** — architecture documented in `design/CHARA_CARD.md`. Not started.
