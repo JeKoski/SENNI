@@ -122,7 +122,8 @@
   }
   .type-card:hover { border-color: rgba(129,140,248,0.3); background: rgba(129,140,248,0.05); transform: translateY(-2px); }
   .type-card.selected { border-color: var(--border-hi); background: rgba(129,140,248,0.09); box-shadow: 0 0 0 1px rgba(129,140,248,0.18), 0 8px 32px rgba(99,102,241,0.14); }
-  .type-card-icon { font-size: 30px; line-height: 1; opacity: 0.85; }
+  .type-card-icon { font-size: 30px; line-height: 1; opacity: 0.85; display: flex; align-items: center; justify-content: center; }
+  .type-card-svg  { width: 32px; height: 32px; color: currentColor; flex-shrink: 0; }
   .type-card-name { font-size: 15px; font-weight: 500; color: var(--text-bright); letter-spacing: 0.02em; }
   .type-card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.55; }
   .type-card-check {
@@ -426,7 +427,7 @@
 
 <div class="wiz-orb">
   <div class="wiz-orb-ring"></div>
-  <div class="wiz-orb-icon" id="wiz-orb-icon">&#x2736;</div>
+  <div class="wiz-orb-icon" id="wiz-orb-icon"><svg viewBox="0 0 100 100" fill="currentColor" style="width:44px;height:44px;color:var(--indigo);opacity:0.7" aria-hidden="true"><path d="M16 8Q14 1 50 1Q86 1 84 8Q90 20 84 36Q78 50 50 52Q22 50 16 36Q10 20 16 8Z"/><path d="M43 50L43 63Q43 66 50 66Q57 66 57 63L57 50Z"/><path d="M43 63Q36 67 22 76Q10 85 8 100L92 100Q90 85 78 76Q64 67 57 63Z"/></svg></div>
 </div>
 
 <main class="wiz-stage">
@@ -440,25 +441,25 @@
     <div class="type-grid">
       <div class="type-card" onclick="selectType(this,'assistant')">
         <div class="type-card-check">&#x2713;</div>
-        <div class="type-card-icon">&#x26A1;</div>
+        <div class="type-card-icon"><svg class="type-card-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="12" height="18" rx="2"/><line x1="3" y1="7" x2="15" y2="7"/><line x1="6" y1="2" x2="6" y2="7"/><line x1="6" y1="11" x2="13" y2="11"/><line x1="6" y1="14" x2="11" y2="14"/><path d="M17 4l3 3-7 11h-3v-3z"/></svg></div>
         <div class="type-card-name">Assistant</div>
         <div class="type-card-desc">Focused, capable, and always ready to help you think and do.</div>
       </div>
       <div class="type-card" onclick="selectType(this,'friend')">
         <div class="type-card-check">&#x2713;</div>
-        <div class="type-card-icon">&#x1F33F;</div>
+        <div class="type-card-icon"><svg class="type-card-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="6" r="3"/><path d="M2 21v-1a6 6 0 0 1 12 0v1"/><circle cx="16" cy="6" r="3"/><path d="M10 21v-1a6 6 0 0 1 12 0v1"/></svg></div>
         <div class="type-card-name">Friend</div>
         <div class="type-card-desc">A warm presence to talk to, think out loud with, and just be around.</div>
       </div>
       <div class="type-card" onclick="selectType(this,'companion')">
         <div class="type-card-check">&#x2713;</div>
-        <div class="type-card-icon">&#x2736;</div>
+        <div class="type-card-icon"><svg class="type-card-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="22" x2="12" y2="13"/><path d="M12 17C10 15 7 13 6 9C9 9 12 13 12 17Z"/><path d="M12 17C14 15 17 13 18 9C15 9 12 13 12 17Z"/><path d="M12 13C11.5 10 12 6 12 6C12 6 12.5 10 12 13"/></svg></div>
         <div class="type-card-name">Companion</div>
         <div class="type-card-desc">A deeper bond &mdash; someone who knows you and grows with you over time.</div>
       </div>
       <div class="type-card" onclick="selectType(this,'roleplay')">
         <div class="type-card-check">&#x2713;</div>
-        <div class="type-card-icon">&#x1F3AD;</div>
+        <div class="type-card-icon"><svg class="type-card-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21L5 19L15 9L13 11Z" fill="currentColor" stroke-width="1" stroke-linejoin="round"/><path d="M16 2L17.2 5L20 6L17.2 7L16 10L14.8 7L12 6L14.8 5Z"/><circle cx="22" cy="17" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r="1" fill="currentColor" stroke="none"/></svg></div>
         <div class="type-card-name">Role-play</div>
         <div class="type-card-desc">A character in a world you define, shaped by story and imagination.</div>
       </div>
@@ -486,7 +487,7 @@
         <div class="portrait-orb" id="portrait-orb">
           <div class="portrait-orb-ring"></div>
           <div class="portrait-orb-ring portrait-orb-ring-2"></div>
-          <span id="portrait-emoji">&#x2736;</span>
+          <span id="portrait-emoji"><svg viewBox="0 0 100 100" fill="currentColor" style="width:170px;height:170px;color:var(--indigo);opacity:0.45" aria-hidden="true"><path d="M16 8Q14 1 50 1Q86 1 84 8Q90 20 84 36Q78 50 50 52Q22 50 16 36Q10 20 16 8Z"/><path d="M43 50L43 63Q43 66 50 66Q57 66 57 63L57 50Z"/><path d="M43 63Q36 67 22 76Q10 85 8 100L92 100Q90 85 78 76Q64 67 57 63Z"/></svg></span>
         </div>
         <div class="portrait-label">Taking shape</div>
         <p class="portrait-text" id="portrait-text"><em>Make a few selections and your companion will begin to emerge&hellip;</em></p>
@@ -1219,6 +1220,24 @@ function _getTarget(name) {
 }
 
 const SPECIES_EMOJI = { elf:'🌿', vampire:'🌑', orc:'⚔️', spirit:'✨', fae:'🍄', android:'⚡', demon:'🔥', angel:'🕊️' };
+
+// Neutral humanoid silhouette — shown when no special species is selected.
+// Filled shape (not line art) so it reads clearly at any orb size.
+// Will morph with body sliders in the full silhouette session.
+// Bust silhouette — fills most of the orb.
+// Head+hair: wider envelope to suggest hair volume.
+// Visible neck segment, shoulders sweep to near orb edge.
+// Gender-neutral until gender/species chips drive body variants.
+const _SILHOUETTE_LG = `<svg viewBox="0 0 100 100" fill="currentColor" style="width:170px;height:170px;color:var(--indigo);opacity:0.45" aria-hidden="true">
+  <path d="M16 8Q14 1 50 1Q86 1 84 8Q90 20 84 36Q78 50 50 52Q22 50 16 36Q10 20 16 8Z"/>
+  <path d="M43 50L43 63Q43 66 50 66Q57 66 57 63L57 50Z"/>
+  <path d="M43 63Q36 67 22 76Q10 85 8 100L92 100Q90 85 78 76Q64 67 57 63Z"/>
+</svg>`;
+const _SILHOUETTE_SM = `<svg viewBox="0 0 100 100" fill="currentColor" style="width:44px;height:44px;color:var(--indigo);opacity:0.7" aria-hidden="true">
+  <path d="M16 8Q14 1 50 1Q86 1 84 8Q90 20 84 36Q78 50 50 52Q22 50 16 36Q10 20 16 8Z"/>
+  <path d="M43 50L43 63Q43 66 50 66Q57 66 57 63L57 50Z"/>
+  <path d="M43 63Q36 67 22 76Q10 85 8 100L92 100Q90 85 78 76Q64 67 57 63Z"/>
+</svg>`;
 const HEIGHT_LABELS   = ['Very short','Short','Below average','Average','Above average','Tall','Very tall'];
 const HEIGHT_PROSE    = ['very short','short','below average height','average height','above average height','tall','very tall'];
 const CURVY_LABELS    = ['Slender','Lean','Balanced','Full','Broad'];
@@ -1728,6 +1747,30 @@ function _renderStep6() {
     </div>`;
   // wire up newly created chips
   _initChipGrids(el);
+
+  // Restore adult selections from _data (handles import)
+  const adultSrc = _data.adult || {};
+  el.querySelectorAll('.chip-grid[data-group]').forEach(grid => {
+    const group      = grid.dataset.group;
+    const val        = adultSrc[group];
+    if (val === undefined || val === null) return;
+    const staticVals = [...grid.querySelectorAll('.chip:not(.custom-chip)[data-val]')].map(c => c.dataset.val);
+    grid.querySelectorAll('.chip[data-val]').forEach(chip => {
+      const hit = Array.isArray(val) ? val.includes(chip.dataset.val) : chip.dataset.val === String(val);
+      chip.classList.toggle('selected', hit);
+    });
+    const customChip = grid.querySelector('.custom-chip');
+    if (customChip) {
+      if (Array.isArray(val)) {
+        const cv = val.find(v => !staticVals.includes(v));
+        if (cv) { customChip.classList.add('selected'); customChip.dataset.val = cv; customChip.textContent = cv; }
+      } else if (!staticVals.includes(String(val))) {
+        customChip.classList.add('selected'); customChip.dataset.val = val; customChip.textContent = val;
+      }
+    }
+  });
+  const notesEl = el.querySelector('textarea');
+  if (notesEl && adultSrc.notes) notesEl.value = adultSrc.notes;
 }
 
 function toggleFeature(key) {
@@ -1869,8 +1912,8 @@ function _updatePortrait() {
       const s = parts.join(', ');
       el.textContent = s.charAt(0).toUpperCase() + s.slice(1) + '.';
     }
-    emojiEl.textContent = newEmoji;
-    document.getElementById('wiz-orb-icon').textContent = newEmoji;
+    emojiEl.innerHTML = newEmoji === '\u2736' ? _SILHOUETTE_LG : newEmoji;
+    document.getElementById('wiz-orb-icon').innerHTML = newEmoji === '\u2736' ? _SILHOUETTE_SM : newEmoji;
     el.style.opacity      = '1';
     emojiEl.style.opacity = '1';
   }, 400);
@@ -1897,11 +1940,17 @@ function _openCustomInput(grid, chip) {
     chip.style.display = '';
     input.remove();
     if (val) {
+      const oldVal = chip.dataset.val !== 'custom' ? chip.dataset.val : null;
       chip.classList.add('selected');
       chip.dataset.val = val;
       chip.textContent = val;
       if (isArray) {
         if (!target[group]) target[group] = [];
+        // Remove old custom value if editing an existing entry
+        if (oldVal && oldVal !== val) {
+          const oi = target[group].indexOf(oldVal);
+          if (oi >= 0) target[group].splice(oi, 1);
+        }
         if (!target[group].includes(val)) target[group].push(val);
       } else {
         // single: deselect others first
@@ -2006,24 +2055,28 @@ async function _handleImportFile(file) {
   const zone = document.getElementById('import-zone');
   zone?.classList.add('importing');
   try {
-    const buf = await file.arrayBuffer();
-    let card = null;
+    const buf  = await file.arrayBuffer();
+    let   card = null;
     if (file.name.toLowerCase().endsWith('.json')) {
       card = JSON.parse(new TextDecoder().decode(buf));
+      if (!card || card.spec !== 'chara_card_v2') {
+        alert('Could not read a V2 character card from this file.'); return;
+      }
+      _importCard(card);
     } else {
       card = _extractCharaFromPng(buf);
-      if (card) {
-        // Use the PNG image itself as the avatar
-        const reader = new FileReader();
-        reader.onload = e => { _data.review.avatarData = e.target.result; };
-        reader.readAsDataURL(new Blob([buf], { type: 'image/png' }));
+      if (!card || card.spec !== 'chara_card_v2') {
+        alert('Could not read a V2 character card from this file.'); return;
       }
+      // Use the PNG image itself as the avatar — set _data before calling _importCard
+      // so _restoreUI can show it in the step-9 preview immediately.
+      const reader = new FileReader();
+      reader.onload = e => {
+        _data.review.avatarData = e.target.result;
+        _importCard(card);
+      };
+      reader.readAsDataURL(new Blob([buf], { type: 'image/png' }));
     }
-    if (!card || card.spec !== 'chara_card_v2') {
-      alert('Could not read a V2 character card from this file.');
-      return;
-    }
-    _importCard(card);
   } catch (e) {
     alert('Import failed: ' + e.message);
   } finally {
@@ -2072,9 +2125,33 @@ function _restoreUI() {
     if (m) card.classList.toggle('selected', m[1] === _data.type);
   });
 
+  // Cognitive archetype cards
+  const arch = _data.personality?.archetype;
+  document.querySelectorAll('.archetype-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.archetype === arch);
+  });
+
   // Adult toggle
   document.getElementById('adult-pill')?.classList.toggle('on', !!_data.adultContent);
   document.getElementById('adult-toggle')?.classList.toggle('adult-on', !!_data.adultContent);
+
+  // Memory + heartbeat toggles
+  const mem = !!_data.memory?.memoryEnabled;
+  document.getElementById('toggle-memory')?.classList.toggle('on', mem);
+  document.getElementById('toggle-memory-pill')?.classList.toggle('on', mem);
+  const hb = !!_data.memory?.heartbeat;
+  document.getElementById('toggle-heartbeat')?.classList.toggle('on', hb);
+  document.getElementById('toggle-heartbeat-pill')?.classList.toggle('on', hb);
+  const hbSettings = document.getElementById('heartbeat-settings');
+  if (hbSettings) hbSettings.style.display = hb ? 'block' : 'none';
+
+  // Avatar preview (step 9)
+  if (_data.review?.avatarData) {
+    const img  = document.getElementById('review-avatar-img');
+    const icon = document.getElementById('review-avatar-icon');
+    if (img)  { img.src = _data.review.avatarData; img.style.display = 'block'; }
+    if (icon) icon.style.display = 'none';
+  }
 
   // All chip grids
   document.querySelectorAll('.chip-grid[data-group]').forEach(grid => {
@@ -2088,6 +2165,17 @@ function _restoreUI() {
       const hit = Array.isArray(val) ? val.includes(chip.dataset.val) : chip.dataset.val === String(val);
       chip.classList.toggle('selected', hit);
     });
+    // Custom chip — set if stored value doesn't match any static chip
+    const customChip = grid.querySelector('.custom-chip');
+    if (customChip) {
+      const staticVals = [...grid.querySelectorAll('.chip:not(.custom-chip)[data-val]')].map(c => c.dataset.val);
+      if (Array.isArray(val)) {
+        const customVal = val.find(v => !staticVals.includes(v));
+        if (customVal) { customChip.classList.add('selected'); customChip.dataset.val = customVal; customChip.textContent = customVal; }
+      } else if (!staticVals.includes(String(val))) {
+        customChip.classList.add('selected'); customChip.dataset.val = val; customChip.textContent = val;
+      }
+    }
   });
 
   // Sliders — pass raw stored value; height needs idx→slider conversion

@@ -379,9 +379,16 @@ def _build_user_profile(user: dict) -> str:
 # ── V2 character card ──────────────────────────────────────────────────────────
 
 def _build_birth_certificate(data: dict) -> dict:
+    import copy
     p    = data.get("personality", {})
     a    = data.get("appearance",  {})
     name = p.get("name", "Companion")
+
+    # Strip avatar base64 from wizard_selections — the PNG image IS the avatar;
+    # embedding it again in the JSON chunk would roughly double the file size.
+    selections = copy.deepcopy(data)
+    if isinstance(selections.get("review"), dict):
+        selections["review"].pop("avatarData", None)
 
     personality_str = ""
     if p.get("traits"):
@@ -421,7 +428,7 @@ def _build_birth_certificate(data: dict) -> dict:
                     "user_profile":    data.get("user", {}),
                     "memory_config":   data.get("memory", {}),
                     "settings":        data.get("settings", {}),
-                    "wizard_selections": data,
+                    "wizard_selections": selections,
                 }
             },
         }

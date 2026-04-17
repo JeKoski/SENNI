@@ -156,6 +156,44 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-17 #5 (Wizard session 6)
+
+**Wizard — Import QA fixes, icon style pass, neutral bust silhouette.**
+
+### What changed
+
+**Import QA fixes:**
+- **Custom chip values not restoring** — `_restoreUI()` now detects values without a matching static chip and sets the `.custom-chip` element's text/value/selected state for both single and array grids.
+- **Adult step chips not restoring** — adult chips are built lazily; `_renderStep6()` now restores all chip selections + notes textarea from `_data.adult` immediately after `_initChipGrids(el)`.
+- **Heartbeat + memory toggles not restoring** — `_restoreUI()` now syncs both toggle states and shows/hides the heartbeat settings panel.
+- **Avatar not showing after PNG import** — `_handleImportFile()` restructured: for PNG, `_importCard(card)` is now called inside `reader.onload` so `_data.review.avatarData` is set before step 9 renders.
+- **Duplicate entries on custom chip edit** — `_openCustomInput` captures the old `chip.dataset.val` before overwriting it, then removes it from the array before pushing the new value.
+- **Cognitive archetype not restoring** — archetype cards use `data-archetype` / `_selectArchetype()`, not the chip grid system. `_restoreUI()` now handles them separately.
+- **`avatarData` in `wizard_selections` making PNG huge** — `_build_birth_certificate()` in `wizard_compile.py` now deep-copies `data` and strips `review.avatarData` before storing in `wizard_selections`. The PNG image itself is the avatar; embedding it again in the tEXt JSON was pure overhead.
+
+**New utility:**
+- `read_card.py` — helper script at project root. Run `python read_card.py companions/FOLDER/character_card.png` to pretty-print the embedded chara JSON from a PNG card.
+
+**Icon style pass (mockup — in progress):**
+- All 4 type card icons replaced with thin-line SVGs: notebook+pen (Assistant), two-person (Friend), sprout (Companion), magic wand with 4-point star (Role-play)
+- Wand has a filled parallelogram body for visible thickness/outline
+- Neutral bust silhouette added to portrait orb (180px) and wiz-orb (72px corner):
+  - 3-part design: head+hair envelope, visible neck segment, shoulder sweep
+  - Head+hair wider than bare head to suggest hair volume
+  - Shoulders fill ~80% of orb width; figure touches bottom of orb
+  - Fills ~94% of the 180px circle
+  - `_onSpeciesChange` updated to use `innerHTML` so silhouette restores when no special species selected
+
+### Pending for next session
+
+- **Icon + silhouette QA** — user hasn't seen the latest bust silhouette + sprout/wand icons yet; check proportions, tweak as needed
+- **Silhouette morphing** — full session: SVG bilinear interpolation between body variants driven by the two sliders (curvy/athletic). Gender chip → base shape variant (neutral → female/male/nb). Species could eventually drive special shapes.
+- **Full icon pass** — remaining emoji to replace: import zone arrow, adult toggle 🔞, step gate lock, species emoji in orbs (these will be replaced by silhouette variants eventually)
+- **`first_mes`** — pinned for the chara_card_v2 feature session
+- **`system_prompt` + `post_history_instructions`** — same session as first_mes
+
+---
+
 ## Session notes — 2026-04-17 #4 (Wizard session 5)
 
 **Wizard — QA fixes, memory depth wiring, PNG export, import feature, chara_card_v2 research.**
