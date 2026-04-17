@@ -173,6 +173,10 @@ async function loadStatus() {
         config.active_heartbeat = s.active_companion.heartbeat;
       }
       config.force_read_before_write = s.active_companion?.force_read_before_write ?? true;
+      // Per-companion memory settings override global (written by wizard at compile time)
+      if (s.active_companion?.memory) {
+        config.memory = { ...config.memory, ...s.active_companion.memory };
+      }
     } catch {}
 
   } catch (e) {

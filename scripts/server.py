@@ -53,7 +53,7 @@ from scripts.config import (
     write_avatar_file,
 )
 from scripts.tool_loader import get_tool, load_tools
-from wizard_compile import compile_companion
+from scripts.wizard_compile import compile_companion
 
 log = logging.getLogger(__name__)
 
@@ -862,6 +862,22 @@ async def api_wizard_compile(request: Request):
         save_config(cfg)
         get_companion_paths(result["folder"])
     return result
+
+
+# ── Wizard PNG export ─────────────────────────────────────────────────────────
+
+@app.get("/api/wizard/export/{folder}")
+async def api_wizard_export_png(folder: str):
+    """
+    Download the compiled character_card.png for a companion.
+    Written at compile time if avatar was uploaded and Pillow is available.
+    Future: also generated from wizard SVG/silhouette when no avatar is present.
+    """
+    png_path = COMPANIONS_DIR / folder / "character_card.png"
+    if not png_path.exists():
+        return JSONResponse({"ok": False, "error": "No character card found"}, status_code=404)
+    return FileResponse(str(png_path), media_type="image/png",
+                        filename=f"{folder}_character_card.png")
 
 
 # ── Factory reset ──────────────────────────────────────────────────────────────
