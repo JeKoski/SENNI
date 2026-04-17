@@ -86,24 +86,18 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 - **TTS — remaining work**
   - ~~Global enable/disable toggle~~ — **Done.** Under Settings > Server.
   - ~~Streaming audio output~~ — **Done.**
-  - CPU or GPU option — Intel Arc A750, no CUDA. Need to research if/how Kokoro runs on Arc (oneAPI/SYCL). Low priority until confirmed feasible.
+  - CPU or GPU option — switching to RTX 5060 Ti (CUDA) soon; CUDA Kokoro should work out of the box and be near-instant.
   - ~~Mood integration: map moods to voice presets (null/neutral mood = companion default; each mood can override).~~
 
 ---
 
-## Companion Creation Wizard *(in progress — see design/WIZARD.md)*
+## Companion Creation Wizard *(feature-complete MVP — see design/WIZARD.md and BACKLOG.md)*
 
-**Status:** Architecture locked, mockup started. `static/wizard.html` has Steps 1–2 working (type selection + appearance chips/sliders). Full design decisions in `design/WIZARD.md`.
+**Status:** Fully functional. Steps 1–9 complete, compile pipeline working, PNG character card export, V2 card import. Served at `/companion-wizard`.
 
-**Format:** CharacterAI V2 character card spec. Output is a PNG with companion JSON embedded in the `tEXt` chunk (key `chara`), importable by SillyTavern and the broader ecosystem. SENNI-specific data lives in `extensions.senni`.
+**What's built:** Type selection, appearance sub-steps (Foundation/Body/Face/Hair/Details) with gendered silhouettes, Outfit, Personality, Closeness, Adult, You, Memory & Growth, Review/compile. Import zone (drag PNG or JSON). Compile animation + launch. `scripts/wizard_compile.py` writes config + soul files + birth certificate + PNG card.
 
-**Next up:**
-- Appearance sub-steps (Foundation → Hair → Face → Body) with secondary mini-indicator
-- Custom SVG icons replacing emoji throughout
-- Morphing body silhouette (SVG bilinear interpolation across 4 corner body shapes)
-- Steps 3–8 (Outfit, Personality, Closeness, Adult, User, Memory & Agency)
-- The compile / reincarnation sequence UI
-- Backend: `/wizard` route, compile endpoint, PNG character card export with EXIF embedding
+**Pending:** See BACKLOG.md → Wizard Backlog section.
 
 ---
 
