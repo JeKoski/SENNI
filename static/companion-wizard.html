@@ -132,6 +132,16 @@
   }
   .type-card.selected .type-card-check { border-color: var(--indigo); background: var(--indigo); color: #fff; }
 
+  /* ── Import zone (Step 1) ── */
+  .import-divider { display: flex; align-items: center; gap: 12px; margin: 28px 0 16px; color: var(--text-dim); font-size: 11px; font-family: 'DM Mono', monospace; letter-spacing: 0.08em; width: 100%; max-width: 900px; }
+  .import-divider::before, .import-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .import-zone { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; max-width: 900px; padding: 28px 24px; border: 1.5px dashed var(--border); border-radius: 14px; cursor: pointer; text-align: center; transition: border-color 0.2s, background 0.2s; }
+  .import-zone:hover, .import-zone.drag-over { border-color: var(--indigo-hi); background: rgba(129,140,248,0.04); }
+  .import-zone.importing { opacity: 0.6; pointer-events: none; }
+  .import-zone-icon { font-size: 22px; opacity: 0.35; margin-bottom: 2px; }
+  .import-zone-label { color: var(--text-muted); font-size: 13px; }
+  .import-zone-note { color: var(--text-dim); font-size: 11px; font-family: 'DM Mono', monospace; }
+
   /* ── Adult toggle (footer) ── */
   .adult-toggle-wrap {
     display: none; align-items: center; gap: 10px; padding: 8px 14px 8px 12px;
@@ -453,6 +463,15 @@
         <div class="type-card-desc">A character in a world you define, shaped by story and imagination.</div>
       </div>
     </div>
+
+    <div class="import-divider"><span>or import an existing card</span></div>
+    <label class="import-zone" id="import-zone">
+      <input type="file" id="import-file-input" accept=".png,.json" style="display:none"
+        onchange="_handleImportFile(this.files[0]); this.value=''">
+      <div class="import-zone-icon">&#x2B06;</div>
+      <div class="import-zone-label">Drop a character card here, or click to browse</div>
+      <div class="import-zone-note">V2 character card PNG &middot; birth_certificate.json</div>
+    </label>
   </div>
 
   <!-- ════ STEP 2 — Appearance ════ -->
@@ -589,7 +608,7 @@
           </div>
           <div class="sel-section">
             <div class="sel-label">Additional details <span class="sel-label-note">optional</span></div>
-            <textarea class="wiz-textarea" placeholder="Anything else about their body or physical presence&hellip;"
+            <textarea id="wiz-body-notes" class="wiz-textarea" placeholder="Anything else about their body or physical presence&hellip;"
               oninput="_data.appearance['body-notes']=this.value.trim()||undefined"></textarea>
           </div>
         </div>
@@ -661,7 +680,7 @@
           </div>
           <div class="sel-section">
             <div class="sel-label">Additional details <span class="sel-label-note">optional</span></div>
-            <textarea class="wiz-textarea" placeholder="Anything else about their face or expressions&hellip;"
+            <textarea id="wiz-face-notes" class="wiz-textarea" placeholder="Anything else about their face or expressions&hellip;"
               oninput="_data.appearance['face-notes']=this.value.trim()||undefined"></textarea>
           </div>
         </div>
@@ -751,7 +770,7 @@
           </div>
           <div class="sel-section">
             <div class="sel-label">Additional details <span class="sel-label-note">optional</span></div>
-            <textarea class="wiz-textarea" placeholder="Scars, markings, distinguishing features&hellip;"
+            <textarea id="wiz-detail-notes" class="wiz-textarea" placeholder="Scars, markings, distinguishing features&hellip;"
               oninput="_data.appearance['detail-notes']=this.value.trim()||undefined"></textarea>
           </div>
         </div>
@@ -807,7 +826,7 @@
       </div>
       <div class="sel-section">
         <div class="sel-label">Signature item <span class="sel-label-note">optional</span></div>
-        <input type="text" class="wiz-input" placeholder="The one thing they&rsquo;re always wearing&hellip;"
+        <input id="wiz-outfit-signature" type="text" class="wiz-input" placeholder="The one thing they&rsquo;re always wearing&hellip;"
           oninput="_data.outfit['signature']=this.value.trim()||undefined"/>
       </div>
     </div>
@@ -869,12 +888,12 @@
       </div>
       <div class="sel-section">
         <div class="sel-label">Occupation <span class="sel-label-note">optional</span></div>
-        <input type="text" class="wiz-input" placeholder="What do they do?"
+        <input id="wiz-occupation" type="text" class="wiz-input" placeholder="What do they do?"
           oninput="_data.personality.occupation=this.value.trim()||undefined"/>
       </div>
       <div class="sel-section">
         <div class="sel-label">Background <span class="sel-label-note">optional</span></div>
-        <textarea class="wiz-textarea" placeholder="Their story, their world, their history&hellip;"
+        <textarea id="wiz-lore" class="wiz-textarea" placeholder="Their story, their world, their history&hellip;"
           oninput="_data.personality.lore=this.value.trim()||undefined"></textarea>
       </div>
       <div class="sel-section">
@@ -973,12 +992,12 @@
     <div class="step-content">
       <div class="sel-section">
         <div class="sel-label">Your name <span class="sel-label-note">optional</span></div>
-        <input type="text" class="wiz-input" placeholder="What should they call you?"
+        <input id="wiz-user-name" type="text" class="wiz-input" placeholder="What should they call you?"
           oninput="_data.user.name=this.value.trim()||undefined"/>
       </div>
       <div class="sel-section">
         <div class="sel-label">About you <span class="sel-label-note">optional</span></div>
-        <textarea class="wiz-textarea" style="min-height:110px" placeholder="Anything you want them to know from the very start&hellip;"
+        <textarea id="wiz-about" class="wiz-textarea" style="min-height:110px" placeholder="Anything you want them to know from the very start&hellip;"
           oninput="_data.user.about=this.value.trim()||undefined"></textarea>
       </div>
       <div class="sel-section">
@@ -1054,7 +1073,7 @@
       <div class="sel-section">
         <div class="sel-label">First things to know <span class="sel-label-note">optional</span></div>
         <p class="sel-note">These seed their memory before your first conversation &mdash; context about you or your shared world they&rsquo;ll carry from day one. Unlike &ldquo;About You&rdquo; (which becomes their profile), this writes directly into their memory store.</p>
-        <textarea class="wiz-textarea" style="min-height:100px" placeholder="Anything they should know from the very first moment&hellip;"
+        <textarea id="wiz-first-note" class="wiz-textarea" style="min-height:100px" placeholder="Anything they should know from the very first moment&hellip;"
           oninput="_data.memory.firstNote=this.value.trim()||undefined"></textarea>
       </div>
 
@@ -1957,9 +1976,176 @@ function _initChipGrids(root) {
   });
 }
 
+// ── Card import ───────────────────────────────────────────────────────────────
+
+function _extractCharaFromPng(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const view  = new DataView(buffer);
+  if (view.getUint32(0) !== 0x89504E47 || view.getUint32(4) !== 0x0D0A1A0A) return null;
+  let offset = 8;
+  while (offset + 12 <= buffer.byteLength) {
+    const length = view.getUint32(offset);
+    const type   = String.fromCharCode(bytes[offset+4], bytes[offset+5], bytes[offset+6], bytes[offset+7]);
+    if (type === 'tEXt') {
+      const data    = bytes.slice(offset + 8, offset + 8 + length);
+      const nullIdx = data.indexOf(0);
+      const keyword = new TextDecoder().decode(data.slice(0, nullIdx));
+      if (keyword === 'chara') {
+        const b64 = new TextDecoder('latin1').decode(data.slice(nullIdx + 1));
+        try { return JSON.parse(atob(b64)); } catch { return null; }
+      }
+    }
+    if (type === 'IEND') break;
+    offset += 12 + length;
+  }
+  return null;
+}
+
+async function _handleImportFile(file) {
+  if (!file) return;
+  const zone = document.getElementById('import-zone');
+  zone?.classList.add('importing');
+  try {
+    const buf = await file.arrayBuffer();
+    let card = null;
+    if (file.name.toLowerCase().endsWith('.json')) {
+      card = JSON.parse(new TextDecoder().decode(buf));
+    } else {
+      card = _extractCharaFromPng(buf);
+      if (card) {
+        // Use the PNG image itself as the avatar
+        const reader = new FileReader();
+        reader.onload = e => { _data.review.avatarData = e.target.result; };
+        reader.readAsDataURL(new Blob([buf], { type: 'image/png' }));
+      }
+    }
+    if (!card || card.spec !== 'chara_card_v2') {
+      alert('Could not read a V2 character card from this file.');
+      return;
+    }
+    _importCard(card);
+  } catch (e) {
+    alert('Import failed: ' + e.message);
+  } finally {
+    zone?.classList.remove('importing');
+  }
+}
+
+function _importCard(card) {
+  const d     = card.data || {};
+  const senni = d.extensions?.senni;
+
+  if (senni?.wizard_selections) {
+    // SENNI card — full restore from stored wizard state
+    const sel = senni.wizard_selections;
+    Object.keys(_data).forEach(k => {
+      if (sel[k] === undefined) return;
+      if (sel[k] !== null && typeof sel[k] === 'object' && !Array.isArray(sel[k])) {
+        Object.assign(_data[k], sel[k]);
+      } else {
+        _data[k] = sel[k];
+      }
+    });
+    _restoreUI();
+    _checkReady();
+    _goto(9);
+  } else {
+    // Foreign V2 card — best-effort field mapping
+    if (d.name)           _data.personality.name = d.name;
+    if (d.scenario)       _data.personality.lore = d.scenario;
+    else if (d.description) _data.personality.lore = d.description;
+    const typeMap = { assistant:'assistant', friend:'friend', companion:'companion', 'role-play':'roleplay', roleplay:'roleplay' };
+    for (const [k, v] of Object.entries(typeMap)) {
+      if ((d.tags || []).some(t => t.toLowerCase().includes(k))) { _data.type = v; break; }
+    }
+    _restoreUI();
+    _checkReady();
+    _goto(1);
+    alert(`Imported "${d.name || 'unnamed'}" from a ${d.creator || 'foreign'} card.\nAppearance and SENNI-specific fields weren't found — please fill them in.`);
+  }
+}
+
+function _restoreUI() {
+  // Type cards
+  document.querySelectorAll('.type-card').forEach(card => {
+    const m = (card.getAttribute('onclick') || '').match(/selectType\(this,'(\w+)'\)/);
+    if (m) card.classList.toggle('selected', m[1] === _data.type);
+  });
+
+  // Adult toggle
+  document.getElementById('adult-pill')?.classList.toggle('on', !!_data.adultContent);
+  document.getElementById('adult-toggle')?.classList.toggle('adult-on', !!_data.adultContent);
+
+  // All chip grids
+  document.querySelectorAll('.chip-grid[data-group]').forEach(grid => {
+    const group  = grid.dataset.group;
+    const target = grid.dataset.target || 'appearance';
+    const src    = _data[target];
+    if (!src) return;
+    const val = src[group];
+    if (val === undefined || val === null) return;
+    grid.querySelectorAll('.chip[data-val]').forEach(chip => {
+      const hit = Array.isArray(val) ? val.includes(chip.dataset.val) : chip.dataset.val === String(val);
+      chip.classList.toggle('selected', hit);
+    });
+  });
+
+  // Sliders — pass raw stored value; height needs idx→slider conversion
+  const a = _data.appearance || {};
+  const c = _data.closeness   || {};
+  if (a.age != null)              _restoreSlider('age',          a.age);
+  if (a['body-curvy'] != null)    _restoreSlider('body-curvy',   a['body-curvy']);
+  if (a['body-athletic'] != null) _restoreSlider('body-athletic',a['body-athletic']);
+  if (a['height-idx'] != null)    _restoreSlider('height',       Math.round(a['height-idx'] / 6 * 100));
+  if (c.initialCloseness != null) _restoreSlider('closeness',    c.initialCloseness);
+
+  // True age
+  const trueAgeEl = document.getElementById('true-age-input');
+  if (trueAgeEl) {
+    trueAgeEl.value = a['true-age'] || '';
+    if (a['true-age']) document.getElementById('true-age-section')?.style.removeProperty('display');
+  }
+
+  // Text inputs / textareas (those with IDs)
+  const setText = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+  setText('personality-name',     _data.personality?.name);
+  setText('wiz-occupation',       _data.personality?.occupation);
+  setText('wiz-lore',             _data.personality?.lore);
+  setText('wiz-user-name',        _data.user?.name);
+  setText('wiz-about',            _data.user?.about);
+  setText('wiz-first-note',       _data.memory?.firstNote);
+  setText('wiz-body-notes',       _data.appearance?.['body-notes']);
+  setText('wiz-face-notes',       _data.appearance?.['face-notes']);
+  setText('wiz-detail-notes',     _data.appearance?.['detail-notes']);
+  setText('wiz-outfit-signature', _data.outfit?.signature);
+
+  _updatePortrait();
+}
+
+function _restoreSlider(id, sliderVal) {
+  const el = document.getElementById(id + '-slider');
+  if (!el || sliderVal == null) return;
+  el.value = sliderVal;
+  sliderCommit(id, sliderVal);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   _initChipGrids(document);
   _updateNav();
+
+  // Import zone — drag-and-drop
+  const zone = document.getElementById('import-zone');
+  if (zone) {
+    zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', ()  => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) _handleImportFile(file);
+    });
+  }
+
   // Heartbeat frequency → reveal custom trigger section
   document.getElementById('heartbeat-freq-grid')?.addEventListener('click', e => {
     const chip = e.target.closest('.chip');

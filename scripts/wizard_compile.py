@@ -13,7 +13,7 @@ import base64
 import logging
 from pathlib import Path
 
-from config import (
+from .config import (
     COMPANIONS_DIR,
     get_companion_paths,
     save_companion_config,
@@ -124,7 +124,7 @@ def _build_config(data: dict, avatar_filename: str = "") -> dict:
             "default":           "Reflect on the conversation. Update session notes with anything important.",
             "idle":              "",
             "conversation_end":  "",
-            "session_start":     "",
+            "session_start":     "A new session is beginning. Greet the user warmly and naturally — as you would when they first arrive. Be brief and genuine.",
             "context_threshold": "",
             "manual":            "",
         },
@@ -238,6 +238,17 @@ def _build_appearance_prose(a: dict) -> str:
     elif hs:
         desc.append(f"{hs} hair")
 
+    # Distinguishing marks — skip "none" sentinel
+    marks = []
+    if a.get("makeup") and a["makeup"] != "none":
+        marks.append(f"{a['makeup']} makeup")
+    if a.get("tattoos") and a["tattoos"] != "none":
+        marks.append(f"tattoos ({a['tattoos']})")
+    if a.get("piercings") and a["piercings"] != "none":
+        marks.append(f"piercings ({a['piercings']})")
+    if marks:
+        desc.append(", ".join(marks))
+
     if intro and desc:
         sentence = intro + " with " + ", ".join(desc)
     elif intro:
@@ -267,14 +278,17 @@ def _build_companion_identity(data: dict) -> str:
         parts.append(f"*{' | '.join(meta_bits)}*\n")
 
     prose = _build_appearance_prose(a)
-    if prose or a.get("true-age") or a.get("details"):
+    _app_notes = list(filter(None, [
+        a.get("body-notes"), a.get("face-notes"), a.get("detail-notes"),
+    ]))
+    if prose or a.get("true-age") or _app_notes:
         parts.append("## Appearance\n")
         if prose:
             parts.append(prose)
         if a.get("true-age"):
             parts.append(f"True age: {a['true-age']}.")
-        if a.get("details"):
-            parts.append(a["details"])
+        for note in _app_notes:
+            parts.append(note)
         parts.append("")
 
     parts.append("## Personality\n")
@@ -293,7 +307,7 @@ def _build_companion_identity(data: dict) -> str:
         parts.append(p["lore"])
         parts.append("")
 
-    outfit_bits = [o.get("style"), o.get("signatureItem")]
+    outfit_bits = [o.get("style"), o.get("signature")]
     outfit_bits += (o.get("accessories") or []) if isinstance(o.get("accessories"), list) else []
     if any(outfit_bits):
         parts.append("## Default Outfit\n")
@@ -302,8 +316,8 @@ def _build_companion_identity(data: dict) -> str:
         if o.get("accessories"):
             acc = o["accessories"] if isinstance(o["accessories"], list) else [o["accessories"]]
             parts.append("**Accessories:** " + ", ".join(acc))
-        if o.get("signatureItem"):
-            parts.append(f"**Signature item:** {o['signatureItem']}")
+        if o.get("signature"):
+            parts.append(f"**Signature item:** {o['signature']}")
         parts.append("")
 
     rel_types = cl.get("relationshipType") or []
@@ -315,6 +329,25 @@ def _build_companion_identity(data: dict) -> str:
         if cl.get("initialCloseness") is not None:
             parts.append(f"**Starting closeness:** {int(cl['initialCloseness'])}%")
         parts.append("")
+
+    if data.get("adultContent"):
+        ad = data.get("adult", {})
+        ad_bits = [ad.get("role"), ad.get("initiation"), ad.get("intensity"),
+                   ad.get("interests"), ad.get("notes")]
+        if any(ad_bits):
+            parts.append("## Intimacy\n")
+            if ad.get("role"):
+                parts.append(f"**Role:** {ad['role']}")
+            if ad.get("initiation"):
+                parts.append(f"**Initiation:** {ad['initiation']}")
+            if ad.get("intensity"):
+                parts.append(f"**Intensity:** {ad['intensity']}")
+            if ad.get("interests"):
+                interests = ad["interests"] if isinstance(ad["interests"], list) else [ad["interests"]]
+                parts.append("**Interests:** " + ", ".join(interests))
+            if ad.get("notes"):
+                parts.append(ad["notes"])
+            parts.append("")
 
     first_note = data.get("memory", {}).get("firstNote")
     if first_note:
@@ -407,7 +440,7 @@ def _write_character_card_png(folder: str, bc: dict, avatar_data: str) -> bool:
         img.save(str(out), "PNG", pnginfo=meta)
         return True
     except ImportError:
-        log.debug("Pillow not installed — skipping PNG character card export")
+        log.warning("Pillow not installed — PNG character card skipped (pip install Pillow to enable)")
         return False
     except Exception as e:
         log.warning("PNG card export failed: %s", e)

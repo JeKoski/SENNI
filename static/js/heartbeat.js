@@ -169,8 +169,20 @@ async function heartbeatFire(trigger) {
       const text = response.trim();
       const skip = text === '[skip]' || text.toLowerCase() === '[skip]';
 
-      // No output — remove the pill
-      if (skip && pill) pill.remove();
+      // No output — remove the pill and any streamed bubble
+      if (skip) {
+        if (pill) pill.remove();
+        // Streaming renders the bubble before we can check for [skip], so remove it
+        if (typeof streamWasRendered === 'function' && streamWasRendered()) {
+          const rows = document.querySelectorAll('.msg-row.companion');
+          if (rows.length) rows[rows.length - 1].remove();
+          // Pop the history entry streaming added
+          if (conversationHistory?.length &&
+              conversationHistory[conversationHistory.length - 1].role === 'assistant') {
+            conversationHistory.pop();
+          }
+        }
+      }
 
       if (c.message_enabled && !skip) {
         // callModel → _streamFinalReply already rendered the bubble and pushed

@@ -12,6 +12,9 @@ beautifulsoup4>=4.12 # web_scrape
 chromadb>=0.5.0                      # vector store
 sentence-transformers>=3.0.0         # all-MiniLM-L6-v2 embeddings (~90MB download on first run)
 
+# Character card PNG export (optional — wizard compile writes PNG character cards with embedded JSON)
+Pillow>=10.0.0
+
 # TTS (optional — installed separately via Aurini or manually)
 # kokoro
 # soundfile

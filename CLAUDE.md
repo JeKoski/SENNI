@@ -156,6 +156,57 @@ Bugs are grouped by area. Where a fix should be bundled with a feature, that is 
 
 ---
 
+## Session notes — 2026-04-17 #4 (Wizard session 5)
+
+**Wizard — QA fixes, memory depth wiring, PNG export, import feature, chara_card_v2 research.**
+
+### What changed
+
+**Bug fixes (found during QA):**
+- `ModuleNotFoundError: No module named 'wizard_compile'` — `server.py` had bare `from wizard_compile import`; fixed to `from scripts.wizard_compile import`. Matching pattern used by `tool_loader`.
+- `ModuleNotFoundError: No module named 'config'` (secondary) — `wizard_compile.py` used bare `from config import` which breaks when imported as part of the `scripts` package. Fixed to `from .config import` (relative import).
+- **Pillow silent failure** — PNG not embedded without any visible error. `log.debug` → `log.warning` with `pip install Pillow` hint.
+- **`companion_identity.md` missing fields** — note key mismatches (`details` vs `body-notes`/`face-notes`/`detail-notes`), missing makeup/tattoos/piercings, no `## Intimacy` section. All fixed in `_build_companion_identity()` and `_build_appearance_prose()`.
+- **`signatureItem` key mismatch** — wizard writes `_data.outfit['signature']`, compile read `o.get("signatureItem")`. Fixed to `o.get("signature")`.
+- **`[skip]` heartbeat visible as companion message** — streaming renders the bubble before the post-stream skip check. Fixed in `heartbeat.js`: when skip detected + streaming rendered, removes last `.msg-row.companion` DOM element and pops `conversationHistory`.
+- **Session start heartbeat returning `[skip]`** — empty `session_start` instruction fell through to "Reflect on conversation" prompt which produces `[skip]` on a fresh companion. Fixed: set proper `"Greet the user warmly..."` instruction at compile time.
+
+**New features:**
+- **Memory depth → per-companion config** — `wizard_compile.py` now writes `memory: { session_start_k, mid_convo_k }` to `config.json` via `DEPTH_MAP`. `memory_server.py` reads per-companion values in `api_memory_init`, falls back to global. `chat.js` `loadStatus()` merges per-companion memory settings into `config.memory`, so `_assocInterval()` picks up `mid_convo_k` automatically.
+- **PNG export route** — `GET /api/wizard/export/{folder}` added to `server.py`. Serves `character_card.png` from companion folder (404 if not present). Requires avatar + Pillow at compile time.
+- **`+ Create` button** — `chat.html`: `+ New` changed to `+ Create`, routes to `/companion-wizard`.
+- **Pillow added to `requirements.txt`** — under "Character card PNG export (optional)" section.
+
+**Import feature (complete):**
+- Import zone added to Step 1 HTML (below type grid) with drag-and-drop + click-to-browse.
+- Pure-JS PNG binary parser `_extractCharaFromPng(buffer)` — reads tEXt chunks, extracts `chara` key, base64-decodes to V2 card JSON.
+- `_handleImportFile(file)` — routes `.png`/`.json`, extracts PNG avatar as data URL for companion upload.
+- `_importCard(card)` — SENNI V2 cards: full restore from `extensions.senni.wizard_selections` → navigates to step 9. Foreign V2 cards: best-effort name/lore/type mapping → navigates to step 1 with alert.
+- `_restoreUI()` — restores type cards, adult toggle, all chip grids (by `data-group`/`data-target`), all sliders (height-idx needs `Math.round(idx / 6 * 100)` conversion), true age section, all 9 text inputs/textareas (by ID).
+- `_restoreSlider(id, sliderVal)` — sets slider element value and calls `sliderCommit()` to sync data + portrait.
+- IDs added to 9 previously anonymous inputs: `wiz-body-notes`, `wiz-face-notes`, `wiz-detail-notes`, `wiz-occupation`, `wiz-lore`, `wiz-user-name`, `wiz-about`, `wiz-first-note`, `wiz-outfit-signature`.
+
+**Research / Design:**
+- `design/CHARA_CARD.md` — new file. Full chara_card_v2 field reference + SENNI mapping, system prompt injection architecture, first_mes design, soul file best practices for instruction-tuned models, character book 3-tier design, standalone wizard + Tauri architecture section, new features checklist.
+- Added to design folder index in CLAUDE.md.
+
+### Key architecture decisions
+
+- **Wizard stays integrated** (not standalone Tauri) for now. Tauri architecture documented in `CHARA_CARD.md` for when the wizard is feature-complete.
+- **"Sennify" concept** — import any V2 character card, wizard pre-populates what it can, user refines, recompiles as a proper SENNI companion.
+- **DEPTH_MAP** in `wizard_compile.py`: `light→(3,2)`, `balanced→(6,4)`, `deep→(10,2)` for `(session_start_k, mid_convo_k)`.
+
+### Pending for next session
+
+- **`first_mes` feature** — design documented in `CHARA_CARD.md`. Store in `config.json`, inject as the first companion bubble on every new chat. Not yet implemented.
+- **`system_prompt` + `post_history_instructions`** — design documented, not yet implemented.
+- **`output_dir` parameter refactor** in `wizard_compile.py` — prerequisite for standalone distribution. Documented, not coded.
+- **Morphing body silhouette** — SVG bilinear interpolation in 2b Body. Own session.
+- **Custom SVG icons** — emoji placeholders throughout wizard.
+- **Import QA** — test round-trip: compile SENNI card → export PNG → drag into fresh wizard → verify all fields restore → recompile.
+
+---
+
 ## Session notes — 2026-04-17 #3
 
 **Wizard — UX refinements, backend compile, archetype fix.**
@@ -758,6 +809,7 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 | `design/ORB_DESIGN.md` | Orb positioning, layout modes, CSS variable documentation |
 | `design/MOOD.md` | Mood system — full design + implementation notes. Config schema, default moods, orb schema translation, tool hook pending. Updated 2026-04-13 #4. |
 | `design/WIZARD.md` | Companion Creation Wizard — V2 character card format, Birth Certificate architecture, step flow, appearance sub-steps, morphing silhouette plan. Updated 2026-04-16 #7. |
+| `design/CHARA_CARD.md` | Chara card V2 field reference, SENNI alignment, soul file best practices, system_prompt/post_history_instructions architecture, first_mes feature, character_book/lorebook design. Updated 2026-04-17. |
 
 When starting a session that touches any of these systems, search project knowledge for the relevant design doc rather than asking the user to explain it.
 
