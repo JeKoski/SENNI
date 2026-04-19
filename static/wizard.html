@@ -88,8 +88,7 @@
       <!-- ── STEP: Intro (first screen — Senni introduces the app) ──────────── -->
       <div class="wiz-step active" id="step-intro">
         <h1 class="step-heading intro-heading">Your local<br><em>AI companion.</em></h1>
-        <p class="step-sub">No cloud. No subscriptions. Just Senni, running entirely on your own PC.</p>
-        <button class="btn-primary" onclick="startSetup()" style="align-self:flex-start">Get started →</button>
+        <button class="btn-primary" onclick="startSetup()">Get started →</button>
       </div>
 
       <!-- ── STEP: System check ─────────────────────────────────────────────── -->
@@ -141,37 +140,88 @@
 
         <div class="field-section">
           <span class="field-label">Your hardware</span>
-          <div class="gpu-row">
-            <div class="gpu-chip" data-gpu="nvidia" onclick="selectGPU(this)">
-              <div class="gpu-dot" style="background:#76c442"></div>NVIDIA
+
+          <!-- Step 1: GPU or CPU? -->
+          <div class="hw-cat-row">
+            <div class="hw-cat-card" id="hw-cat-gpu" onclick="selectHWCategory('gpu')">
+              <svg class="hw-cat-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 7V5m4 2V5m4 2V5m4 2V5M6 17v2m4-2v2m4-2v2m4-2v2"/></svg>
+              <div class="hw-cat-name">Graphics Card</div>
+              <div class="hw-cat-sub">NVIDIA, AMD, or Intel Arc</div>
             </div>
-            <div class="gpu-chip" data-gpu="amd" onclick="selectGPU(this)">
-              <div class="gpu-dot" style="background:#e05a3a"></div>AMD <span style="font-size:11px;opacity:0.6">(Vulkan)</span>
-            </div>
-            <div class="gpu-chip" data-gpu="intel" onclick="selectGPU(this)">
-              <div class="gpu-dot" style="background:#6496f5"></div>Intel Arc
-            </div>
-            <div class="gpu-chip" data-gpu="cpu" onclick="selectGPU(this)">
-              <div class="gpu-dot" style="background:#888"></div>CPU only
+            <div class="hw-cat-card" id="hw-cat-cpu" onclick="selectHWCategory('cpu')">
+              <svg class="hw-cat-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2m6-2v2M9 20v2m6-2v2M2 9h2m-2 6h2m18-6h-2m2 6h-2"/></svg>
+              <div class="hw-cat-name">No GPU — CPU only</div>
+              <div class="hw-cat-sub">Works on any hardware</div>
             </div>
           </div>
-          <div class="detected-note" id="detected-note">
+
+          <!-- Detected note -->
+          <div class="detected-note" id="detected-note" style="display:none">
             <span style="color:var(--green)">✓</span>
             <span id="detected-label"></span>
           </div>
-          <div style="font-size:12px;color:var(--text-dim);margin-top:-6px;margin-bottom:12px">
-            Not sure? Pick <strong style="color:var(--text-muted)">CPU</strong> — it works on any hardware. You can switch later in Settings.
-          </div>
-        </div>
 
-        <div class="info-note" id="amd-rocm-note" style="display:none">
-          <div class="info-note-icon">ⓘ</div>
-          <div class="info-note-body">
-            <strong>Want better AMD performance?</strong>
-            ROCm is AMD's native GPU runtime and can significantly improve speed, but requires a separate install.
-            The Vulkan build works well for most users and needs no extra setup.
-            <a href="https://rocm.docs.amd.com" target="_blank" class="info-link">Learn about ROCm →</a>
+          <!-- Step 2: GPU brand (visible when GPU selected) -->
+          <div id="hw-brands" class="gpu-row" style="display:none">
+            <div class="gpu-chip gpu-brand-chip" data-brand="nvidia" onclick="selectGPUBrand('nvidia')"><div class="gpu-dot" style="background:#76c442"></div>NVIDIA</div>
+            <div class="gpu-chip gpu-brand-chip" data-brand="amd"    onclick="selectGPUBrand('amd')">   <div class="gpu-dot" style="background:#e05a3a"></div>AMD</div>
+            <div class="gpu-chip gpu-brand-chip" data-brand="intel"  onclick="selectGPUBrand('intel')"> <div class="gpu-dot" style="background:#6496f5"></div>Intel Arc</div>
+            <div class="gpu-chip gpu-brand-chip" data-brand="other"  onclick="selectGPUBrand('other')"> <div class="gpu-dot" style="background:#888"></div>Other</div>
           </div>
+
+          <!-- Step 3: Build variant cards (visible when brand selected) -->
+          <div id="hw-builds" style="display:none">
+
+            <div id="hw-opts-nvidia" class="model-list">
+              <div class="model-card" data-build="cuda" onclick="selectBuildCard(this,'cuda')">
+                <div class="model-card-top"><span class="model-name">CUDA</span><span class="model-badge recommended">Recommended</span></div>
+                <span class="model-desc">Native NVIDIA acceleration. Best performance for NVIDIA cards.</span>
+              </div>
+              <div class="model-card" data-build="vulkan" onclick="selectBuildCard(this,'vulkan')">
+                <div class="model-card-top"><span class="model-name">Vulkan</span><span class="model-badge fallback">Fallback</span></div>
+                <span class="model-desc">Works on any GPU. Use if CUDA gives you trouble.</span>
+              </div>
+            </div>
+
+            <div id="hw-opts-amd" class="model-list" style="display:none">
+              <div class="model-card" data-build="vulkan" onclick="selectBuildCard(this,'vulkan')">
+                <div class="model-card-top"><span class="model-name">Vulkan</span><span class="model-badge recommended">Recommended</span></div>
+                <span class="model-desc">Best option for AMD without extra setup. Good performance.</span>
+              </div>
+              <div class="info-note" style="margin-top:4px;margin-bottom:0">
+                <div class="info-note-icon">ⓘ</div>
+                <div class="info-note-body"><strong>Want better AMD performance?</strong> ROCm is AMD's native runtime and can significantly improve speed, but requires a separate install. Vulkan works well for most users. <a href="https://rocm.docs.amd.com" target="_blank" class="info-link">Learn about ROCm →</a></div>
+              </div>
+            </div>
+
+            <div id="hw-opts-intel" class="model-list" style="display:none">
+              <div class="model-card" data-build="sycl" onclick="selectBuildCard(this,'sycl')">
+                <div class="model-card-top"><span class="model-name">SYCL</span><span class="model-badge recommended">Recommended</span></div>
+                <span class="model-desc">Best performance on Intel Arc. Requires Intel oneAPI Runtime to be installed.</span>
+              </div>
+              <div class="model-card" data-build="vulkan" onclick="selectBuildCard(this,'vulkan')">
+                <div class="model-card-top"><span class="model-name">Vulkan</span><span class="model-badge fallback">No extras needed</span></div>
+                <span class="model-desc">Works without oneAPI. Slightly lower performance but simpler setup.</span>
+              </div>
+            </div>
+
+            <div id="hw-opts-other" class="model-list" style="display:none">
+              <div class="model-card" data-build="vulkan" onclick="selectBuildCard(this,'vulkan')">
+                <div class="model-card-top"><span class="model-name">Vulkan</span><span class="model-badge recommended">Recommended</span></div>
+                <span class="model-desc">Broad GPU support. Works on most graphics hardware without extra drivers.</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- CPU-only build (visible when CPU selected) -->
+          <div id="hw-cpu-note" class="model-list" style="display:none">
+            <div class="model-card" data-build="cpu" onclick="selectBuildCard(this,'cpu')">
+              <div class="model-card-top"><span class="model-name">CPU build</span><span class="model-badge fallback">No GPU needed</span></div>
+              <span class="model-desc">Runs on any hardware. Slower than GPU builds, but reliable everywhere.</span>
+            </div>
+          </div>
+
         </div>
 
         <div class="field-section">
@@ -183,6 +233,7 @@
             </div>
             <button class="btn-secondary" onclick="browseFile('binary')">Browse</button>
           </div>
+          <div class="file-path-display" id="engine-path-display" style="display:none"></div>
           <button class="btn-download" id="engine-dl-btn" onclick="downloadEngine()" disabled>
             <span id="engine-dl-label">Select your hardware above, then download</span>
           </button>
@@ -212,7 +263,7 @@
         <!-- Download tab -->
         <div id="model-dl-tab">
           <div class="model-list">
-            <div class="model-card" data-model="gemma-4-e4b" onclick="selectModelCard(this)">
+            <div class="model-card" data-model="gemma4-e4b-q4km" onclick="selectModelCard(this)">
               <div class="model-card-top">
                 <span class="model-name">Gemma 4 E4B</span>
                 <span class="model-badge recommended">Recommended</span>
@@ -224,7 +275,7 @@
                 <span class="model-time">~10 min on average connection</span>
               </div>
             </div>
-            <div class="model-card" data-model="qwen-3.5-9b" onclick="selectModelCard(this)">
+            <div class="model-card" data-model="qwen35-9b-q4km" onclick="selectModelCard(this)">
               <div class="model-card-top">
                 <span class="model-name">Qwen 3.5 9B</span>
                 <span class="model-badge capable">More capable</span>

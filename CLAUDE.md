@@ -137,6 +137,78 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-19 #3 (Setup Wizard UI polish)
+
+**Hardware selection redesign, system check continue button, intro cleanup, engine path display, continue button fix.**
+
+### What changed
+
+**wizard.html:**
+- Intro step: removed redundant sub paragraph (Senni's speech covers it), button centered
+- Engine step: replaced flat gpu-row with 2-level hardware selection — category cards (Graphics Card / No GPU), brand chips (NVIDIA/AMD/Intel Arc/Other), build variant cards (reuse model-card style)
+- Engine file section: added `engine-path-display` div showing `dim-dir/` + `green-filename` after chip
+
+**wizard.css:**
+- `.hw-cat-row`, `.hw-cat-card`, `.hw-cat-icon`, `.hw-cat-name`, `.hw-cat-sub` — category card styles
+- `.model-badge.fallback` — grey badge for Fallback/No GPU/No extras
+- `.file-path-display`, `.path-dir`, `.path-file` — split path display
+- Fade-up animation on brand/build sections
+
+**wizard.js:**
+- State: replaced `selectedGPU` with `hwCategory`, `gpuBrand`, `selectedBuild`; added `_checkDestination`, `_lastDetected`
+- `selectGPU()` → `selectHWCategory()`, `selectGPUBrand()`, `selectBuildCard()`, `_updateEngineDlBtn()`
+- `setDetectedGPU()` → `setDetectedHW(gpu, buildType)` — auto-selects all 3 levels from status API response
+- `CONTINUE_MAP` now includes `check` step (enabled once `_checkDestination` set)
+- `navContinue()` handles check step via `_proceedFromCheck()`
+- `runSystemCheck()` sets `_checkDestination` / `_lastDetected` + calls `_refreshContinue()` instead of auto-navigating
+- `_updateFooter()` now clears `visibility:hidden` on continue button (was set on init, never cleared — root cause of "no continue after download" bug)
+- `setFileDisplay()` populates `engine-path-display` for binary type
+- `browseFile()` passes `initial_dir` to `/api/browse` when path already known
+- `downloadEngine()` sends `build_type: selectedBuild` instead of `gpu_type: selectedGPU`
+- `_startBoot()` updated from `selectedGPU` → `gpuBrand`
+
+**server.py:**
+- `_run_file_dialog()` accepts `initialdir` param; only applied if path exists on disk
+- `api_browse` extracts `initial_dir` from request body and passes it through
+
+---
+
+## Session notes — 2026-04-19 #2 (Setup Wizard backend wiring)
+
+**All 4 `/api/setup/` endpoints live. `/wizard` route fixed. First-run detection updated.**
+
+### What changed
+
+**`scripts/setup_router.py` created (new APIRouter, included in server.py):**
+- `GET /api/setup/status` — binary path + exists, model path + exists, GPU detection, build type, oneAPI present
+- `GET /api/setup/models` — MODELS list (easy to extend: add entries at top of file)
+- `POST /api/setup/download-binary` — fetches latest llama.cpp release from GitHub, finds right asset via BINARY_PATTERNS dict, downloads with SSE progress (queue-based threading), extracts to `./llama/`, saves path to config
+- `POST /api/setup/download-model` — downloads GGUF from HuggingFace with SSE progress, saves to `./models/`, saves path to config
+- GPU → build type mapping: nvidia→cuda, intel→sycl (with oneAPI fallback to vulkan), amd→vulkan, cpu→cpu
+- SSE format: `{type: "progress"|"status"|"done"|"error", ...}`
+
+**`server.py` changes (3 surgical edits):**
+- Setup router included at top (before TTS/memory routers)
+- `GET /wizard` route added — fixes the Settings → About → Re-run wizard 404
+- `/` root route updated: checks `model_path` exists on disk instead of `first_run` flag
+
+**`static/js/wizard.js` changes:**
+- `runSystemCheck()` updated to call `/api/setup/status` (new field names: `gpu`, `binary_found`, `binary_path`, `model_found`)
+- `downloadEngine()` — real SSE download replacing stub
+- `startModelDownload()` — real SSE download with AbortController for cancel
+- `_streamPost()` helper added — generic POST + SSE stream consumer
+- `_formatSpeed()` helper added — formats bytes/sec to human-readable
+
+**`static/wizard.html`:**
+- Model card `data-model` IDs updated to match MODELS list IDs (`gemma4-e4b-q4km`, `qwen35-9b-q4km`)
+
+### Known pending (Phase 1)
+- `_installExtras()` in wizard.js still a stub — needs `/api/setup/install-extras` endpoint (pip install kokoro/chromadb + SSE)
+- Senni companion folder not yet created
+- End-to-end test on clean install
+
+---
+
 ## Session notes — 2026-04-19 (Setup Wizard redesign)
 
 **Full ground-up redesign of `static/wizard.html` + companion CSS/JS. Distribution roadmap planned.**
