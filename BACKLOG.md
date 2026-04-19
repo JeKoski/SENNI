@@ -7,11 +7,41 @@ Update at end of each session. Completed items get deleted, not struck through.
 
 ## High Priority
 
-- Making installation and updating easy (design session needed)
-  - We need to prioritize actually getting the app out ther
-  - Main app is functional, Wizard is functional etc.
-  - We'll figure out any UX quirks while we do this (start-up wizard probably needs a redo as well, or perhaps we'll move its functionality to the installer/launcher)
-  - Launcher? Wrapper? No clue. App should have a standard installer for installing everything so that regular people can start using it.
+### Tauri distribution — phased roadmap
+
+Goal: zero-dependency install for end users. Double-click → runs. Auto-updates. No terminal, no Python knowledge required.
+
+**Architecture decision (2026-04-19):**
+- No separate launcher app. Aurini concept absorbed into SENNI.
+- Tauri wraps the existing web UI in a native shell. Python backend runs as a PyInstaller-compiled sidecar.
+- Frontend (HTML/CSS/JS) is served by FastAPI as today — no frontend recompile needed for UI updates.
+- Release flow: `git tag vX.Y.Z && git push --tags` → GitHub Actions builds Windows + Linux binaries → auto-update notification to existing users.
+- Code signing: apply for **SignPath Foundation** (free for OSS) — eliminates Windows SmartScreen warning.
+
+**Phase 1 — First-run setup wizard** *(pre-Tauri, ships with Python)*
+Visual redesign + step structure complete (`wizard.html` / `wizard.css` / `wizard.js` rewritten 2026-04-19).
+Remaining Phase 1 work:
+- Wire up 4 backend endpoints: `/api/setup/status`, `/api/setup/download-binary`, `/api/setup/models`, `/api/setup/download-model` (all currently stubs)
+- `main.py` first-run detection: redirect `/` to `/setup` if no binary or no model found
+- Checksum verify on downloads
+- Senni companion folder (`companions/senni/`) — create with config + avatar so Meet Senni step shows real portrait
+
+**Phase 2 — PyInstaller sidecar**
+Compile Python backend (`main.py` + all scripts + static files) into a single binary via PyInstaller.
+- Windows: `senni-backend.exe`
+- Linux: `senni-backend`
+- GitHub Actions build step — never compiled manually
+- Prerequisite for Phase 3
+
+**Phase 3 — Tauri shell**
+Tauri wraps the webview, manages the Python sidecar, provides tray icon + window chrome.
+- Webview points to `http://localhost:8000` (same as browser today)
+- Sidecar: the PyInstaller binary from Phase 2
+- Auto-updater wired to GitHub Releases
+- GitHub Actions builds full Tauri package for Windows (.msi / .exe) and Linux (.AppImage)
+- `output_dir` refactor in `wizard_compile.py` prerequisite for clean packaging
+
+*Note: macOS not a current target. Requires Apple Developer account ($99/yr) for notarization.*
 
 ---
 
@@ -53,7 +83,8 @@ Update at end of each session. Completed items get deleted, not struck through.
 
 *Too open-ended to task out. Need a dedicated design conversation first.*
 
-- **Main Chat UI redesign** — "smoother, fuller, cozier". Known starting points: sidebar companion state card (mood, recent memory), memory viewer/editor panel. Wizard has established the visual language — good time to apply it. See `design/FEATURES.md` → Sidebar/UI section.
+- **Startup wizard — backend wiring** — visual redesign complete (2026-04-19). Next: wire the 4 `/api/setup/` endpoints and `main.py` first-run redirect. See `design/SETUP_WIZARD.md` → Backend requirements.
+- **Main Chat UI redesign** — "smoother, fuller, cozier". The companion wizard has established the visual language — now apply it to the main app. Known starting points: sidebar companion state card (mood, recent memory), memory viewer/editor panel. Do this before Tauri so the app Tauri wraps is already polished. See `design/FEATURES.md` → Sidebar/UI section.
 - **Memory viewer/editor** — browse/edit/delete soul/, mind/, and ChromaDB notes. Duplicate dedup UI. Can roll into chat UI design session. See `design/FEATURES.md` → Memory section.
 - **Closeness/relationship progression** — may become gamified (develop closeness over time). Wizard closeness step is partially blocked on this.
 - **Companion Templates rework** — templates need redesigning to fit memory system + Wizard + Mood. See `design/FEATURES.md` → Companion section.
@@ -82,4 +113,4 @@ Update at end of each session. Completed items get deleted, not struck through.
 - **TTS upgrade** — newer realistic TTS models (Qwen Audio etc.) worth evaluating once new PC is up. Kokoro on CPU is too slow on current i5-7600K; CUDA on 5060 Ti should be near-instant.
 - **App Sounds** — Just an idea right now. App has only TTS, no other audio. Would add a lot of ambiance and polish.
 - **Cozy Mode** — full sensory layer (lighting, ambient sounds, warm orb). Wishlist, needs visual/interaction design. See `design/FEATURES.md` → Cozy Mode.
-- **Standalone Wizard / Tauri** — architecture documented in `design/CHARA_CARD.md`. Not started.
+- **Tauri shell (Phase 3)** — waiting on Phase 1 + 2. See Tauri roadmap in High Priority.
