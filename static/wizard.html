@@ -3,145 +3,397 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Companion — Setup</title>
+  <title>SENNI — Setup</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/wizard.css"/>
 </head>
 <body>
-<div class="page">
-  <div class="card">
 
-    <div class="dots">
-      <div class="dot active" id="dot-0"></div>
-      <div class="dot"        id="dot-1"></div>
-      <div class="dot"        id="dot-2"></div>
-    </div>
-
-    <!-- ── STEP 0: Model + hardware ──────────────────────────────────── -->
-    <div class="step visible" id="step-0">
-      <div class="eyebrow">Setup — 1 of 2</div>
-      <h1>Let's find your<br><em>model file.</em></h1>
-      <p class="subtitle">
-        Click <strong style="color:var(--text)">Browse</strong> to open a file picker,
-        or use <strong style="color:var(--text)">Scan</strong> to search common locations.
-      </p>
-
-      <span class="field-label">Model file (.gguf)</span>
-      <!-- File chip — shows selected file like attachment chips in chat -->
-      <div class="file-chip-row" id="model-chip-row">
-        <div class="file-chip empty" id="model-chip" onclick="browseFile('model')">
-          <span class="file-chip-icon">📦</span>
-          <span class="file-chip-name" id="model-chip-name">Click to select…</span>
-        </div>
-        <button class="btn-secondary" id="scan-btn" onclick="scanForModels()" style="margin-left:8px;flex-shrink:0">
-          Scan
-        </button>
-      </div>
-      <div class="scan-results" id="scan-results"></div>
-
-      <div class="divider"></div>
-
-      <div class="toggle-row" onclick="toggleMultimodal()">
-        <div class="toggle-track" id="mm-toggle"><div class="toggle-thumb"></div></div>
-        <span class="toggle-label">
-          <strong>Multimodal</strong> — enable image support (requires an mmproj file)
-        </span>
-      </div>
-
-      <div class="mmproj-section" id="mmproj-section">
-        <span class="field-label" style="margin-bottom:9px">Vision projector (mmproj)</span>
-        <div class="file-chip-row">
-          <div class="file-chip empty" id="mmproj-chip" onclick="browseFile('mmproj')">
-            <span class="file-chip-icon">🔭</span>
-            <span class="file-chip-name" id="mmproj-chip-name">Click to select…</span>
-          </div>
-        </div>
-        <div id="mmproj-candidates-wrap" style="display:none">
-          <div style="font-size:11.5px;color:var(--text-muted);margin:8px 0 6px">
-            Possible matches in same folder:
-          </div>
-          <div id="mmproj-candidate-list"></div>
-        </div>
-        <p class="mmproj-note">
-          Must match your model's embedding size exactly.
-          A mismatch will prevent the model from loading.
-        </p>
-      </div>
-
-      <div class="divider"></div>
-
-      <span class="field-label">GPU</span>
-      <div class="detected-note" id="detected-note">✓ <span id="detected-label"></span></div>
-      <div class="gpu-row">
-        <div class="gpu-chip" data-gpu="intel"  onclick="selectGPU(this)"><div class="gpu-dot" style="background:#6496f5"></div>Intel Arc</div>
-        <div class="gpu-chip" data-gpu="nvidia" onclick="selectGPU(this)"><div class="gpu-dot" style="background:#76c442"></div>NVIDIA</div>
-        <div class="gpu-chip" data-gpu="amd"    onclick="selectGPU(this)"><div class="gpu-dot" style="background:#e05a3a"></div>AMD</div>
-        <div class="gpu-chip" data-gpu="cpu"    onclick="selectGPU(this)"><div class="gpu-dot" style="background:#888"></div>CPU only</div>
-      </div>
-
-      <div class="adv-toggle" onclick="toggleAdv(this)">
-        <span class="chevron">›</span> Advanced settings
-      </div>
-      <div class="adv-fields">
-        <span class="field-label">GPU layers (ngl)</span>
-        <input type="number" id="ngl" value="99" min="0" max="999"/>
-        <span class="field-label">Ports</span>
-        <div class="adv-row">
-          <div>
-            <span class="field-label" style="margin-bottom:4px">Bridge</span>
-            <input type="number" id="port-bridge" value="8000"/>
-          </div>
-          <div>
-            <span class="field-label" style="margin-bottom:4px">Model server</span>
-            <input type="number" id="port-model" value="8081"/>
-          </div>
-        </div>
-      </div>
-
-      <div class="error-msg" id="err-0"></div>
-      <div class="btn-row">
-        <button class="btn-primary" id="btn-start" onclick="startBoot()" disabled>
-          Start it up →
-        </button>
-      </div>
-    </div>
-
-    <!-- ── STEP 1: Boot ───────────────────────────────────────────────── -->
-    <div class="step" id="step-1">
-      <div class="boot-wrap">
-        <div class="boot-ring" id="boot-ring"></div>
-        <div class="eyebrow" id="boot-eyebrow" style="text-align:center;margin-bottom:10px">Starting up</div>
-        <h1 style="text-align:center;margin-bottom:20px">Bringing your<br><em>companion online…</em></h1>
-      </div>
-      <div class="boot-log" id="boot-log">
-        <span style="color:var(--text-dim)">Waiting for llama-server…</span>
-      </div>
-      <div class="error-msg" id="err-1"></div>
-      <div class="btn-row" id="boot-next-row" style="display:none">
-        <button class="btn-primary" onclick="goTo(2)">Say hello →</button>
-      </div>
-    </div>
-
-    <!-- ── STEP 2: Ready ──────────────────────────────────────────────── -->
-    <div class="step" id="step-2">
-      <div class="ready-icon">✦</div>
-      <div class="eyebrow">Ready</div>
-      <h1>Your companion<br>is <em>waiting for you.</em></h1>
-      <p class="subtitle">
-        Everything's running. Head into chat — they'll introduce themselves
-        and get to know you from there.
-      </p>
-      <div class="btn-row">
-        <button class="btn-primary" onclick="window.location.href='/chat'">Open chat →</button>
-      </div>
-    </div>
-
-  </div>
+<!-- ── Background ──────────────────────────────────────────────────────────── -->
+<div class="bg-layer">
+  <div class="bg-mesh"></div>
+  <div class="bg-grain"></div>
+  <div class="bg-grid"></div>
 </div>
 
-<!-- Native file inputs for model/mmproj — open GNOME Files / OS picker -->
+<!-- ── Top nav ─────────────────────────────────────────────────────────────── -->
+<nav class="wiz-nav">
+  <div class="wiz-logo">SENNI</div>
+  <div class="wiz-steps" id="wiz-steps">
+    <div class="step-item" id="nav-engine">
+      <div class="wiz-step-dot" id="dot-engine">01</div>
+      <div class="step-item-label">Engine</div>
+    </div>
+    <div class="wiz-step-line"></div>
+    <div class="step-item" id="nav-model">
+      <div class="wiz-step-dot" id="dot-model">02</div>
+      <div class="step-item-label">Model</div>
+    </div>
+    <div class="wiz-step-line"></div>
+    <div class="step-item" id="nav-extras">
+      <div class="wiz-step-dot" id="dot-extras">03</div>
+      <div class="step-item-label">Features</div>
+    </div>
+    <div class="wiz-step-line"></div>
+    <div class="step-item" id="nav-boot">
+      <div class="wiz-step-dot" id="dot-boot">04</div>
+      <div class="step-item-label">Start up</div>
+    </div>
+  </div>
+  <div class="wiz-nav-spacer"></div>
+</nav>
+
+<!-- ── Stage ───────────────────────────────────────────────────────────────── -->
+<div class="wiz-stage">
+
+  <!-- wiz-pair: Senni + content together, centered on screen.
+       Gets .intro class on the intro step (column layout, Senni prominent) -->
+  <div class="wiz-pair intro" id="wiz-pair">
+
+    <!-- ── Senni guide panel ────────────────────────────────────────────────── -->
+    <aside class="senni-panel" id="senni-panel">
+
+      <!-- Full app-style orb (glow + breath + ring + dots) -->
+      <div class="senni-orb-wrap" id="senni-orb-wrap">
+        <div class="senni-orb-dots" id="senni-orb-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="senni-orb-body" id="senni-orb-body">
+          <div class="senni-orb-ring" id="senni-orb-ring"></div>
+          <div class="senni-orb-icon" id="senni-orb-icon">
+            <!-- Replaced with avatar img when companions/senni/ exists -->
+            <div class="senni-placeholder"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="senni-name">Senni</div>
+      <div class="senni-mood">
+        <div class="senni-mood-dot" id="senni-mood-dot"></div>
+        <span class="senni-mood-label" id="senni-mood-label">Warm</span>
+      </div>
+
+      <!-- Chat bubble: Senni is "saying" this -->
+      <div class="senni-bubble" id="senni-bubble">
+        <p class="senni-speech-text" id="senni-speech-text">Hi. Let's get you set up — it won't take long.</p>
+      </div>
+
+    </aside>
+
+    <!-- ── Step content ─────────────────────────────────────────────────────── -->
+    <div class="wiz-content">
+
+      <!-- ── STEP: Intro (first screen — Senni introduces the app) ──────────── -->
+      <div class="wiz-step active" id="step-intro">
+        <h1 class="step-heading intro-heading">Your local<br><em>AI companion.</em></h1>
+        <p class="step-sub">No cloud. No subscriptions. Just Senni, running entirely on your own PC.</p>
+        <button class="btn-primary" onclick="startSetup()" style="align-self:flex-start">Get started →</button>
+      </div>
+
+      <!-- ── STEP: System check ─────────────────────────────────────────────── -->
+      <div class="wiz-step" id="step-check">
+        <div class="step-eyebrow">Starting up</div>
+        <h1 class="step-heading">Checking your<br><em>setup…</em></h1>
+        <div class="check-list">
+          <div class="check-item" id="chk-gpu">
+            <div class="check-icon" id="chk-gpu-icon"><div class="mini-spin"></div></div>
+            <div class="check-text">
+              <span class="check-label">Detecting your GPU</span>
+              <span class="check-sub" id="chk-gpu-sub"></span>
+            </div>
+          </div>
+          <div class="check-item" id="chk-engine">
+            <div class="check-icon" id="chk-engine-icon"><div class="mini-spin"></div></div>
+            <div class="check-text">
+              <span class="check-label">Looking for AI engine</span>
+              <span class="check-sub" id="chk-engine-sub"></span>
+            </div>
+          </div>
+          <div class="check-item" id="chk-model">
+            <div class="check-icon" id="chk-model-icon"><div class="mini-spin"></div></div>
+            <div class="check-text">
+              <span class="check-label">Looking for a model</span>
+              <span class="check-sub" id="chk-model-sub"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STEP: Welcome back ─────────────────────────────────────────────── -->
+      <div class="wiz-step" id="step-welcome">
+        <div class="step-eyebrow">Welcome back</div>
+        <h1 class="step-heading">Everything looks<br><em>good to go.</em></h1>
+        <p class="step-sub">Your setup is complete. Jump straight in, or reconfigure your engine and model first.</p>
+        <div class="summary-chips" id="welcome-chips"></div>
+        <div class="step-actions">
+          <button class="btn-ghost" onclick="goTo('engine')">Reconfigure</button>
+          <button class="btn-primary" onclick="startBoot()">Start up →</button>
+        </div>
+      </div>
+
+      <!-- ── STEP: AI Engine ────────────────────────────────────────────────── -->
+      <div class="wiz-step" id="step-engine">
+        <div class="step-eyebrow">Step 1 of 4 — AI Engine</div>
+        <h1 class="step-heading">Let's get your<br><em>AI engine.</em></h1>
+        <p class="step-sub">A small program (~15 MB) that runs AI locally on your PC. We'll grab the right build for your hardware.</p>
+
+        <div class="field-section">
+          <span class="field-label">Your hardware</span>
+          <div class="gpu-row">
+            <div class="gpu-chip" data-gpu="nvidia" onclick="selectGPU(this)">
+              <div class="gpu-dot" style="background:#76c442"></div>NVIDIA
+            </div>
+            <div class="gpu-chip" data-gpu="amd" onclick="selectGPU(this)">
+              <div class="gpu-dot" style="background:#e05a3a"></div>AMD <span style="font-size:11px;opacity:0.6">(Vulkan)</span>
+            </div>
+            <div class="gpu-chip" data-gpu="intel" onclick="selectGPU(this)">
+              <div class="gpu-dot" style="background:#6496f5"></div>Intel Arc
+            </div>
+            <div class="gpu-chip" data-gpu="cpu" onclick="selectGPU(this)">
+              <div class="gpu-dot" style="background:#888"></div>CPU only
+            </div>
+          </div>
+          <div class="detected-note" id="detected-note">
+            <span style="color:var(--green)">✓</span>
+            <span id="detected-label"></span>
+          </div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:-6px;margin-bottom:12px">
+            Not sure? Pick <strong style="color:var(--text-muted)">CPU</strong> — it works on any hardware. You can switch later in Settings.
+          </div>
+        </div>
+
+        <div class="info-note" id="amd-rocm-note" style="display:none">
+          <div class="info-note-icon">ⓘ</div>
+          <div class="info-note-body">
+            <strong>Want better AMD performance?</strong>
+            ROCm is AMD's native GPU runtime and can significantly improve speed, but requires a separate install.
+            The Vulkan build works well for most users and needs no extra setup.
+            <a href="https://rocm.docs.amd.com" target="_blank" class="info-link">Learn about ROCm →</a>
+          </div>
+        </div>
+
+        <div class="field-section">
+          <span class="field-label">Engine file</span>
+          <div class="file-chip-row" id="engine-chip-row">
+            <div class="file-chip empty" id="engine-chip" onclick="browseFile('binary')">
+              <span class="file-chip-icon">⚙️</span>
+              <span class="file-chip-name" id="engine-chip-name">Click to select…</span>
+            </div>
+            <button class="btn-secondary" onclick="browseFile('binary')">Browse</button>
+          </div>
+          <button class="btn-download" id="engine-dl-btn" onclick="downloadEngine()" disabled>
+            <span id="engine-dl-label">Select your hardware above, then download</span>
+          </button>
+          <div class="dl-progress" id="engine-dl-progress" style="display:none">
+            <div class="dl-bar"><div class="dl-fill" id="engine-dl-fill"></div></div>
+            <div class="dl-meta">
+              <span class="dl-status" id="engine-dl-status">Downloading…</span>
+              <span class="dl-eta" id="engine-dl-eta"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="error-msg" id="err-engine"></div>
+      </div>
+
+      <!-- ── STEP: Model ────────────────────────────────────────────────────── -->
+      <div class="wiz-step" id="step-model">
+        <div class="step-eyebrow">Step 2 of 4 — Model</div>
+        <h1 class="step-heading">Now for the<br><em>brain.</em></h1>
+        <p class="step-sub">A model is the AI itself — a file your engine loads and runs, all on your own PC.</p>
+
+        <div class="model-tabs">
+          <button class="model-tab active" id="tab-download" onclick="switchModelTab('download')">Download a model</button>
+          <button class="model-tab" id="tab-browse" onclick="switchModelTab('browse')">I already have one</button>
+        </div>
+
+        <!-- Download tab -->
+        <div id="model-dl-tab">
+          <div class="model-list">
+            <div class="model-card" data-model="gemma-4-e4b" onclick="selectModelCard(this)">
+              <div class="model-card-top">
+                <span class="model-name">Gemma 4 E4B</span>
+                <span class="model-badge recommended">Recommended</span>
+              </div>
+              <span class="model-desc">SENNI's primary model. Fast, capable, and great at being a companion.</span>
+              <div class="model-meta">
+                <span class="model-size">~3 GB</span>
+                <span class="model-dot">·</span>
+                <span class="model-time">~10 min on average connection</span>
+              </div>
+            </div>
+            <div class="model-card" data-model="qwen-3.5-9b" onclick="selectModelCard(this)">
+              <div class="model-card-top">
+                <span class="model-name">Qwen 3.5 9B</span>
+                <span class="model-badge capable">More capable</span>
+              </div>
+              <span class="model-desc">Better reasoning and more expressive. Needs more memory or VRAM.</span>
+              <div class="model-meta">
+                <span class="model-size">~5.5 GB</span>
+                <span class="model-dot">·</span>
+                <span class="model-time">~18 min on average connection</span>
+              </div>
+            </div>
+            <div class="model-card-note">Larger models coming soon — pending hardware testing.</div>
+          </div>
+          <div class="dl-progress" id="model-dl-progress" style="display:none">
+            <div class="dl-bar"><div class="dl-fill" id="model-dl-fill"></div></div>
+            <div class="dl-meta">
+              <span class="dl-status" id="model-dl-status">Downloading…</span>
+              <span class="dl-eta" id="model-dl-eta"></span>
+            </div>
+            <button class="btn-cancel" onclick="cancelModelDownload()">Cancel download</button>
+          </div>
+          <div class="step-actions" id="model-dl-actions">
+            <div></div>
+            <button class="btn-primary" id="btn-model-dl-next" onclick="startModelDownload()" disabled>Download →</button>
+          </div>
+        </div>
+
+        <!-- Browse tab -->
+        <div id="model-browse-tab" style="display:none">
+          <div class="file-chip-row" id="model-chip-row">
+            <div class="file-chip empty" id="model-chip" onclick="browseFile('model')">
+              <span class="file-chip-icon">📦</span>
+              <span class="file-chip-name" id="model-chip-name">Click to select…</span>
+            </div>
+            <button class="btn-secondary" id="scan-btn" onclick="scanForModels()">Scan</button>
+          </div>
+          <div class="scan-results" id="scan-results"></div>
+
+          <div class="toggle-row" onclick="toggleMultimodal()" style="margin-top:8px">
+            <div class="toggle-track" id="mm-toggle"><div class="toggle-thumb"></div></div>
+            <span class="toggle-label"><strong>Multimodal</strong> — enable image support (requires an mmproj file)</span>
+          </div>
+          <div class="mmproj-section" id="mmproj-section">
+            <span class="field-label" style="margin-bottom:9px">Vision projector (mmproj)</span>
+            <div class="file-chip-row">
+              <div class="file-chip empty" id="mmproj-chip" onclick="browseFile('mmproj')">
+                <span class="file-chip-icon">🔭</span>
+                <span class="file-chip-name" id="mmproj-chip-name">Click to select…</span>
+              </div>
+            </div>
+            <div id="mmproj-candidates-wrap" style="display:none">
+              <div style="font-size:11.5px;color:var(--text-muted);margin:8px 0 6px">Possible matches in same folder:</div>
+              <div id="mmproj-candidate-list"></div>
+            </div>
+            <p class="mmproj-note">Must match your model's embedding size exactly.</p>
+          </div>
+          <div class="error-msg" id="err-model"></div>
+        </div>
+      </div>
+
+      <!-- ── STEP: Extras ───────────────────────────────────────────────────── -->
+      <div class="wiz-step" id="step-extras">
+        <div class="step-eyebrow">Step 3 of 4 — Features</div>
+        <h1 class="step-heading">A couple of<br><em>optional extras.</em></h1>
+        <p class="step-sub">Both are recommended. You can change these anytime in Settings.</p>
+
+        <div class="feature-list">
+          <div class="feature-card enabled" id="feat-tts" onclick="toggleFeature('tts')">
+            <div class="feature-card-inner">
+              <div class="feature-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                </svg>
+              </div>
+              <div class="feature-text">
+                <div class="feature-name">Voice responses</div>
+                <div class="feature-desc">I can speak to you out loud using Kokoro TTS — runs locally, no internet needed once set up.</div>
+                <div class="feature-size">~300 MB download</div>
+              </div>
+              <div class="toggle-track on" id="tts-toggle"><div class="toggle-thumb"></div></div>
+            </div>
+          </div>
+
+          <div class="feature-card enabled" id="feat-memory" onclick="toggleFeature('memory')">
+            <div class="feature-card-inner">
+              <div class="feature-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+              </div>
+              <div class="feature-text">
+                <div class="feature-name">Memory</div>
+                <div class="feature-desc">I'll remember our conversations across sessions. Everything stays on your PC — nothing leaves your machine.</div>
+                <div class="feature-size">Small install</div>
+              </div>
+              <div class="toggle-track on" id="memory-toggle"><div class="toggle-thumb"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dl-progress" id="extras-dl-progress" style="display:none">
+          <div class="dl-bar"><div class="dl-fill" id="extras-dl-fill"></div></div>
+          <div class="dl-meta">
+            <span class="dl-status" id="extras-dl-status">Installing…</span>
+            <span class="dl-eta" id="extras-dl-eta"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STEP: Boot ─────────────────────────────────────────────────────── -->
+      <div class="wiz-step" id="step-boot">
+        <div class="step-eyebrow">Step 4 of 4 — Starting up</div>
+        <div class="boot-wrap">
+          <div class="boot-ring" id="boot-ring"></div>
+          <h1 class="step-heading" style="text-align:center">Bringing your<br><em>companion online…</em></h1>
+        </div>
+        <div class="boot-log" id="boot-log">
+          <span style="color:var(--text-dim)">Waiting for AI engine…</span>
+        </div>
+        <div class="error-msg" id="err-boot"></div>
+        <div class="step-actions" id="boot-next-row" style="display:none">
+          <div></div>
+          <button class="btn-primary" onclick="goTo('meet')">Say hello →</button>
+        </div>
+      </div>
+
+      <!-- ── STEP: Meet Senni ───────────────────────────────────────────────── -->
+      <div class="wiz-step" id="step-meet">
+        <div class="step-eyebrow">All set</div>
+        <h1 class="step-heading">Ready to<br><em>get started.</em></h1>
+        <p class="step-sub" style="margin-bottom:40px">Your companion is waiting. Chat with Senni right now, or take a few minutes to design your own first.</p>
+
+        <div class="meet-card" onclick="meetSenni()">
+          <div class="meet-card-portrait" id="meet-card-portrait">
+            <div class="meet-orb-ring"></div>
+            <div class="meet-portrait" id="meet-portrait">
+              <div class="senni-placeholder"></div>
+            </div>
+          </div>
+          <div class="meet-card-body">
+            <div class="meet-name">Senni</div>
+            <div class="meet-tagline">Your guide, companion, and AI — ready when you are.</div>
+            <button class="btn-primary meet-btn">Chat with Senni →</button>
+          </div>
+        </div>
+
+        <div class="meet-divider">or</div>
+        <button class="btn-create-own" onclick="window.location.href='/companion-wizard'">
+          Design your own companion →
+        </button>
+      </div>
+
+    </div><!-- /wiz-content -->
+  </div><!-- /wiz-pair -->
+</div><!-- /wiz-stage -->
+
+<!-- ── Footer ──────────────────────────────────────────────────────────────── -->
+<footer class="wiz-footer">
+  <div class="wiz-footer-left">
+    <button class="btn-back-nav" id="btn-back" onclick="navBack()" style="visibility:hidden">← Back</button>
+  </div>
+  <div class="wiz-footer-center">
+    <span class="step-counter" id="step-counter"></span>
+  </div>
+  <div class="wiz-footer-right">
+    <button class="btn-primary" id="btn-continue" onclick="navContinue()" style="display:none">Continue →</button>
+  </div>
+</footer>
+
 <input type="file" id="pick-model"  accept=".gguf" style="display:none" onchange="onNativePick(this,'model')"/>
 <input type="file" id="pick-mmproj" accept=".gguf" style="display:none" onchange="onNativePick(this,'mmproj')"/>
 <script src="/static/js/wizard.js"></script>

@@ -6,6 +6,7 @@ Search for it using project knowledge before doing anything else.
 ---
 
 ## Session Flow
+
 1. Start session with CLAUDE.md
 2. Check BACKLOG.md for what's next
 3. Surgical work happens (Claude reads files directly — no uploads needed)
@@ -16,11 +17,13 @@ Search for it using project knowledge before doing anything else.
 
 - **Modular Architecture:** We should work towards making everything modular - within reason - while creating new code and also noting down possible refactors when going over old code. Adding, editing or replacing small or large components shouldn't require edits across multiple files. Creating separate helper scripts when functionality repeats will help with consistency and bug fixing.
 - **Simplicity and efficiency** — are to be prioritized when it makes sense. Overengineering is to be avoided.
-- **Prefer surgical edits** — use targeted find-and-replace edits for most changes. Full file rewrites are fine for large refactors where most of the file is changing. The old "complete files only" rule was a Web UI workaround — Claude Code applies edits directly, so partial edits are no longer a problem.
+- **Prefer surgical edits** — use targeted find-and-replace edits for most changes. Full file rewrites are fine for large refactors where most of the file is changing. The old "complete files only" rule was a Web UI workaround — Claude Code applies edits directly, so partial edits are no longer a problem. Every changed line should trace directly to the user's request. Don't "improve" adjacent code, comments, or formatting unless asked. If unrelated dead code is spotted, mention it — don't delete it.
 - **One file at a time** where possible. Flag upfront if a feature will require touching multiple files and get agreement before proceeding.
+- **Surface tradeoffs, don't pick silently** — if multiple valid approaches exist, name them and let Jesse choose. If a simpler path exists than what was asked for, say so. If something is unclear, stop and ask rather than assuming.
 - **Stop and check in** if things start going wrong rather than pushing through. Escalating complexity when stuck makes things worse.
 - **Never ask the user to remember to do things** at specific times — ADHD means this won't work. Automate it or build it into existing flows instead.
 - **Suggest Extended Thinking** and/or Opus when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
+- **Goal-driven execution** — for any non-trivial task, define success criteria upfront before writing code. e.g. "Fix the scenario field" → "wizard_compile.py outputs correct scenario value; round-trip import restores it." Verifiable goals enable looping to completion without constant check-ins.
 - **End every session by updating CLAUDE.md, BACKLOG.md, and any relevant design docs.** This is non-negotiable — it's what makes the next session productive.
 
 ---
@@ -30,6 +33,7 @@ Search for it using project knowledge before doing anything else.
 SENNI is a local AI companion framework. Currently running with Gemma 4 E4B Q4_K_M, Intel Arc A750 GPU.
 
 Two servers:
+
 - **Python bridge** (`scripts/server.py`) — FastAPI, handles UI, tools, config. Needs terminal restart for changes.
 - **llama-server** — the model itself. Can be restarted in-app.
 
@@ -55,6 +59,7 @@ Companion config lives in `companions/<folder>/config.json`.
 Global config in `config.json` at project root.
 
 Key companion config fields:
+
 - `avatar_path` — orb avatar filename (e.g. `"avatar.jpg"`), relative to companion folder
 - `sidebar_avatar_path` — sidebar portrait avatar filename (e.g. `"sidebar_avatar.jpg"`). Falls back to `avatar_path` if not set.
 - `presence_presets` — dict of preset name → per-state dict `{ thinking:{...}, idle:{...}, ... }`
@@ -66,19 +71,23 @@ Key companion config fields:
 - `last_consolidated_at` — timestamp for crash-recovery consolidation
 
 Key global config fields:
+
 - `memory.enabled` — master switch for the ChromaDB memory system (default: `True`)
 - `memory.mid_convo_k` — how many notes the associative trigger surfaces (default: `4`)
 - `memory.session_start_k` — how many notes to surface at session start (default: `6`)
 
 ### Presence preset config values — important
+
 Presence presets store **real CSS values**: seconds for speeds, pixels for sizes, 0.0–1.0 floats for alpha. The 0–100 slider scale in the UI is a display-layer conversion only. `orb.js` always receives and applies real CSS values directly — do not change this. Same applies to mood config values.
 
 ### Tool distinction (important for system prompt clarity)
+
 - `memory` tool → soul/ and mind/ **markdown file** read/write
 - `write_memory` / `retrieve_memory` / `supersede_memory` / `update_relational_state` → **ChromaDB** episodic store only
 - `set_mood` → writes `active_mood` to companion config; orb + pill update via tool call hook (see MOOD.md)
 
 ### Zep-style temporal chaining
+
 When a fact changes, the companion calls `supersede_memory` with the old note's ID. The old note is marked `superseded_by` and excluded from future retrieval. The new note carries a `supersedes` back-reference.
 
 ---
@@ -86,6 +95,7 @@ When a fact changes, the companion calls `supersede_memory` with the old note's 
 ## Companion portability
 
 Copying a companion folder between installs:
+
 - **Safe to copy:** `soul/`, `mind/`, `config.json` — fully portable
 - **Do NOT copy:** `memory_store/` (ChromaDB, path-dependent and binary), `memory_meta.json` (install-specific consolidation state)
 
@@ -127,6 +137,61 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-19 (Setup Wizard redesign)
+
+**Full ground-up redesign of `static/wizard.html` + companion CSS/JS. Distribution roadmap planned.**
+
+### What changed
+
+**Tauri distribution roadmap (BACKLOG.md):**
+
+- Architecture decision: no separate launcher. Tauri wraps existing web UI, Python as PyInstaller sidecar.
+- Phase 1 = setup wizard expansion (this session). Phase 2 = PyInstaller sidecar. Phase 3 = Tauri shell.
+- SignPath Foundation (free OSS) for Windows code signing — eliminates SmartScreen warning.
+- Aurini concept absorbed into SENNI. No separate project.
+
+**`design/SETUP_WIZARD.md` created** — full spec:
+
+- Fullscreen two-column layout (Senni panel 260px left, content flex-1 right)
+- Per-step Senni speech + mood + color table
+- GPU→binary mapping (NVIDIA→CUDA, Intel Arc→SYCL, AMD→Vulkan, CPU→CPU)
+- Installable components: llama-server, model, Kokoro TTS (optional), ChromaDB memory (optional)
+- Default models: Gemma 4 E4B Q4_K_M (recommended ~3GB), Qwen 3.5 9B Q4_K_M (more capable ~5.5GB)
+- Meet Senni final step — prominent Chat button + secondary "Create your own" chip
+- Backend endpoints needed: `/api/setup/status`, `/api/setup/download-binary`, `/api/setup/models`, `/api/setup/download-model`
+
+**`static/wizard.html` full rewrite:**
+
+- Fullscreen layout matching companion wizard visual language exactly
+- Steps: check → welcome → engine → model → extras → boot → meet
+- Senni guide panel: animated portrait placeholder (crimson→violet gradient), mood chip (dot + label), per-step Lora italic speech
+- Step-extras: TTS + Memory feature cards with SVG icons, both default ON
+- Step-meet: meet-card (portrait placeholder + "Chat with Senni" button) + "Design your own companion →" secondary chip
+- Nav: 4 numbered dots (Engine / Model / Features / Start up)
+
+**`static/css/wizard.css` full rewrite:**
+
+- Root vars: `--senni-ring`, `--senni-glow`, `--text-bright`, `--purple`
+- Animations: `meshShift`, `senniRingPulse`, `moodPulse`, `speechFadeIn`, `stepIn`, `popIn`
+- `.senni-placeholder` gradient: crimson (#be123c) → violet (#7c3aed), matches Senni's actual hair colors
+- All companion-wizard layout patterns ported in
+
+**`static/js/wizard.js` full rewrite:**
+
+- `SENNI_GUIDE` object: per-step mood name, hex color, speech text
+- `goTo(name)` — centralized navigation: updates step visibility, Senni panel, nav dots, footer state, triggers `_startBoot()` when entering boot
+- **Fixed**: `goTo()` was defined twice (first def was dead code). Merged into single clean definition.
+- State: `currentStep`, `selectedGPU`, `enginePath`, `modelPath`, `mmprojPath`, `multimodal`, `featTts`, `featMemory`
+- All engine/model/extras downloads are stubs pending Phase 1 backend wiring
+
+### Known pending
+
+- Phase 1 backend wiring: 4 `/api/setup/` endpoints (all stubs currently)
+- Senni companion folder (`companions/senni/`) not yet created — placeholder orb used
+- Main Chat UI redesign should happen before Tauri wrapping
+
+---
+
 ## Session notes — 2026-04-17 #6 (Wizard session 7)
 
 **Wizard — Inkscape-traced silhouettes (female/male/neutral), SVG gen tool, gender chip wiring, icon pass.**
@@ -134,16 +199,19 @@ Copying a companion folder between installs:
 ### What changed
 
 **Inkscape silhouette workflow:**
+
 - Hand-coded SVG bust attempts all produced hourglass shapes → pivoted to Inkscape Trace Bitmap (multicolor mode) → Path > Union → Plain SVG export
 - User got 4 reference images from Grok (2 male variants, 1 female long hair, 1 neutral)
 - Resulting paths embedded as constants: `_SILHOUETTE_PATH` (female), `_MALE_PATH`, `_NEUTRAL_PATH`
 
 **ViewBox values (QA confirmed):**
+
 - Female: `"20 20 115 154"` — A4 space mm units, head ~7px from top at 155px wide
 - Male: `"265 198 340 420"`
 - Neutral: `"0 195 848 960"` — full canvas width
 
 **Gender chip wiring:**
+
 - `_getSilhouette()` reads `_data.appearance.gender` → returns correct SVG string
 - `_updatePortrait()` calls `_getSilhouette()` — gender switching automatic, no extra hook needed
 - `_onSpeciesChange` calls `_getSilhouette()` so silhouette restores to correct gender when special species deselected
@@ -151,17 +219,20 @@ Copying a companion folder between installs:
 - Small orb: `width: 64px; margin-top: 6px`
 
 **Icon pass (complete — species deferred):**
+
 - Import zone: upload arrow SVG
 - Adult toggle: crescent moon SVG
 - Step gate: padlock SVG
 - Species emoji (elf/vampire/etc.) deferred — will use color-shifting short-term, silhouette variants long-term
 
 **SVG gen tool (functional, parked):**
+
 - `svg_gen_server.py` + `svg_gen.html` at project root
 - Standalone FastAPI on port 8082, boots llama-server on 8083
 - Run: `python svg_gen_server.py --model "path/to/model.gguf"` (needs chat-template model)
 
 **Docs:**
+
 - `BACKLOG.md` created — single source of truth for all pending work, replaces "Pending for next session" and "Design sessions needed" in CLAUDE.md
 
 ---
@@ -173,6 +244,7 @@ Copying a companion folder between installs:
 ### What changed
 
 **Import QA fixes:**
+
 - Custom chip values not restoring → `_restoreUI()` now detects values without matching static chip
 - Adult chips not restoring → `_renderStep6()` restores from `_data.adult` after `_initChipGrids(el)`
 - Heartbeat + memory toggles not restoring → `_restoreUI()` syncs toggle states and panel visibility
@@ -182,9 +254,11 @@ Copying a companion folder between installs:
 - `avatarData` in `wizard_selections` → stripped at compile time (PNG image is the avatar, no double-embed)
 
 **New utility:**
+
 - `read_card.py` — `python read_card.py companions/FOLDER/character_card.png` to inspect embedded chara JSON
 
 **Icon style pass:**
+
 - All 4 type card icons: notebook+pen (Assistant), two-person (Friend), sprout+ellipse (Companion), wand+star (Role-play)
 - Neutral bust silhouette in portrait orb and wiz-orb corner
 
@@ -194,17 +268,18 @@ Copying a companion folder between installs:
 
 Large design decisions live in `design/` as standalone docs. These are NOT loaded into context automatically — search project knowledge when you need them.
 
-| File | Contents |
-|------|----------|
-| `BACKLOG.md` | All pending work — quick wins, design sessions, on-hold items. Check this at session start. |
-| `design/ARCHITECTURE.md` | Modularity plan, completed refactors, planned modules, script/stylesheet load orders. |
-| `design/BOOT.md` | Boot & process lifecycle, TOCTOU problem, per-OS path resolution, file browsing via tkinter |
-| `design/SYSTEMS.md` | Current state: Orb, Presence, Heartbeat, Companion window, Settings dirty tracking, Chat tabs, Vision mode, associative memory pill |
-| `design/TTS.md` | Kokoro TTS architecture, config schema, Aurini integration boundary, what's done/pending |
-| `design/FEATURES.md` | All planned features and changes, grouped by area |
-| `design/MEMORY.md` | Full memory architecture — primitives, composites, primitive_ratios, retrieval, consolidation, ChromaDB stack. |
-| `design/COMPANION_STACK.md` | Cognitive function stack format, O+J axis pairing, charge as directionality, stack position as probability. |
-| `design/ORB_DESIGN.md` | Orb positioning, layout modes, CSS variable documentation |
-| `design/MOOD.md` | Mood system — full design + implementation notes. Config schema, default moods, orb schema translation. |
-| `design/WIZARD.md` | Companion Creation Wizard — V2 character card format, Birth Certificate architecture, step flow, appearance sub-steps. |
-| `design/CHARA_CARD.md` | Chara card V2 field reference, SENNI alignment, soul file best practices, first_mes, system_prompt, character_book/lorebook design. |
+| File                        | Contents                                                                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKLOG.md`                | All pending work — quick wins, design sessions, on-hold items. Check this at session start.                                         |
+| `design/ARCHITECTURE.md`    | Modularity plan, completed refactors, planned modules, script/stylesheet load orders.                                               |
+| `design/BOOT.md`            | Boot & process lifecycle, TOCTOU problem, per-OS path resolution, file browsing via tkinter                                         |
+| `design/SYSTEMS.md`         | Current state: Orb, Presence, Heartbeat, Companion window, Settings dirty tracking, Chat tabs, Vision mode, associative memory pill |
+| `design/TTS.md`             | Kokoro TTS architecture, config schema, Aurini integration boundary, what's done/pending                                            |
+| `design/FEATURES.md`        | All planned features and changes, grouped by area                                                                                   |
+| `design/MEMORY.md`          | Full memory architecture — primitives, composites, primitive_ratios, retrieval, consolidation, ChromaDB stack.                      |
+| `design/COMPANION_STACK.md` | Cognitive function stack format, O+J axis pairing, charge as directionality, stack position as probability.                         |
+| `design/ORB_DESIGN.md`      | Orb positioning, layout modes, CSS variable documentation                                                                           |
+| `design/MOOD.md`            | Mood system — full design + implementation notes. Config schema, default moods, orb schema translation.                             |
+| `design/SETUP_WIZARD.md`    | Setup wizard — step flow, GPU→binary mapping, animation principles, backend endpoints needed.                                       |
+| `design/WIZARD.md`          | Companion Creation Wizard — V2 character card format, Birth Certificate architecture, step flow, appearance sub-steps.              |
+| `design/CHARA_CARD.md`      | Chara card V2 field reference, SENNI alignment, soul file best practices, first_mes, system_prompt, character_book/lorebook design. |
