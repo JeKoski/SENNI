@@ -20,7 +20,7 @@ const BACK_MAP = { model: 'engine', extras: 'model', boot: 'extras' };
 const CONTINUE_MAP = {
   check:  { label: 'Continue \u2192', enabledFn: () => !!_checkDestination },
   engine: { label: 'Continue \u2192', enabledFn: () => !!enginePath },
-  model:  { label: 'Continue \u2192', enabledFn: () => activeModelTab === 'browse' ? !!modelPath : !!selectedModelCard },
+  model:  { label: 'Continue \u2192', enabledFn: () => !_modelDownloading && (activeModelTab === 'browse' ? !!modelPath : !!selectedModelCard) },
   extras: { label: 'Set up features \u2192', enabledFn: () => true },
 };
 
@@ -52,7 +52,7 @@ function goTo(name) {
   _updateNav(name);
   _updateFooter(name);
   if (name === 'boot') _startBoot();
-  if (name === 'meet') setTimeout(_animateMeetPortrait, 80);
+  if (name === 'meet') { setTimeout(_animateMeetPortrait, 80); _initMeetStep(); }
 }
 
 function navBack() {
@@ -346,9 +346,12 @@ function selectModelCard(el) {
 }
 
 let _modelDownloadAbort = null;
+let _modelDownloading   = false;
 
 async function startModelDownload() {
-  if (!selectedModelCard) return;
+  if (!selectedModelCard || _modelDownloading) return;
+  _modelDownloading = true;
+  document.getElementById('btn-continue').disabled = true;
   document.getElementById('model-dl-actions').style.display = 'none';
   document.querySelectorAll('.model-card').forEach(c => c.style.pointerEvents = 'none');
 
@@ -387,9 +390,11 @@ async function startModelDownload() {
 
 function cancelModelDownload() {
   if (_modelDownloadAbort) { _modelDownloadAbort.abort(); _modelDownloadAbort = null; }
+  _modelDownloading = false;
   document.getElementById('model-dl-progress').style.display = 'none';
   document.getElementById('model-dl-actions').style.display = 'flex';
   document.querySelectorAll('.model-card').forEach(c => c.style.pointerEvents = '');
+  _refreshContinue();
 }
 
 // ── Extras / feature toggles ──────────────────────────────────────────────
@@ -405,12 +410,36 @@ function toggleFeature(feat) {
   }
 }
 
-function _installExtras() {
+async function _installExtras() {
   if (!featTts && !featMemory) { goTo('boot'); return; }
-  const prog = document.getElementById('extras-dl-progress');
+  const prog   = document.getElementById('extras-dl-progress');
+  const fill   = document.getElementById('extras-dl-fill');
+  const status = document.getElementById('extras-dl-status');
+  const eta    = document.getElementById('extras-dl-eta');
   prog.style.display = 'block';
   document.getElementById('btn-continue').disabled = true;
-  _stubProgress('extras-dl-fill', 'extras-dl-status', 'extras-dl-eta', () => goTo('boot'));
+
+  await _streamPost(
+    '/api/setup/install-extras',
+    { tts: featTts, memory: featMemory },
+    (msg) => {
+      if (fill) fill.style.width = msg.pct + '%';
+    },
+    (msg) => {
+      if (status) status.textContent = msg.label || 'Installing\u2026';
+      if (eta && msg.step && msg.total) eta.textContent = `${msg.step} of ${msg.total}`;
+    },
+    () => {
+      if (fill)   fill.style.width   = '100%';
+      if (status) status.textContent = 'Done \u2713';
+      if (eta)    eta.textContent    = '';
+      setTimeout(() => goTo('boot'), 600);
+    },
+    (msg) => {
+      if (status) status.textContent = '\u2717 ' + (msg.message || 'Install failed');
+      document.getElementById('btn-continue').disabled = false;
+    },
+  );
 }
 
 // ── Multimodal ────────────────────────────────────────────────────────────
@@ -605,7 +634,11 @@ async function _startBoot() {
   try { await fetch('/api/shutdown-model', { method: 'POST' }); } catch {}
   const res = await fetch('/api/setup', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ model_path: modelPath, mmproj_path: multimodal ? mmprojPath : '', gpu_type: gpuBrand, ngl: 99, port_bridge: 8000, port_model: 8081 })
+    body: JSON.stringify({
+      model_path: modelPath, mmproj_path: multimodal ? mmprojPath : '',
+      gpu_type: gpuBrand, ngl: 99, port_bridge: 8000, port_model: 8081,
+      tts_enabled: featTts, memory_enabled: featMemory,
+    })
   });
   if (!res.ok) { showError('err-boot', 'Could not save config. Is the server running?'); return; }
   await fetch('/api/boot', { method: 'POST' });
@@ -633,10 +666,67 @@ function streamBootLog() {
       ring.classList.add('done'); ring.textContent = '\u2713'; ring.style.display = 'flex';
       const ok = document.createElement('div'); ok.className='log-ok'; ok.textContent='\u2713 Server is ready';
       logEl.appendChild(ok); logEl.scrollTop = logEl.scrollHeight;
-      document.getElementById('boot-next-row').style.display = 'flex';
+      if (featTts) {
+        _bootStartTts(logEl).then(() => { document.getElementById('boot-next-row').style.display = 'flex'; });
+      } else {
+        document.getElementById('boot-next-row').style.display = 'flex';
+      }
     }
   };
   es.onerror = () => { es.close(); showError('err-boot', 'Lost connection to boot log. Check Settings \u2192 Server if the issue persists.'); };
+}
+
+async function _bootStartTts(logEl) {
+  function _logLine(cls, text) {
+    const div = document.createElement('div');
+    div.className = cls; div.textContent = text;
+    logEl.appendChild(div); logEl.scrollTop = logEl.scrollHeight;
+  }
+  _logLine('log-info', '\u203a Starting voice system\u2026');
+  try {
+    const res  = await fetch('/api/tts/start', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      _logLine('log-ok', '\u2713 Voice ready');
+    } else {
+      _logLine('log-warn', '  Voice unavailable \u2014 ' + (data.reason || data.error || 'unknown'));
+    }
+  } catch {
+    _logLine('log-warn', '  Voice startup failed');
+  }
+}
+
+function _initMeetStep() {
+  const btn = document.getElementById('hear-senni-btn');
+  if (btn) btn.style.display = featTts ? 'inline-flex' : 'none';
+}
+
+async function hearSenni() {
+  const btn = document.getElementById('hear-senni-btn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Loading\u2026';
+  try {
+    const res = await fetch('/api/tts/speak', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text:   "Hi there. I'm Senni. It's good to finally meet you.",
+        voices: { af_heart: 1.0 },
+        speed:  1.0, lang: 'a',
+      }),
+    });
+    if (res.ok && res.headers.get('content-type')?.includes('audio')) {
+      const url   = URL.createObjectURL(await res.blob());
+      const audio = new Audio(url);
+      btn.textContent = '\u266a Playing\u2026';
+      audio.onended = () => { URL.revokeObjectURL(url); btn.disabled = false; btn.innerHTML = '\u25b6 Hear Senni'; };
+      audio.play();
+    } else {
+      btn.disabled = false; btn.innerHTML = '\u25b6 Hear Senni';
+    }
+  } catch {
+    btn.disabled = false; btn.innerHTML = '\u25b6 Hear Senni';
+  }
 }
 
 // ── System check ──────────────────────────────────────────────────────────

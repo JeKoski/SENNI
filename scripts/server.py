@@ -502,6 +502,10 @@ async def api_setup(request: Request):
         port_bridge = int(body.get("port_bridge", 8000)),
         port_model  = int(body.get("port_model", 8081)),
     )
+    if "tts_enabled" in body:
+        config["tts"]["enabled"] = bool(body["tts_enabled"])
+    if "memory_enabled" in body:
+        config["memory"]["enabled"] = bool(body["memory_enabled"])
     get_companion_paths(config["companion_folder"])
     save_config(config)
     log.info("Config saved. Companion folder: %s", config["companion_folder"])

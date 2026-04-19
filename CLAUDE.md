@@ -137,6 +137,52 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-19 #4 (Setup Wizard — extras install, TTS boot, intro redesign)
+
+**Extras install wired. TTS startup on boot. Model continue button fixed. Intro layout redesigned.**
+
+### What changed
+
+**`scripts/setup_router.py`:**
+- `POST /api/setup/install-extras` — installs `kokoro` and/or `chromadb` via pip with SSE progress (status per package, progress pct after each, done on completion)
+- `GET /api/setup/status` — now falls back to scanning `llama/` and `models/` default dirs when config path is missing/stale (`_scan_default_binary`, `_scan_default_model`)
+- `POST /api/setup` handler — now accepts `tts_enabled` and `memory_enabled` booleans; patches `config["tts"]["enabled"]` and `config["memory"]["enabled"]` before saving
+
+**`static/js/wizard.js`:**
+- `_installExtras()` — replaced stub with real `_streamPost` call to `/api/setup/install-extras`
+- `_modelDownloading` flag — disables Continue during active model download; `cancelModelDownload()` now calls `_refreshContinue()`
+- `_startBoot()` — sends `tts_enabled`/`memory_enabled` in `/api/setup` body
+- `streamBootLog()` — after "Server is ready", if TTS selected: runs `_bootStartTts()` then shows "Say hello →"
+- `_bootStartTts(logEl)` — calls `/api/tts/start`, logs "→ Starting voice system…" + result
+- `_initMeetStep()` / `hearSenni()` — "▶ Hear Senni" button on meet step; shows only if TTS installed; calls `/api/tts/speak` with preset greeting, plays WAV
+- Intro step: `_initMeetStep()` hooked into `goTo('meet')`
+
+**`static/wizard.html`:**
+- Intro step redesigned: heading row + Senni orb/bubble row + button row as direct `wiz-pair` children
+- `senni-orb-col` wrapper groups orb+name+mood for row layout
+- `step-intro` now empty (heading/button live outside `wiz-content`)
+- `hear-senni-btn` added to meet step
+
+**`static/css/wizard.css`:**
+- `.wiz-pair.intro` — column with 3 children: heading row, senni-panel row, button row
+- `.intro-heading-row`, `.intro-btn-row` — hidden outside intro, shown in intro
+- `.wiz-pair.intro .wiz-content` — hidden during intro
+- `.wiz-pair.intro .senni-panel` — flex-row for orb-left / bubble-right layout
+- `.senni-orb-col` — column wrapper for orb+name+mood
+- Bubble tail overrides for intro (left-pointing triangle)
+- `.senni-placeholder` — uses `static/images/senni_placeholder.jpg` with gradient fallback
+- `.btn-hear-voice` — green pill button style for "Hear Senni"
+- Intro orb bumped to 170px
+
+### Senni portrait placeholder
+- `static/images/senni_placeholder.jpg` — drop Senni's portrait JPG here. Referenced in `.senni-placeholder` CSS. Falls back to crimson→violet gradient if file missing.
+
+### Default Senni companion — first message note
+When building the Senni companion folder, her first unprompted message should reference the setup completion:
+> "Now that we've got everything up and running — nice to properly meet you! I'm Senni…"
+
+---
+
 ## Session notes — 2026-04-19 #3 (Setup Wizard UI polish)
 
 **Hardware selection redesign, system check continue button, intro cleanup, engine path display, continue button fix.**
