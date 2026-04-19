@@ -69,6 +69,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Setup router ───────────────────────────────────────────────────────────────
+from scripts.setup_router import router as setup_router
+app.include_router(setup_router)
+
 # ── TTS router ─────────────────────────────────────────────────────────────────
 try:
     from scripts.tts_server import router as tts_router, kill_tts_server
@@ -215,9 +219,15 @@ def _kill_llama_server() -> None:
 @app.get("/", response_class=HTMLResponse)
 async def root():
     config = load_config()
-    if config.get("first_run", True):
-        return FileResponse(str(STATIC_DIR / "wizard.html"))
-    return FileResponse(str(STATIC_DIR / "chat.html"))
+    model  = config.get("model_path", "")
+    if model and Path(model).exists():
+        return FileResponse(str(STATIC_DIR / "chat.html"))
+    return FileResponse(str(STATIC_DIR / "wizard.html"))
+
+
+@app.get("/wizard", response_class=HTMLResponse)
+async def setup_wizard_page():
+    return FileResponse(str(STATIC_DIR / "wizard.html"))
 
 
 @app.get("/companion-wizard", response_class=HTMLResponse)
@@ -250,7 +260,7 @@ async def api_mmproj_candidates(model_path: str = ""):
 
 # ── API: browse (native OS file picker) ───────────────────────────────────────
 
-def _run_file_dialog(title: str, filetypes: list) -> str | None:
+def _run_file_dialog(title: str, filetypes: list, initialdir: str | None = None) -> str | None:
     """
     Open a native OS file-picker dialog via tkinter.
     Must run in a worker thread — NOT the asyncio event loop thread.
@@ -264,7 +274,10 @@ def _run_file_dialog(title: str, filetypes: list) -> str | None:
         root.attributes("-topmost", True)
         root.lift()
         root.update()
-        path = filedialog.askopenfilename(title=title, filetypes=filetypes)
+        kwargs = {"title": title, "filetypes": filetypes}
+        if initialdir and Path(initialdir).exists():
+            kwargs["initialdir"] = initialdir
+        path = filedialog.askopenfilename(**kwargs)
         root.destroy()
         return path or None
     except Exception:
@@ -327,10 +340,11 @@ async def api_browse(request: Request):
         title     = "Select model file (.gguf)"
         filetypes = [("GGUF files", "*.gguf"), ("All files", "*.*")]
 
+    initial_dir = body.get("initial_dir") or None
     try:
         path = await loop.run_in_executor(
             _executor,
-            lambda: _run_file_dialog(title, filetypes),
+            lambda: _run_file_dialog(title, filetypes, initial_dir),
         )
     except Exception as e:
         return {"ok": False, "reason": str(e)}

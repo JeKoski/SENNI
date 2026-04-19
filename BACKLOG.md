@@ -20,11 +20,13 @@ Goal: zero-dependency install for end users. Double-click → runs. Auto-updates
 
 **Phase 1 — First-run setup wizard** *(pre-Tauri, ships with Python)*
 Visual redesign + step structure complete (`wizard.html` / `wizard.css` / `wizard.js` rewritten 2026-04-19).
+Backend wiring complete (2026-04-19 session 2): `scripts/setup_router.py` added with all 4 endpoints live.
 Remaining Phase 1 work:
-- Wire up 4 backend endpoints: `/api/setup/status`, `/api/setup/download-binary`, `/api/setup/models`, `/api/setup/download-model` (all currently stubs)
-- `main.py` first-run detection: redirect `/` to `/setup` if no binary or no model found
-- Checksum verify on downloads
-- Senni companion folder (`companions/senni/`) — create with config + avatar so Meet Senni step shows real portrait
+- **Extras install** — `_installExtras()` in wizard.js still a stub. Needs `POST /api/setup/install-extras` → pip install kokoro / chromadb with SSE progress.
+- **Checksum verify on downloads** — not yet implemented. llama.cpp releases don't publish checksums; could do size check only.
+- **Senni companion folder** (`companions/senni/`) — create with config + avatar so Meet Senni step shows real portrait
+- **End-to-end test** — run wizard on a clean install to verify binary download + extraction + model download flow
+- **Extras install** — `_installExtras()` still a stub; needs `/api/setup/install-extras` with pip install + SSE progress
 
 **Phase 2 — PyInstaller sidecar**
 Compile Python backend (`main.py` + all scripts + static files) into a single binary via PyInstaller.
@@ -83,7 +85,6 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 *Too open-ended to task out. Need a dedicated design conversation first.*
 
-- **Startup wizard — backend wiring** — visual redesign complete (2026-04-19). Next: wire the 4 `/api/setup/` endpoints and `main.py` first-run redirect. See `design/SETUP_WIZARD.md` → Backend requirements.
 - **Main Chat UI redesign** — "smoother, fuller, cozier". The companion wizard has established the visual language — now apply it to the main app. Known starting points: sidebar companion state card (mood, recent memory), memory viewer/editor panel. Do this before Tauri so the app Tauri wraps is already polished. See `design/FEATURES.md` → Sidebar/UI section.
 - **Memory viewer/editor** — browse/edit/delete soul/, mind/, and ChromaDB notes. Duplicate dedup UI. Can roll into chat UI design session. See `design/FEATURES.md` → Memory section.
 - **Closeness/relationship progression** — may become gamified (develop closeness over time). Wizard closeness step is partially blocked on this.

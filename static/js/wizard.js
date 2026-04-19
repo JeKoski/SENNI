@@ -18,6 +18,7 @@ const BACK_MAP = { model: 'engine', extras: 'model', boot: 'extras' };
 
 // Steps with a Continue button in the footer
 const CONTINUE_MAP = {
+  check:  { label: 'Continue \u2192', enabledFn: () => !!_checkDestination },
   engine: { label: 'Continue \u2192', enabledFn: () => !!enginePath },
   model:  { label: 'Continue \u2192', enabledFn: () => activeModelTab === 'browse' ? !!modelPath : !!selectedModelCard },
   extras: { label: 'Set up features \u2192', enabledFn: () => true },
@@ -25,7 +26,9 @@ const CONTINUE_MAP = {
 
 // ── State ──────────────────────────────────────────────────────────────────
 let currentStep      = 'intro';
-let selectedGPU      = '';
+let hwCategory       = '';      // 'gpu' | 'cpu'
+let gpuBrand         = '';      // 'nvidia' | 'amd' | 'intel' | 'other'
+let selectedBuild    = '';      // 'cuda' | 'vulkan' | 'sycl' | 'cpu'
 let enginePath       = '';
 let modelPath        = '';
 let mmprojPath       = '';
@@ -36,6 +39,8 @@ let selectedModelCard = null;
 let activeModelTab   = 'download';
 let featTts          = true;
 let featMemory       = true;
+let _checkDestination = '';
+let _lastDetected     = {};
 
 // ── Navigation ────────────────────────────────────────────────────────────
 function goTo(name) {
@@ -56,10 +61,17 @@ function navBack() {
 }
 
 function navContinue() {
+  if (currentStep === 'check')  { _proceedFromCheck(); return; }
   if (currentStep === 'extras') { _installExtras(); return; }
   if (currentStep === 'model' && activeModelTab === 'download') { startModelDownload(); return; }
   const next = { engine: 'model', model: 'extras', extras: 'boot' };
   if (next[currentStep]) goTo(next[currentStep]);
+}
+
+function _proceedFromCheck() {
+  if (!_checkDestination) return;
+  if (_checkDestination === 'welcome') _buildWelcomeChips(_lastDetected);
+  goTo(_checkDestination);
 }
 
 // ── Intro screen ──────────────────────────────────────────────────────────
@@ -175,9 +187,10 @@ function _updateFooter(step) {
   const contConf = CONTINUE_MAP[step];
   if (continueBtn) {
     if (contConf) {
-      continueBtn.style.display = '';
-      continueBtn.textContent   = contConf.label;
-      continueBtn.disabled      = !contConf.enabledFn();
+      continueBtn.style.display    = '';
+      continueBtn.style.visibility = '';   // clear visibility:hidden set on init
+      continueBtn.textContent      = contConf.label;
+      continueBtn.disabled         = !contConf.enabledFn();
     } else {
       continueBtn.style.display = 'none';
     }
@@ -193,56 +206,123 @@ function _refreshContinue() {
   if (btn && contConf) btn.disabled = !contConf.enabledFn();
 }
 
-// ── GPU ───────────────────────────────────────────────────────────────────
-function selectGPU(el) {
-  document.querySelectorAll('.gpu-chip').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedGPU = el.dataset.gpu;
+// ── Hardware selection ────────────────────────────────────────────────────
+function selectHWCategory(cat) {
+  hwCategory = cat;
+  document.querySelectorAll('.hw-cat-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('hw-cat-' + cat)?.classList.add('selected');
 
-  document.getElementById('amd-rocm-note').style.display = selectedGPU === 'amd' ? 'flex' : 'none';
+  const brandsEl  = document.getElementById('hw-brands');
+  const cpuEl     = document.getElementById('hw-cpu-note');
+  const buildsEl  = document.getElementById('hw-builds');
 
-  const labels = {
-    nvidia: 'Download CUDA engine (NVIDIA) \u2192',
-    amd:    'Download Vulkan engine (AMD) \u2192',
-    intel:  'Download SYCL engine (Intel Arc) \u2192',
-    cpu:    'Download CPU engine \u2192',
-  };
-  document.getElementById('engine-dl-label').textContent = labels[selectedGPU] || 'Download engine \u2192';
-  document.getElementById('engine-dl-btn').disabled = false;
-
+  if (cat === 'cpu') {
+    if (brandsEl) brandsEl.style.display = 'none';
+    if (buildsEl) buildsEl.style.display = 'none';
+    if (cpuEl)    cpuEl.style.display    = 'flex';
+    // auto-select the cpu build card
+    const cpuCard = document.querySelector('#hw-cpu-note .model-card');
+    if (cpuCard) { cpuCard.classList.add('selected'); selectedBuild = 'cpu'; }
+  } else {
+    if (brandsEl) brandsEl.style.display = 'flex';
+    if (cpuEl)    cpuEl.style.display    = 'none';
+    if (!gpuBrand && buildsEl) buildsEl.style.display = 'none';
+  }
+  _updateEngineDlBtn();
   _refreshContinue();
 }
 
-function setDetectedGPU(gpu) {
-  selectedGPU = gpu;
-  document.querySelectorAll('.gpu-chip').forEach(c =>
-    c.classList.toggle('selected', c.dataset.gpu === gpu)
-  );
-  const labels = { intel: 'Intel GPU detected', nvidia: 'NVIDIA GPU detected', amd: 'AMD GPU detected (Vulkan build)', cpu: 'No discrete GPU — CPU mode' };
-  document.getElementById('detected-label').textContent = labels[gpu] || gpu;
-  document.getElementById('detected-note').style.display = 'flex';
-  if (gpu === 'amd') document.getElementById('amd-rocm-note').style.display = 'flex';
+function selectGPUBrand(brand) {
+  gpuBrand = brand;
+  document.querySelectorAll('.gpu-brand-chip').forEach(c => c.classList.remove('selected'));
+  document.querySelector(`.gpu-brand-chip[data-brand="${brand}"]`)?.classList.add('selected');
 
-  const dlLabels = {
-    nvidia: 'Download CUDA engine (NVIDIA) \u2192',
-    amd:    'Download Vulkan engine (AMD) \u2192',
-    intel:  'Download SYCL engine (Intel Arc) \u2192',
-    cpu:    'Download CPU engine \u2192',
-  };
-  document.getElementById('engine-dl-label').textContent = dlLabels[gpu] || 'Download engine \u2192';
-  document.getElementById('engine-dl-btn').disabled = false;
+  const buildsEl = document.getElementById('hw-builds');
+  if (buildsEl) buildsEl.style.display = 'block';
+  ['nvidia','amd','intel','other'].forEach(b => {
+    const el = document.getElementById('hw-opts-' + b);
+    if (el) el.style.display = b === brand ? 'block' : 'none';
+  });
+
+  // reset then auto-select first card for this brand
+  document.querySelectorAll('#hw-builds .model-card').forEach(c => c.classList.remove('selected'));
+  selectedBuild = '';
+  const first = document.querySelector(`#hw-opts-${brand} .model-card`);
+  if (first) { first.classList.add('selected'); selectedBuild = first.dataset.build; }
+
+  _updateEngineDlBtn();
+  _refreshContinue();
 }
 
-// ── Engine download (stub for Phase 1) ────────────────────────────────────
-function downloadEngine() {
-  const prog = document.getElementById('engine-dl-progress');
+function selectBuildCard(el, build) {
+  const parent = el.closest('#hw-opts-nvidia,#hw-opts-amd,#hw-opts-intel,#hw-opts-other,#hw-cpu-note');
+  if (parent) parent.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedBuild = build;
+  _updateEngineDlBtn();
+}
+
+function _updateEngineDlBtn() {
+  const btn   = document.getElementById('engine-dl-btn');
+  const label = document.getElementById('engine-dl-label');
+  if (!btn) return;
+  const labels = { cuda: 'Download CUDA engine \u2192', vulkan: 'Download Vulkan engine \u2192', sycl: 'Download SYCL engine \u2192', cpu: 'Download CPU engine \u2192' };
+  btn.disabled = !selectedBuild;
+  if (label) label.textContent = selectedBuild ? (labels[selectedBuild] || 'Download engine \u2192') : 'Select your hardware above, then download';
+}
+
+function setDetectedHW(gpu, buildType) {
+  const isCpu = !gpu || gpu === 'cpu';
+  const noteLabels = { nvidia: 'NVIDIA GPU detected', amd: 'AMD GPU detected', intel: 'Intel Arc detected', cpu: 'No discrete GPU \u2014 CPU mode' };
+  const noteEl  = document.getElementById('detected-note');
+  const labelEl = document.getElementById('detected-label');
+  if (noteEl)  noteEl.style.display  = 'flex';
+  if (labelEl) labelEl.textContent   = noteLabels[gpu] || (gpu ? gpu + ' detected' : 'No GPU detected');
+
+  if (isCpu) {
+    selectHWCategory('cpu');
+  } else {
+    selectHWCategory('gpu');
+    selectGPUBrand(gpu === 'intel' ? 'intel' : gpu === 'amd' ? 'amd' : gpu === 'nvidia' ? 'nvidia' : 'other');
+    // if status API gave us a specific build, override the auto-selected card
+    if (buildType && buildType !== selectedBuild) {
+      const card = document.querySelector(`#hw-opts-${gpuBrand} .model-card[data-build="${buildType}"]`);
+      if (card) selectBuildCard(card, buildType);
+    }
+  }
+}
+
+// ── Engine download ────────────────────────────────────────────────────────
+async function downloadEngine() {
+  const prog   = document.getElementById('engine-dl-progress');
+  const fill   = document.getElementById('engine-dl-fill');
+  const status = document.getElementById('engine-dl-status');
+  const eta    = document.getElementById('engine-dl-eta');
   prog.style.display = 'block';
   document.getElementById('engine-dl-btn').disabled = true;
-  _stubProgress('engine-dl-fill', 'engine-dl-status', 'engine-dl-eta', () => {
-    enginePath = '/stubs/llama-server';
-    setFileDisplay('engine', enginePath, true);
-    _refreshContinue();
-  });
+
+  await _streamPost(
+    '/api/setup/download-binary',
+    { build_type: selectedBuild, gpu_type: gpuBrand },
+    (msg) => {
+      if (fill)   fill.style.width    = msg.pct + '%';
+      if (status) status.textContent  = `Downloading\u2026 ${msg.pct}%`;
+      if (eta)    eta.textContent     = _formatSpeed(msg.speed_bps);
+    },
+    (msg) => { if (status) status.textContent = msg.label || 'Working\u2026'; },
+    (msg) => {
+      enginePath = msg.path;
+      setFileDisplay('engine', enginePath, true);
+      if (fill)   fill.style.width   = '100%';
+      if (status) status.textContent = 'Complete \u2713';
+      if (eta)    eta.textContent    = '';
+      setTimeout(_refreshContinue, 400);
+    },
+    (msg) => {
+      if (status) status.textContent = '\u2717 ' + (msg.message || 'Download failed');
+      document.getElementById('engine-dl-btn').disabled = false;
+    },
+  );
 }
 
 // ── Model tab switching ────────────────────────────────────────────────── */
@@ -265,18 +345,48 @@ function selectModelCard(el) {
   _refreshContinue();
 }
 
-function startModelDownload() {
+let _modelDownloadAbort = null;
+
+async function startModelDownload() {
   if (!selectedModelCard) return;
   document.getElementById('model-dl-actions').style.display = 'none';
   document.querySelectorAll('.model-card').forEach(c => c.style.pointerEvents = 'none');
-  document.getElementById('model-dl-progress').style.display = 'block';
-  _stubProgress('model-dl-fill', 'model-dl-status', 'model-dl-eta', () => {
-    modelPath = '/stubs/model.gguf';
-    goTo('extras');
-  });
+
+  const prog   = document.getElementById('model-dl-progress');
+  const fill   = document.getElementById('model-dl-fill');
+  const status = document.getElementById('model-dl-status');
+  const eta    = document.getElementById('model-dl-eta');
+  prog.style.display = 'block';
+
+  _modelDownloadAbort = new AbortController();
+
+  await _streamPost(
+    '/api/setup/download-model',
+    { model_id: selectedModelCard },
+    (msg) => {
+      if (fill)   fill.style.width   = msg.pct + '%';
+      if (status) status.textContent = `Downloading\u2026 ${msg.pct}%`;
+      if (eta)    eta.textContent    = _formatSpeed(msg.speed_bps);
+    },
+    (msg) => { if (status) status.textContent = msg.label || 'Working\u2026'; },
+    (msg) => {
+      modelPath = msg.path;
+      if (fill)   fill.style.width   = '100%';
+      if (status) status.textContent = 'Complete \u2713';
+      if (eta)    eta.textContent    = '';
+      _modelDownloadAbort = null;
+      setTimeout(() => goTo('extras'), 600);
+    },
+    (msg) => {
+      if (status) status.textContent = '\u2717 ' + (msg.message || 'Download failed');
+      cancelModelDownload();
+    },
+    _modelDownloadAbort.signal,
+  );
 }
 
 function cancelModelDownload() {
+  if (_modelDownloadAbort) { _modelDownloadAbort.abort(); _modelDownloadAbort = null; }
   document.getElementById('model-dl-progress').style.display = 'none';
   document.getElementById('model-dl-actions').style.display = 'flex';
   document.querySelectorAll('.model-card').forEach(c => c.style.pointerEvents = '');
@@ -319,7 +429,14 @@ async function browseFile(type) {
   const chip   = document.getElementById(chipId);
   if (chip) chip.style.opacity = '0.6';
   try {
-    const res  = await fetch('/api/browse', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type }) });
+    const body = { type };
+    const knownPath = type === 'binary' ? enginePath : type === 'model' ? modelPath : mmprojPath;
+    if (knownPath) {
+      const parts = knownPath.replace(/\\/g, '/').split('/');
+      parts.pop();
+      body.initial_dir = parts.join('/') || '/';
+    }
+    const res  = await fetch('/api/browse', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
     if (data.ok && data.path)      _applyPath(type, data.path);
     else if (data.reason !== 'cancelled') _showPathFallback(type);
@@ -372,10 +489,26 @@ function setFileDisplay(type, path, isSet) {
   const chip     = document.getElementById(chipId);
   const chipName = document.getElementById(chipNameId);
   if (chip && chipName) {
-    chipName.textContent = path ? path.split(/[\\/]/).pop() : 'Click to select\u2026';
+    const filename = path ? path.split(/[\\/]/).pop() : '';
+    chipName.textContent = filename || 'Click to select\u2026';
     chipName.title       = path || '';
     chip.classList.toggle('set',   !!isSet);
     chip.classList.toggle('empty', !isSet);
+  }
+  // Show full path below engine chip
+  if (type === 'binary') {
+    const pathDisplay = document.getElementById('engine-path-display');
+    if (pathDisplay) {
+      if (path && isSet) {
+        const parts = path.replace(/\\/g, '/').split('/');
+        const file  = parts.pop();
+        const dir   = parts.join('/') + '/';
+        pathDisplay.innerHTML      = `<span class="path-dir">${dir}</span><span class="path-file">${file}</span>`;
+        pathDisplay.style.display  = 'block';
+      } else {
+        pathDisplay.style.display = 'none';
+      }
+    }
   }
 }
 
@@ -472,7 +605,7 @@ async function _startBoot() {
   try { await fetch('/api/shutdown-model', { method: 'POST' }); } catch {}
   const res = await fetch('/api/setup', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ model_path: modelPath, mmproj_path: multimodal ? mmprojPath : '', gpu_type: selectedGPU, ngl: 99, port_bridge: 8000, port_model: 8081 })
+    body: JSON.stringify({ model_path: modelPath, mmproj_path: multimodal ? mmprojPath : '', gpu_type: gpuBrand, ngl: 99, port_bridge: 8000, port_model: 8081 })
   });
   if (!res.ok) { showError('err-boot', 'Could not save config. Is the server running?'); return; }
   await fetch('/api/boot', { method: 'POST' });
@@ -514,39 +647,34 @@ async function runSystemCheck() {
 
   await _delay(300);
   let detected = {};
-  try { const res = await fetch('/api/scan'); detected = await res.json(); } catch {}
+  try { const res = await fetch('/api/setup/status'); detected = await res.json(); } catch {}
 
   await _delay(400);
-  _resolveCheck('gpu', detected.gpu_detected ? 'ok' : 'missing',
-    detected.gpu_detected ? `${detected.gpu_detected.toUpperCase()} GPU detected` : 'No GPU detected \u2014 CPU mode');
-  if (detected.gpu_detected) setDetectedGPU(detected.gpu_detected);
-  else setDetectedGPU('cpu'); // safe default so engine step isn't stuck
+  const gpu = detected.gpu || '';
+  _resolveCheck('gpu', gpu ? 'ok' : 'missing',
+    gpu ? `${gpu.toUpperCase()} GPU detected` : 'No GPU detected \u2014 CPU mode');
+  setDetectedHW(gpu || 'cpu', detected.build_type || '');
 
   await _delay(350);
-  const hasEngine = !!(detected.server_binary);
-  enginePath = detected.server_binary || '';
+  const hasEngine = !!detected.binary_found;
+  enginePath = detected.binary_path || '';
   _resolveCheck('engine', hasEngine ? 'ok' : 'missing',
-    hasEngine ? detected.server_binary.split(/[\\/]/).pop() : 'Not found \u2014 we\'ll get one');
+    hasEngine ? enginePath.split(/[\\/]/).pop() : 'Not found \u2014 we\'ll get one');
   if (hasEngine) setFileDisplay('engine', enginePath, true);
 
   await _delay(300);
-  const hasModel = !!(detected.model_path);
+  const hasModel = !!detected.model_found;
   modelPath = detected.model_path || '';
   _resolveCheck('model', hasModel ? 'ok' : 'missing',
-    hasModel ? detected.model_path.split(/[\\/]/).pop() : 'Not found \u2014 we\'ll pick one');
+    hasModel ? modelPath.split(/[\\/]/).pop() : 'Not found \u2014 we\'ll pick one');
   if (hasModel) setFileDisplay('model', modelPath, true);
 
   await _delay(700);
   document.getElementById('senni-orb-wrap').classList.remove('thinking');
 
-  if (hasEngine && hasModel) {
-    _buildWelcomeChips(detected);
-    goTo('welcome');
-  } else if (hasEngine) {
-    goTo('model');
-  } else {
-    goTo('engine');
-  }
+  _lastDetected = detected;
+  _checkDestination = (hasEngine && hasModel) ? 'welcome' : hasEngine ? 'model' : 'engine';
+  _refreshContinue();
 }
 
 function _resolveCheck(id, state, subText) {
@@ -559,9 +687,9 @@ function _resolveCheck(id, state, subText) {
 function _buildWelcomeChips(detected) {
   const wrap = document.getElementById('welcome-chips'); wrap.innerHTML = '';
   const items = [];
-  if (detected.gpu_detected)  items.push({ icon: '\u26a1', label: detected.gpu_detected.toUpperCase() + ' GPU' });
-  if (detected.server_binary) items.push({ icon: '\u2699\uFE0F', label: detected.server_binary.split(/[\\/]/).pop() });
-  if (detected.model_path)    items.push({ icon: '\u{1F4E6}', label: detected.model_path.split(/[\\/]/).pop() });
+  if (detected.gpu)          items.push({ icon: '\u26a1', label: detected.gpu.toUpperCase() + ' GPU' });
+  if (detected.binary_found) items.push({ icon: '\u2699\uFE0F', label: detected.binary_path.split(/[\\/]/).pop() });
+  if (detected.model_found)  items.push({ icon: '\u{1F4E6}', label: detected.model_path.split(/[\\/]/).pop() });
   items.forEach(({ icon, label }) => {
     wrap.insertAdjacentHTML('beforeend', `<div class="summary-chip"><span class="summary-chip-icon">${icon}</span><span class="summary-chip-label">${label}</span></div>`);
   });
@@ -591,6 +719,54 @@ function _stubProgress(fillId, statusId, etaId, onDone) {
 }
 
 function _delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── SSE via POST ───────────────────────────────────────────────────────────
+// Streams a POST endpoint that emits `data: {...}` lines.
+// Calls onProgress / onStatus / onDone / onError as each message type arrives.
+async function _streamPost(url, body, onProgress, onStatus, onDone, onError, signal) {
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (e) {
+    if (e.name !== 'AbortError') onError({ message: String(e) });
+    return;
+  }
+  if (!res.ok) { onError({ message: `Server error ${res.status}` }); return; }
+
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+
+  while (true) {
+    let chunk;
+    try { chunk = await reader.read(); } catch { break; }
+    if (chunk.done) break;
+    buf += decoder.decode(chunk.value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      let msg;
+      try { msg = JSON.parse(line.slice(6)); } catch { continue; }
+      if      (msg.type === 'progress') onProgress(msg);
+      else if (msg.type === 'status')   onStatus(msg);
+      else if (msg.type === 'done')     { onDone(msg); return; }
+      else if (msg.type === 'error')    { onError(msg); return; }
+    }
+  }
+}
+
+function _formatSpeed(bps) {
+  if (!bps) return '';
+  if (bps >= 1024 * 1024) return (bps / 1024 / 1024).toFixed(1) + ' MB/s';
+  if (bps >= 1024)        return (bps / 1024).toFixed(0) + ' KB/s';
+  return bps + ' B/s';
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
