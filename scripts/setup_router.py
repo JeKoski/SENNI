@@ -220,18 +220,37 @@ def _save_model_path(model_path: Path) -> None:
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
+def _scan_default_binary() -> str:
+    """Fallback: find llama-server binary in the default BINARY_DIR."""
+    hits = list(BINARY_DIR.rglob(BINARY_NAME))
+    return str(hits[0]) if hits else ""
+
+
+def _scan_default_model() -> str:
+    """Fallback: find first .gguf in the default MODELS_DIR."""
+    hits = list(MODELS_DIR.glob("*.gguf"))
+    return str(hits[0]) if hits else ""
+
+
 @router.get("/api/setup/status")
 async def setup_status():
-    config  = load_config()
-    binary  = config.get("server_binary", "")
-    model   = config.get("model_path", "")
-    gpu     = detect_gpu()
-    oneapi  = _detect_oneapi()
+    config = load_config()
+    binary = config.get("server_binary", "")
+    model  = config.get("model_path", "")
+
+    # If config path is missing or stale, scan default directories
+    if not (binary and Path(binary).exists()):
+        binary = _scan_default_binary()
+    if not (model and Path(model).exists()):
+        model = _scan_default_model()
+
+    gpu    = detect_gpu()
+    oneapi = _detect_oneapi()
     return {
         "binary_path":    binary,
-        "binary_found":   bool(binary and Path(binary).exists()),
+        "binary_found":   bool(binary),
         "model_path":     model,
-        "model_found":    bool(model and Path(model).exists()),
+        "model_found":    bool(model),
         "gpu":            gpu,
         "build_type":     _gpu_to_build(gpu, oneapi),
         "oneapi_present": oneapi,
@@ -341,5 +360,73 @@ async def setup_download_model(request: Request):
         await dl_task
         await loop.run_in_executor(None, functools.partial(_save_model_path, dest))
         yield _sse({"type": "done", "path": str(dest)})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ── Extras: package labels and pip names ───────────────────────────────────────
+_EXTRAS_ORDER = ("tts", "memory")
+_EXTRAS_META  = {
+    "tts":    ("kokoro",   "Voice (Kokoro TTS)"),
+    "memory": ("chromadb", "Memory (ChromaDB)"),
+}
+
+
+@router.post("/api/setup/install-extras")
+async def setup_install_extras(request: Request):
+    """Install optional packages (kokoro TTS, chromadb) with SSE progress."""
+    body       = await request.json()
+    to_install = [k for k in _EXTRAS_ORDER if body.get(k)]
+
+    async def stream() -> AsyncGenerator[str, None]:
+        if not to_install:
+            yield _sse({"type": "done"})
+            return
+
+        loop  = asyncio.get_event_loop()
+        total = len(to_install)
+
+        for step, key in enumerate(to_install, start=1):
+            pkg, label = _EXTRAS_META[key]
+            yield _sse({
+                "type": "status",
+                "label": f"Installing {label}\u2026",
+                "step":  step,
+                "total": total,
+            })
+
+            queue: asyncio.Queue = asyncio.Queue()
+
+            def _run_pip(pkg: str = pkg) -> None:
+                import subprocess
+                import sys
+                try:
+                    proc = subprocess.Popen(
+                        [sys.executable, "-m", "pip", "install", "--upgrade", pkg],
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        text=True, bufsize=1,
+                    )
+                    proc.communicate()  # wait; output not forwarded (too noisy for wizard UI)
+                    if proc.returncode != 0:
+                        loop.call_soon_threadsafe(
+                            queue.put_nowait,
+                            {"type": "error", "message": f"pip failed for {pkg} (exit {proc.returncode})"},
+                        )
+                    else:
+                        loop.call_soon_threadsafe(queue.put_nowait, {"type": "pkg_done"})
+                except Exception as exc:
+                    loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "message": str(exc)})
+
+            pip_task = loop.run_in_executor(None, _run_pip)
+
+            msg = await queue.get()
+            await pip_task
+            if msg["type"] == "error":
+                yield _sse(msg)
+                return
+
+            yield _sse({"type": "progress", "pct": int(step / total * 100)})
+
+        yield _sse({"type": "done"})
 
     return StreamingResponse(stream(), media_type="text/event-stream")

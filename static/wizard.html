@@ -52,27 +52,33 @@
        Gets .intro class on the intro step (column layout, Senni prominent) -->
   <div class="wiz-pair intro" id="wiz-pair">
 
+    <!-- Intro-only heading (hidden on all other steps via CSS) -->
+    <div class="intro-heading-row">
+      <h1 class="step-heading intro-heading">Your local<br><em>AI companion.</em></h1>
+    </div>
+
     <!-- ── Senni guide panel ────────────────────────────────────────────────── -->
     <aside class="senni-panel" id="senni-panel">
 
-      <!-- Full app-style orb (glow + breath + ring + dots) -->
-      <div class="senni-orb-wrap" id="senni-orb-wrap">
-        <div class="senni-orb-dots" id="senni-orb-dots">
-          <span></span><span></span><span></span>
-        </div>
-        <div class="senni-orb-body" id="senni-orb-body">
-          <div class="senni-orb-ring" id="senni-orb-ring"></div>
-          <div class="senni-orb-icon" id="senni-orb-icon">
-            <!-- Replaced with avatar img when companions/senni/ exists -->
-            <div class="senni-placeholder"></div>
+      <!-- Orb column: orb + name + mood stacked -->
+      <div class="senni-orb-col">
+        <div class="senni-orb-wrap" id="senni-orb-wrap">
+          <div class="senni-orb-dots" id="senni-orb-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="senni-orb-body" id="senni-orb-body">
+            <div class="senni-orb-ring" id="senni-orb-ring"></div>
+            <div class="senni-orb-icon" id="senni-orb-icon">
+              <!-- Replaced with avatar img when companions/senni/ exists -->
+              <div class="senni-placeholder"></div>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="senni-name">Senni</div>
-      <div class="senni-mood">
-        <div class="senni-mood-dot" id="senni-mood-dot"></div>
-        <span class="senni-mood-label" id="senni-mood-label">Warm</span>
+        <div class="senni-name">Senni</div>
+        <div class="senni-mood">
+          <div class="senni-mood-dot" id="senni-mood-dot"></div>
+          <span class="senni-mood-label" id="senni-mood-label">Warm</span>
+        </div>
       </div>
 
       <!-- Chat bubble: Senni is "saying" this -->
@@ -85,11 +91,8 @@
     <!-- ── Step content ─────────────────────────────────────────────────────── -->
     <div class="wiz-content">
 
-      <!-- ── STEP: Intro (first screen — Senni introduces the app) ──────────── -->
-      <div class="wiz-step active" id="step-intro">
-        <h1 class="step-heading intro-heading">Your local<br><em>AI companion.</em></h1>
-        <button class="btn-primary" onclick="startSetup()">Get started →</button>
-      </div>
+      <!-- ── STEP: Intro (heading + button live outside wiz-content for layout) -->
+      <div class="wiz-step active" id="step-intro"></div>
 
       <!-- ── STEP: System check ─────────────────────────────────────────────── -->
       <div class="wiz-step" id="step-check">
@@ -422,6 +425,10 @@
           </div>
         </div>
 
+        <button id="hear-senni-btn" class="btn-hear-voice" onclick="hearSenni()" style="display:none">
+          &#9654; Hear Senni
+        </button>
+
         <div class="meet-divider">or</div>
         <button class="btn-create-own" onclick="window.location.href='/companion-wizard'">
           Design your own companion →
@@ -429,6 +436,12 @@
       </div>
 
     </div><!-- /wiz-content -->
+
+    <!-- Intro-only button row (hidden on all other steps via CSS) -->
+    <div class="intro-btn-row">
+      <button class="btn-primary" onclick="startSetup()">Get started →</button>
+    </div>
+
   </div><!-- /wiz-pair -->
 </div><!-- /wiz-stage -->
 

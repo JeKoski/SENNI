@@ -22,11 +22,10 @@ Goal: zero-dependency install for end users. Double-click → runs. Auto-updates
 Visual redesign + step structure complete (`wizard.html` / `wizard.css` / `wizard.js` rewritten 2026-04-19).
 Backend wiring complete (2026-04-19 session 2): `scripts/setup_router.py` added with all 4 endpoints live.
 Remaining Phase 1 work:
-- **Extras install** — `_installExtras()` in wizard.js still a stub. Needs `POST /api/setup/install-extras` → pip install kokoro / chromadb with SSE progress.
+- **Multimodal toggle + mmproj** — add multimodal toggle to model step, mmproj download/browse, wire into `_startBoot()`. See existing `multimodal`/`mmprojPath` state already in wizard.js.
 - **Checksum verify on downloads** — not yet implemented. llama.cpp releases don't publish checksums; could do size check only.
-- **Senni companion folder** (`companions/senni/`) — create with config + avatar so Meet Senni step shows real portrait
-- **End-to-end test** — run wizard on a clean install to verify binary download + extraction + model download flow
-- **Extras install** — `_installExtras()` still a stub; needs `/api/setup/install-extras` with pip install + SSE progress
+- **Senni companion folder** (`companions/senni/`) — create with config + avatar so Meet Senni step shows real portrait. Portrait placeholder JPG already at `static/images/senni_placeholder.jpg`.
+- **End-to-end test** — run wizard on a clean install to verify binary download + extraction + model download + extras install flow
 
 **Phase 2 — PyInstaller sidecar**
 Compile Python backend (`main.py` + all scripts + static files) into a single binary via PyInstaller.
@@ -44,6 +43,12 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 - `output_dir` refactor in `wizard_compile.py` prerequisite for clean packaging
 
 *Note: macOS not a current target. Requires Apple Developer account ($99/yr) for notarization.*
+
+---
+
+## Bugs
+
+- **First unprompted message bubble duplicated** — first companion message (triggered before user input) shows two bubbles: one from the streaming pass and one from finalization. Same root cause as previous streaming/finalized bubble duplication. Investigate `chat.js` — check if the initial message is being added twice (once on stream start, once on stream end).
 
 ---
 
