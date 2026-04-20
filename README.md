@@ -1,10 +1,10 @@
 # S.E.N.N.I — Shared Experience Nexus for Neural Intelligence
 or just *Senni* for short
 
-S.E.N.N.I is a fully local framework for creating and interacting with your own AI assistants and companions.
+Senni is an easy-to-use and fully local framework for creating and interacting with your own highly customizable AI assistants and companions.
+_Your companion. Your machine. Your privacy._
 
-<img width="1336" height="922" alt="screencap-senni" src="https://github.com/user-attachments/assets/5bc12e79-28a6-4ef2-b068-5763445dd1dc" />
-
+<img width="2560" height="1440" alt="senni-screenshot2" src="https://github.com/user-attachments/assets/a3660e9e-c5a9-4d4a-9314-dd5b57950239" />
 
 ## Focus is on:
 - **Local & Private** — Everything happens on your own computer. No cloud.
@@ -12,7 +12,7 @@ S.E.N.N.I is a fully local framework for creating and interacting with your own 
 - **Fully GUI driven** — A clean interface where you can manage everything without touching code or the command line.
 - **Dynamic Experience** — Your companion adjusts and changes based on what is happening. And if you allow it, they can evolve autonomously!
 - **Experience customisability** — Almost everything to do with companions is fully customizable.
-- **Platform agnostic** — Run on almost any OS or hardware setup. My first development platform was i5-7600k (a 9 year old CPU!) and a 180€ Intel Arc GPU. Anything better and you should be able to run Senni!
+- **Platform agnostic** — Run on almost any OS or hardware setup. My first development platform was i5-7600k (a 9 year old CPU!) and a 180€ Intel Arc GPU. Anything similar or better and you should be able to run Senni just fine!
 
 ---
 
@@ -26,7 +26,7 @@ My means of testing different setups is limited to what I can access. Ensuring r
 
 If you install Senni, please let me know how it went!
 
-Whether you want to give feedback or you have any issues with Senni, feel free to [contact me via email](https://github.com/JeKoski), Discord (Sdesser) or [open a new issue](https://github.com/JeKoski/SENNI/issues).
+Whether you want to say hi, give feedback or have any issues with Senni, feel free to [contact me via email](https://github.com/JeKoski), Discord (Sdesser) or [open a new issue](https://github.com/JeKoski/SENNI/issues).
 
 ---
 
