@@ -17,7 +17,7 @@ Whether you want to give feedback or if you have any issues, feel free to contac
 **Currently working on easy setup** — once finished, you should be able to just double click an executable and Senni should handle everything for you.
 
 For now, these methods should work. Do let me know how it goes:
-- _All platforms:_ Make sure you have Python installed! *Version 3.12.XX recommended*
+- _**All platforms:**_ Make sure you have Python installed! *Version 3.12.XX recommended*
 - **Windows** — run `startup.bat`. Setup Wizard should deal with the rest.
 - **Linux** — run `pip install -r requirements.txt` in Senni root and then boot with `python main.py`. Setup Wizard should deal with the rest.
 - **Mac** — support is experimental. Running `pip install -r requirements.txt` in Senni root followed by `python main.py` to boot up might just work, but haven't had the hardware to test this. While the Setup Wizard tries to install llama.cpp and other components for you, I've no clue if it works.
