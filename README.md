@@ -1,6 +1,22 @@
-# SENNI
+# S.E.N.N.I — Shared Experience Nexus for Neural Intelligence
+or just *Senni* for short
 
-🚧 **Early in development** 🚧
+S.E.N.N.I is a fully local framework for creating and interacting with your own AI assistants and companions.
+
+<img width="1336" height="922" alt="screencap-senni" src="https://github.com/user-attachments/assets/5bc12e79-28a6-4ef2-b068-5763445dd1dc" />
+
+
+## Focus is on:
+- **Local & Private** — Everything happens on your own computer. No cloud.
+- **Ease of use** — Automated installation and setup.
+- **Fully GUI driven** — A clean interface where you can manage everything without touching code or the command line.
+- **Dynamic Experience** — Your companion adjusts and changes based on what is happening. And if you allow it, they can evolve autonomously!
+- **Experience customisability** — Almost everything to do with companions is fully customizable.
+- **Platform agnostic** — Run on almost any OS or hardware setup. My first development platform was i5-7600k (a 9 year old CPU!) and a 180€ Intel Arc GPU. Anything better and you should be able to run Senni!
+
+---
+
+## 🚧 **Early in development** 🚧
 
 *Expect compatibility issues, bugs, quirks and possibly losing companion or user data - Back up often!*
 
@@ -24,7 +40,7 @@ For now, these methods should work. Do let me know how it goes:
 
 ---
 
-🚧 **Having issues?**
+## 🚧 **Having issues?**
 
 Please post into [Issues](https://github.com/JeKoski/SENNI/issues)
 
@@ -49,23 +65,7 @@ Please post into [Issues](https://github.com/JeKoski/SENNI/issues)
 
 ---
 
-## S.E.N.N.I — Shared Experience Nexus for Neural Intelligence
-or just *Senni* for short
 
-S.E.N.N.I is a fully local framework for creating and interacting with your own AI assistants and companions.
-
-<img width="1336" height="922" alt="screencap-senni" src="https://github.com/user-attachments/assets/5bc12e79-28a6-4ef2-b068-5763445dd1dc" />
-
-
-## Focus is on:
-- **Local & Private** — Everything happens on your own computer. No cloud.
-- **Ease of use** — Automated installation and setup.
-- **Fully GUI driven** — A clean interface where you can manage everything without touching code or the command line.
-- **Dynamic Experience** — Your companion adjusts and changes based on what is happening. And if you allow it, they can evolve autonomously!
-- **Experience customisability** — Almost everything to do with companions is fully customizable.
-- **Platform agnostic** — Run on almost any OS or hardware setup. My first development platform was i5-7600k (a 9 year old CPU!) and a 180€ Intel Arc GPU. Anything better and you should be able to run Senni!
-
----
 
 > ⚠️ **WARNING: Installation not yet officially supported**
 > This is being actively worked on right now.
