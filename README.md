@@ -19,9 +19,9 @@ For now, these methods should work. Do let me know how it goes:
 
 ## 🔄 Updates & Progress
 
-**
-**Companion Creation Wizard** — is in! Access during Setup Wizard or from Settings>Companion>+Create (top right of menu).
-  - Default Senni companion (featured during Setup Wizard) isn't implemented yet, but is one of the next things I'm working on.
+**Setup Wizard** — is functional with polishing still going on. On fresh install, Setup Wizard guides you through getting Senni up and running.
+**Companion Creation Wizard** — is in! Access during Setup Wizard or from Settings -> Companion -> + Create (top right of menu).
+  - Default Senni companion (featured during Setup Wizard) isn't implemented yet, but is one of the next things on the list.
 **Mood System** — is in! Your companion is able to change their active mood. Visual feedback included. Fully configurable in Companion Settings>Moods.
 
 ---
