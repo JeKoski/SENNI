@@ -25,8 +25,8 @@ Ensuring wide platform and hardware compatibility, and ease of installation and 
 My means of testing different setups is limited to what I can access. Ensuring real world compatibility is challenging at the moment.
 
 If you install Senni, please let me know how it went!
-You can get hold of me via Discord at username Sdesser.
-Whether you want to give feedback or if you have any issues, feel free to contact me there or [open a new issue on this repo](https://github.com/JeKoski/SENNI/issues).
+
+Whether you want to give feedback or you have any issues with Senni, feel free to [contact me via email](https://github.com/JeKoski), Discord (Sdesser) or [open a new issue](https://github.com/JeKoski/SENNI/issues).
 
 ---
 
