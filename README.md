@@ -5,17 +5,36 @@
 *Expect compatibility issues, bugs, quirks and possibly losing companion or user data - Back up often!*
 
 Development version confirmed to be working specifically on Windows 10 and Ubuntu 25.10 using Intel Arc A750.
-While my focus is to ensure wide platform and hardware compatibility and ease of installation and use, we're not there yet.
+Ensuring wide platform and hardware compatibility, and ease of installation and use are high priorities and are being actively worked on.
+My means of testing different setups is limited to what I can access. Ensuring real world compatibility is challenging at the moment.
+
+If you install Senni, please let me know how it went!
+You can get hold of me via Discord at username Sdesser.
+Whether you want to give feedback or if you have any issues, feel free to contact me there or [open a new issue on this repo](https://github.com/JeKoski/SENNI/issues).
 
 ---
 
 **Currently working on easy setup** — once finished, you should be able to just double click an executable and Senni should handle everything for you.
 
 For now, these methods should work. Do let me know how it goes:
-- Any platform: Make sure you have Python installed!
-- On Windows, run `startup.bat`. This should get you there, but haven't tested on other hardware setups yet.
-- On Linux, running `python main.py` in Senni root should get you there, but again, haven't tested on other hardware setups yet.
-- No clue what happens with Mac, but it might work if you have a working llama.cpp installation (llama-server) you can point Senni to. While the setup tries to install llama.cpp for you, I've no clue whether this works with Mac.
+- _All platforms:_ Make sure you have Python installed! *Version 3.12.XX recommended*
+- **Windows** — run `startup.bat`. Setup Wizard should deal with the rest.
+- **Linux** — run `pip install -r requirements.txt` in Senni root and then boot with `python main.py`. Setup Wizard should deal with the rest.
+- **Mac** — support is experimental. Running `pip install -r requirements.txt` in Senni root followed by `python main.py` to boot up might just work, but haven't had the hardware to test this. While the Setup Wizard tries to install llama.cpp and other components for you, I've no clue if it works.
+
+---
+
+🚧 **Having issues?**
+
+Please post into [Issues](https://github.com/JeKoski/SENNI/issues)
+
+**Provide as much info as you can:**
+- What platform you're on.
+- What your hardware setup is.
+- What you did before the issue appeared.
+- What happened when the issue appeared.
+- Any log and error messages you get.
+- A screenshot of the issue if relevant.
 
 ---
 
