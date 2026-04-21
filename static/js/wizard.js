@@ -20,7 +20,7 @@ const BACK_MAP = { model: 'engine', extras: 'model', boot: 'extras' };
 const CONTINUE_MAP = {
   check:  { label: 'Continue \u2192', enabledFn: () => !!_checkDestination },
   engine: { label: 'Continue \u2192', enabledFn: () => !!enginePath },
-  model:  { label: 'Continue \u2192', enabledFn: () => !_modelDownloading && (activeModelTab === 'browse' ? !!modelPath : !!selectedModelCard) },
+  model:  { label: 'Continue \u2192', enabledFn: () => !_modelDownloading && (activeModelTab === 'browse' ? !!modelPath : (!!selectedModelCard || !!modelPath)) },
   extras: { label: 'Set up features \u2192', enabledFn: () => true },
 };
 
@@ -32,13 +32,17 @@ let selectedBuild    = '';      // 'cuda' | 'vulkan' | 'sycl' | 'cpu'
 let enginePath       = '';
 let modelPath        = '';
 let mmprojPath       = '';
-let multimodal       = false;
+let multimodal       = true;
 let scanDone         = false;
 let _scanResults     = [];
-let selectedModelCard = null;
-let activeModelTab   = 'download';
+let selectedModelCard  = null;
+let activeModelTab     = 'download';
+let _downloadedModels  = {};   // id → {path, mmproj_path}
 let featTts          = true;
 let featMemory       = true;
+let featTtsInstalled    = false;
+let featMemoryInstalled = false;
+let localInstall        = true;   // "Install locally for Senni" toggle
 let _checkDestination = '';
 let _lastDetected     = {};
 
@@ -51,6 +55,7 @@ function goTo(name) {
   _updateSenni(name);
   _updateNav(name);
   _updateFooter(name);
+  if (name === 'extras') _loadExtrasStatus();
   if (name === 'boot') _startBoot();
   if (name === 'meet') { setTimeout(_animateMeetPortrait, 80); _initMeetStep(); }
 }
@@ -63,7 +68,10 @@ function navBack() {
 function navContinue() {
   if (currentStep === 'check')  { _proceedFromCheck(); return; }
   if (currentStep === 'extras') { _installExtras(); return; }
-  if (currentStep === 'model' && activeModelTab === 'download') { startModelDownload(); return; }
+  if (currentStep === 'model' && activeModelTab === 'download') {
+    if (modelPath) { goTo('extras'); return; }  // already downloaded — just advance
+    startModelDownload(); return;
+  }
   const next = { engine: 'model', model: 'extras', extras: 'boot' };
   if (next[currentStep]) goTo(next[currentStep]);
 }
@@ -332,17 +340,73 @@ function switchModelTab(tab) {
   document.getElementById('tab-browse').classList.toggle('active', tab === 'browse');
   document.getElementById('model-dl-tab').style.display     = tab === 'download' ? 'block' : 'none';
   document.getElementById('model-browse-tab').style.display = tab === 'browse'   ? 'block' : 'none';
+  // mmproj picker only visible on browse tab when multimodal is on
+  document.getElementById('mmproj-section').classList.toggle('visible', multimodal && tab === 'browse');
   _refreshContinue();
+}
+
+// ── Model status (downloaded models from status API) ─────────────────────
+function _applyModelStatus(detected) {
+  _downloadedModels = {};
+  for (const m of (detected.downloaded_models || [])) {
+    _downloadedModels[m.id] = m;
+    const card = document.querySelector(`.model-card[data-model="${m.id}"]`);
+    if (!card) continue;
+    card.querySelector('.model-dl-btn')?.style.setProperty('display', 'none');
+    const avail = card.querySelector('.model-available');
+    if (avail) avail.style.display = '';
+    // Downloaded cards never show the mm section on selection
+  }
+
+  // Auto-select card if current model_path matches a Senni-downloaded model
+  if (detected.model_path) {
+    for (const [id, info] of Object.entries(_downloadedModels)) {
+      if (info.path === detected.model_path) {
+        const card = document.querySelector(`.model-card[data-model="${id}"]`);
+        if (card) { card.classList.add('selected'); selectedModelCard = id; }
+        break;
+      }
+    }
+  }
 }
 
 // ── Model card selection ──────────────────────────────────────────────────
 function selectModelCard(el) {
-  document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+  const id = el.dataset.model;
+
+  // Downloaded card → switch to browse tab and fill paths
+  if (_downloadedModels[id]) {
+    const info = _downloadedModels[id];
+    switchModelTab('browse');
+    _applyPath('model', info.path);
+    if (info.mmproj_path) {
+      if (!multimodal) { multimodal = true; _syncMmToggles(); }
+      _applyPath('mmproj', info.mmproj_path);
+      document.getElementById('mmproj-section').classList.add('visible');
+    }
+    return;
+  }
+
+  // Normal (not yet downloaded) card selection
+  document.querySelectorAll('.model-card').forEach(c => {
+    c.classList.remove('selected');
+    const btn = c.querySelector('.model-dl-btn');
+    const mm  = c.querySelector('.model-card-mm');
+    if (btn && !_downloadedModels[c.dataset.model]) btn.style.display = 'none';
+    if (mm)  mm.style.display = 'none';
+  });
   el.classList.add('selected');
-  selectedModelCard = el.dataset.model;
-  // Also enable the Download button
-  document.getElementById('btn-model-dl-next').disabled = false;
+  selectedModelCard = id;
+  const btn = el.querySelector('.model-dl-btn');
+  const mm  = el.querySelector('.model-card-mm');
+  if (btn) btn.style.display = '';
+  if (mm)  mm.style.display  = '';
+  _syncMmToggles();
   _refreshContinue();
+}
+
+function _syncMmToggles() {
+  document.querySelectorAll('.mm-toggle-track').forEach(t => t.classList.toggle('on', multimodal));
 }
 
 let _modelDownloadAbort = null;
@@ -352,7 +416,10 @@ async function startModelDownload() {
   if (!selectedModelCard || _modelDownloading) return;
   _modelDownloading = true;
   document.getElementById('btn-continue').disabled = true;
-  document.getElementById('model-dl-actions').style.display = 'none';
+  // Hide per-card button + mm toggle during download
+  const activeCard = document.querySelector(`.model-card[data-model="${selectedModelCard}"]`);
+  activeCard?.querySelector('.model-dl-btn')?.style.setProperty('display', 'none');
+  activeCard?.querySelector('.model-card-mm')?.style.setProperty('display', 'none');
   document.querySelectorAll('.model-card').forEach(c => c.style.pointerEvents = 'none');
 
   const prog   = document.getElementById('model-dl-progress');
@@ -365,19 +432,27 @@ async function startModelDownload() {
 
   await _streamPost(
     '/api/setup/download-model',
-    { model_id: selectedModelCard },
+    { model_id: selectedModelCard, include_mmproj: multimodal },
     (msg) => {
       if (fill)   fill.style.width   = msg.pct + '%';
-      if (status) status.textContent = `Downloading\u2026 ${msg.pct}%`;
+      if (status) status.textContent = (msg.phase === 'mmproj' ? 'Vision projector\u2026 ' : 'Downloading\u2026 ') + msg.pct + '%';
       if (eta)    eta.textContent    = _formatSpeed(msg.speed_bps);
     },
     (msg) => { if (status) status.textContent = msg.label || 'Working\u2026'; },
     (msg) => {
-      modelPath = msg.path;
+      modelPath  = msg.path;
+      if (msg.mmproj_path) mmprojPath = msg.mmproj_path;
+      _modelDownloading   = false;
+      _modelDownloadAbort = null;
+      // Mark card as downloaded so Available badge shows on revisit
+      _downloadedModels[selectedModelCard] = { id: selectedModelCard, path: modelPath, mmproj_path: mmprojPath };
+      const doneCard = document.querySelector(`.model-card[data-model="${selectedModelCard}"]`);
+      const avail = doneCard?.querySelector('.model-available');
+      if (avail) avail.style.display = '';
+      document.querySelectorAll('.model-card').forEach(c => c.style.pointerEvents = '');
       if (fill)   fill.style.width   = '100%';
       if (status) status.textContent = 'Complete \u2713';
       if (eta)    eta.textContent    = '';
-      _modelDownloadAbort = null;
       setTimeout(() => goTo('extras'), 600);
     },
     (msg) => {
@@ -398,6 +473,75 @@ function cancelModelDownload() {
 }
 
 // ── Extras / feature toggles ──────────────────────────────────────────────
+async function _loadExtrasStatus() {
+  try {
+    const res  = await fetch('/api/setup/extras-status');
+    const data = await res.json();
+    _applyExtrasStatus(data);
+  } catch(e) { /* non-critical — step still works without detection */ }
+}
+
+function _applyExtrasStatus(status) {
+  // espeak — shown separately, not a feature card
+  if (status.espeak) {
+    const el = document.getElementById('espeak-status');
+    if (el) {
+      if (status.espeak.found) {
+        el.textContent = `\u2713 espeak-ng found \u2014 ${status.espeak.path}`;
+        el.style.color = '#6dd4a8';
+      } else {
+        el.textContent = '\u26a0 espeak-ng not found \u2014 voice may not work. Install espeak-ng and add it to PATH, or set the path in Settings.';
+        el.style.color = '#fbbf24';
+      }
+      el.style.display = 'block';
+    }
+  }
+
+  for (const key of ['tts', 'memory']) {
+    const info = status[key];
+    if (!info) continue;
+
+    const localFound  = info.installed && info.source === 'local';
+    const systemFound = info.installed && info.source === 'system';
+    // Skip install if: already local, OR (system found AND user chose not to install locally)
+    const skip = localFound || (systemFound && !localInstall);
+    if (key === 'tts')    featTtsInstalled    = skip;
+    if (key === 'memory') featMemoryInstalled = skip;
+
+    const statusEl = document.getElementById(`${key}-feat-status`);
+    const sizeEl   = document.getElementById(`${key}-feat-size`);
+
+    if (statusEl) {
+      if (localFound) {
+        statusEl.textContent   = `\u2713 Installed locally \u2014 ${info.path}`;
+        statusEl.style.display = 'block';
+        statusEl.style.color   = '';
+      } else if (systemFound && !localInstall) {
+        statusEl.textContent   = `\u2713 Using system install \u2014 ${info.path}`;
+        statusEl.style.display = 'block';
+        statusEl.style.color   = '#6dd4a8';
+      } else if (systemFound) {
+        statusEl.textContent   = `\u26a0 Found in system Python \u2014 will install local copy to ./features/packages/`;
+        statusEl.style.display = 'block';
+        statusEl.style.color   = '#fbbf24';
+      } else {
+        statusEl.style.display = 'none';
+      }
+    }
+    if (sizeEl) {
+      if (!sizeEl.dataset.original) sizeEl.dataset.original = sizeEl.textContent;
+      sizeEl.textContent = skip ? 'Already installed' : sizeEl.dataset.original;
+    }
+  }
+}
+
+function toggleLocalInstall() {
+  localInstall = !localInstall;
+  document.getElementById('local-install-toggle').classList.toggle('on', localInstall);
+  // Re-evaluate skip flags with current status
+  _loadExtrasStatus();
+}
+
 function toggleFeature(feat) {
   if (feat === 'tts') {
     featTts = !featTts;
@@ -411,7 +555,10 @@ function toggleFeature(feat) {
 }
 
 async function _installExtras() {
-  if (!featTts && !featMemory) { goTo('boot'); return; }
+  const needTts    = featTts    && !featTtsInstalled;
+  const needMemory = featMemory && !featMemoryInstalled;
+  if (!needTts && !needMemory) { goTo('boot'); return; }
+
   const prog   = document.getElementById('extras-dl-progress');
   const fill   = document.getElementById('extras-dl-fill');
   const status = document.getElementById('extras-dl-status');
@@ -421,7 +568,7 @@ async function _installExtras() {
 
   await _streamPost(
     '/api/setup/install-extras',
-    { tts: featTts, memory: featMemory },
+    { tts: needTts, memory: needMemory },
     (msg) => {
       if (fill) fill.style.width = msg.pct + '%';
     },
@@ -445,9 +592,10 @@ async function _installExtras() {
 // ── Multimodal ────────────────────────────────────────────────────────────
 function toggleMultimodal() {
   multimodal = !multimodal;
-  document.getElementById('mm-toggle').classList.toggle('on', multimodal);
-  document.getElementById('mmproj-section').classList.toggle('visible', multimodal);
-  if (multimodal && modelPath) fetchMmprojCandidates(modelPath);
+  _syncMmToggles();
+  const showPicker = multimodal && activeModelTab === 'browse';
+  document.getElementById('mmproj-section').classList.toggle('visible', showPicker);
+  if (showPicker && modelPath) fetchMmprojCandidates(modelPath);
   if (!multimodal) { mmprojPath = ''; setFileDisplay('mmproj', '', false); }
   _refreshContinue();
 }
@@ -666,10 +814,15 @@ function streamBootLog() {
       ring.classList.add('done'); ring.textContent = '\u2713'; ring.style.display = 'flex';
       const ok = document.createElement('div'); ok.className='log-ok'; ok.textContent='\u2713 Server is ready';
       logEl.appendChild(ok); logEl.scrollTop = logEl.scrollHeight;
-      if (featTts) {
-        _bootStartTts(logEl).then(() => { document.getElementById('boot-next-row').style.display = 'flex'; });
-      } else {
+      fetch('/api/setup/complete', { method: 'POST' }).catch(() => {});
+      const _markBootDone = () => {
+        ring.classList.add('done'); ring.textContent = '\u2713'; ring.style.display = 'flex';
         document.getElementById('boot-next-row').style.display = 'flex';
+      };
+      if (featTts) {
+        _bootStartTts(logEl).then(_markBootDone);
+      } else {
+        _markBootDone();
       }
     }
   };
@@ -758,6 +911,17 @@ async function runSystemCheck() {
   _resolveCheck('model', hasModel ? 'ok' : 'missing',
     hasModel ? modelPath.split(/[\\/]/).pop() : 'Not found \u2014 we\'ll pick one');
   if (hasModel) setFileDisplay('model', modelPath, true);
+
+  // Pre-fill mmproj if already configured
+  if (detected.mmproj_path) {
+    mmprojPath = detected.mmproj_path;
+    setFileDisplay('mmproj', mmprojPath, true);
+    multimodal = true;
+    _syncMmToggles();
+  }
+
+  // Apply downloaded model state to cards (marks Available, auto-selects active)
+  _applyModelStatus(detected);
 
   await _delay(700);
   document.getElementById('senni-orb-wrap').classList.remove('thinking');

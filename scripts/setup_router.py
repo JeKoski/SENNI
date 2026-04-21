@@ -28,8 +28,10 @@ router = APIRouter()
 IS_WIN = platform.system() == "Windows"
 SYSTEM = platform.system()
 
-BINARY_DIR = PROJECT_ROOT / "llama"
-MODELS_DIR = PROJECT_ROOT / "models"
+BINARY_DIR           = PROJECT_ROOT / "llama"
+MODELS_DIR           = PROJECT_ROOT / "models"
+FEATURES_DIR         = PROJECT_ROOT / "features"
+FEATURES_PACKAGES_DIR = FEATURES_DIR / "packages"   # single shared dir for all extras
 BINARY_NAME = "llama-server.exe" if IS_WIN else "llama-server"
 LLAMA_CPP_REPO = "ggml-org/llama.cpp"
 
@@ -38,22 +40,32 @@ LLAMA_CPP_REPO = "ggml-org/llama.cpp"
 
 MODELS = [
     {
-        "id":          "gemma4-e4b-q4km",
-        "name":        "Gemma 4 E4B Q4_K_M",
-        "description": "SENNI's primary model. Fast, capable, great for companions.",
-        "size_gb":     3.0,
-        "badge":       "Recommended",
-        "url":         "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
-        "filename":    "gemma-4-E4B-it-Q4_K_M.gguf",
+        "id":              "gemma4-e4b-q4km",
+        "name":            "Gemma 4 E4B Q4_K_M",
+        "description":     "SENNI's primary model. Fast, capable, great for companions.",
+        "size_gb":         3.0,
+        "badge":           "Recommended",
+        "subfolder":       "gemma4-e4b",
+        "url":             "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
+        "filename":        "gemma-4-E4B-it-Q4_K_M.gguf",
+        "multimodal":      True,
+        "mmproj_url":      "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/mmproj-F16.gguf",
+        "mmproj_filename": "mmproj-F16.gguf",
+        "mmproj_size_gb":  1.0,
     },
     {
-        "id":          "qwen35-9b-q4km",
-        "name":        "Qwen 3.5 9B Q4_K_M",
-        "description": "Better reasoning. Needs more RAM / VRAM.",
-        "size_gb":     5.5,
-        "badge":       "More capable",
-        "url":         "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf",
-        "filename":    "Qwen3.5-9B-Q4_K_M.gguf",
+        "id":              "qwen35-9b-q4km",
+        "name":            "Qwen 3.5 9B Q4_K_M",
+        "description":     "Better reasoning. Needs more RAM / VRAM.",
+        "size_gb":         5.5,
+        "badge":           "More capable",
+        "subfolder":       "qwen35-9b",
+        "url":             "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf",
+        "filename":        "Qwen3.5-9B-Q4_K_M.gguf",
+        "multimodal":      True,
+        "mmproj_url":      "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/mmproj-F16.gguf",
+        "mmproj_filename": "mmproj-F16.gguf",
+        "mmproj_size_gb":  0.6,
     },
 ]
 
@@ -218,6 +230,15 @@ def _save_model_path(model_path: Path) -> None:
     save_config(config)
 
 
+def _save_mmproj_path(mmproj_path: Path) -> None:
+    config = load_config()
+    config["mmproj_path"] = str(mmproj_path)
+    if not isinstance(config.get("mmproj_paths"), dict):
+        config["mmproj_paths"] = {}
+    config["mmproj_paths"][SYSTEM] = str(mmproj_path)
+    save_config(config)
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 def _scan_default_binary() -> str:
@@ -227,8 +248,8 @@ def _scan_default_binary() -> str:
 
 
 def _scan_default_model() -> str:
-    """Fallback: find first .gguf in the default MODELS_DIR."""
-    hits = list(MODELS_DIR.glob("*.gguf"))
+    """Fallback: find first .gguf in MODELS_DIR, searching subfolders too."""
+    hits = [p for p in MODELS_DIR.rglob("*.gguf") if "mmproj" not in p.name.lower()]
     return str(hits[0]) if hits else ""
 
 
@@ -237,24 +258,42 @@ async def setup_status():
     config = load_config()
     binary = config.get("server_binary", "")
     model  = config.get("model_path", "")
+    mmproj = config.get("mmproj_path", "")
 
     # If config path is missing or stale, scan default directories
     if not (binary and Path(binary).exists()):
         binary = _scan_default_binary()
     if not (model and Path(model).exists()):
         model = _scan_default_model()
+    if mmproj and not Path(mmproj).exists():
+        mmproj = ""
+
+    # Which Senni-managed models are already on disk?
+    downloaded = []
+    for m in MODELS:
+        subfolder   = m.get("subfolder", m["id"])
+        model_file  = MODELS_DIR / subfolder / m["filename"]
+        mmproj_file = MODELS_DIR / subfolder / m.get("mmproj_filename", "")
+        if model_file.exists():
+            downloaded.append({
+                "id":          m["id"],
+                "path":        str(model_file),
+                "mmproj_path": str(mmproj_file) if mmproj_file.name and mmproj_file.exists() else "",
+            })
 
     gpu    = detect_gpu()
     oneapi = _detect_oneapi()
     return {
-        "binary_path":    binary,
-        "binary_found":   bool(binary),
-        "model_path":     model,
-        "model_found":    bool(model),
-        "gpu":            gpu,
-        "build_type":     _gpu_to_build(gpu, oneapi),
-        "oneapi_present": oneapi,
-        "platform":       SYSTEM,
+        "binary_path":       binary,
+        "binary_found":      bool(binary),
+        "model_path":        model,
+        "model_found":       bool(model),
+        "mmproj_path":       mmproj,
+        "downloaded_models": downloaded,
+        "gpu":               gpu,
+        "build_type":        _gpu_to_build(gpu, oneapi),
+        "oneapi_present":    oneapi,
+        "platform":          SYSTEM,
     }
 
 
@@ -327,30 +366,35 @@ async def setup_download_binary(request: Request):
 
 @router.post("/api/setup/download-model")
 async def setup_download_model(request: Request):
-    body     = await request.json()
-    model_id = body.get("model_id", "")
-    dest_dir = Path(body["dest_dir"]) if body.get("dest_dir") else MODELS_DIR
-
-    model = next((m for m in MODELS if m["id"] == model_id), None)
+    body           = await request.json()
+    model_id       = body.get("model_id", "")
+    include_mmproj = body.get("include_mmproj", False)
+    model          = next((m for m in MODELS if m["id"] == model_id), None)
 
     async def stream() -> AsyncGenerator[str, None]:
         if not model:
             yield _sse({"type": "error", "message": f"Unknown model id: {model_id!r}"})
             return
 
+        subfolder = model.get("subfolder", model_id)
+        dest_dir  = MODELS_DIR / subfolder
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        loop = asyncio.get_event_loop()
+
+        # ── Phase 1: model ────────────────────────────────────────────────────
         dest       = dest_dir / model["filename"]
         size_bytes = int(model["size_gb"] * 1024 ** 3)
-        yield _sse({"type": "status", "label": f"Downloading {model['name']}…", "total": size_bytes})
+        yield _sse({"type": "status", "label": f"Downloading {model['name']}…", "total": size_bytes, "phase": "model"})
 
-        loop  = asyncio.get_event_loop()
-        queue = asyncio.Queue()
-        dl    = functools.partial(_download_to_queue, model["url"], dest, queue, loop)
+        queue   = asyncio.Queue()
+        dl      = functools.partial(_download_to_queue, model["url"], dest, queue, loop)
         dl_task = loop.run_in_executor(None, dl)
 
         while True:
             msg = await queue.get()
             if msg["type"] == "progress":
-                yield _sse(msg)
+                yield _sse({**msg, "phase": "model"})
             elif msg["type"] == "download_done":
                 break
             elif msg["type"] == "error":
@@ -359,7 +403,34 @@ async def setup_download_model(request: Request):
 
         await dl_task
         await loop.run_in_executor(None, functools.partial(_save_model_path, dest))
-        yield _sse({"type": "done", "path": str(dest)})
+
+        # ── Phase 2: mmproj (optional) ────────────────────────────────────────
+        want_mmproj = include_mmproj and model.get("multimodal") and model.get("mmproj_url")
+        if not want_mmproj:
+            yield _sse({"type": "done", "path": str(dest), "mmproj_path": ""})
+            return
+
+        mmproj_dest = dest_dir / model["mmproj_filename"]
+        mmproj_size = int(model.get("mmproj_size_gb", 1.0) * 1024 ** 3)
+        yield _sse({"type": "status", "label": "Downloading vision projector (mmproj)…", "total": mmproj_size, "phase": "mmproj"})
+
+        queue   = asyncio.Queue()
+        dl      = functools.partial(_download_to_queue, model["mmproj_url"], mmproj_dest, queue, loop)
+        dl_task = loop.run_in_executor(None, dl)
+
+        while True:
+            msg = await queue.get()
+            if msg["type"] == "progress":
+                yield _sse({**msg, "phase": "mmproj"})
+            elif msg["type"] == "download_done":
+                break
+            elif msg["type"] == "error":
+                yield _sse(msg)
+                return
+
+        await dl_task
+        await loop.run_in_executor(None, functools.partial(_save_mmproj_path, mmproj_dest))
+        yield _sse({"type": "done", "path": str(dest), "mmproj_path": str(mmproj_dest)})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -370,6 +441,54 @@ _EXTRAS_META  = {
     "tts":    ("kokoro",   "Voice (Kokoro TTS)"),
     "memory": ("chromadb", "Memory (ChromaDB)"),
 }
+
+
+def _detect_extra(key: str) -> dict:
+    """
+    Check if an extra is installed. Prefers ./features/packages/ local install;
+    falls back to checking the current Python env via importlib.
+    """
+    import importlib.util
+    pkg = _EXTRAS_META[key][0]
+
+    if (FEATURES_PACKAGES_DIR / pkg).is_dir():
+        return {"installed": True, "path": str(FEATURES_PACKAGES_DIR), "source": "local"}
+
+    spec = importlib.util.find_spec(pkg)
+    if spec and spec.origin:
+        return {"installed": True, "path": str(Path(spec.origin).parent.parent), "source": "system"}
+
+    return {"installed": False, "path": "", "source": ""}
+
+
+def _detect_espeak() -> dict:
+    """Detect espeak-ng binary via config path or PATH lookup."""
+    import shutil
+    cfg_path = load_config().get("tts", {}).get("espeak_path", "").strip()
+    if cfg_path and Path(cfg_path).exists():
+        return {"found": True, "path": cfg_path, "source": "config"}
+    hit = shutil.which("espeak-ng") or shutil.which("espeak")
+    if hit:
+        return {"found": True, "path": hit, "source": "path"}
+    return {"found": False, "path": "", "source": ""}
+
+
+@router.post("/api/setup/complete")
+async def setup_mark_complete():
+    """Called by the wizard after successful boot. Marks setup as done."""
+    config = load_config()
+    config["setup_complete"] = True
+    save_config(config)
+    return {"ok": True}
+
+
+@router.get("/api/setup/extras-status")
+async def setup_extras_status():
+    """Return installation state for each optional extra, plus espeak detection."""
+    return {
+        **{key: _detect_extra(key) for key in _EXTRAS_ORDER},
+        "espeak": _detect_espeak(),
+    }
 
 
 @router.post("/api/setup/install-extras")
@@ -386,8 +505,10 @@ async def setup_install_extras(request: Request):
         loop  = asyncio.get_event_loop()
         total = len(to_install)
 
+        FEATURES_PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
         for step, key in enumerate(to_install, start=1):
             pkg, label = _EXTRAS_META[key]
+            target_dir = FEATURES_PACKAGES_DIR
             yield _sse({
                 "type": "status",
                 "label": f"Installing {label}\u2026",
@@ -397,12 +518,12 @@ async def setup_install_extras(request: Request):
 
             queue: asyncio.Queue = asyncio.Queue()
 
-            def _run_pip(pkg: str = pkg) -> None:
+            def _run_pip(pkg: str = pkg, target: Path = target_dir) -> None:
                 import subprocess
                 import sys
                 try:
                     proc = subprocess.Popen(
-                        [sys.executable, "-m", "pip", "install", "--upgrade", pkg],
+                        [sys.executable, "-m", "pip", "install", "--target", str(target), "--upgrade", pkg],
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, bufsize=1,
                     )

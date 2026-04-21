@@ -584,6 +584,9 @@ html, body {
 .toggle-track.on .toggle-thumb { transform: translateX(16px); }
 .toggle-label { font-size: 14px; color: var(--text-muted); }
 .toggle-label strong { color: var(--text); font-weight: 500; }
+.toggle-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+.mm-toggle-row { margin-top: 16px; align-items: flex-start; }
+.mm-toggle-row .toggle-track { margin-top: 2px; flex-shrink: 0; }
 
 /* ── Mmproj section ──────────────────────────────────────────────────────── */
 .mmproj-section {
@@ -691,6 +694,28 @@ html, body {
 .model-dot  { color: var(--text-dim); font-size: 11px; }
 .model-time { font-size: 11.5px; color: var(--text-dim); }
 .model-card-note { font-size: 12px; color: var(--text-dim); text-align: center; padding: 8px 0 4px; font-style: italic; }
+.model-card-body { display: flex; align-items: flex-start; gap: 12px; }
+.model-card-info { flex: 1; min-width: 0; }
+.model-card-side { flex-shrink: 0; display: flex; align-items: center; padding-top: 2px; }
+.model-dl-btn {
+  font-size: 12px; font-weight: 500; padding: 6px 12px;
+  background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35);
+  color: var(--indigo-hi); border-radius: 8px; cursor: pointer; white-space: nowrap;
+  transition: background .15s;
+}
+.model-dl-btn:hover { background: rgba(99,102,241,0.25); }
+.model-available {
+  font-size: 12px; font-weight: 500; color: #6dd4a8;
+  white-space: nowrap; padding: 4px 0;
+}
+.model-card-mm {
+  border-top: 1px solid rgba(129,140,248,0.12);
+  margin-top: 10px; padding-top: 10px;
+}
+.model-card-mm-inner {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer; user-select: none;
+}
+.model-card-mm-inner .toggle-track { flex-shrink: 0; margin-top: 2px; }
 
 /* ── Feature cards (Extras step) ─────────────────────────────────────────── */
 .feature-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
@@ -712,6 +737,11 @@ html, body {
 .feature-name { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
 .feature-desc { font-size: 13px; color: var(--text-muted); line-height: 1.55; margin-bottom: 5px; }
 .feature-size { font-size: 11.5px; color: var(--text-dim); font-family: 'DM Mono', monospace; }
+.feature-status {
+  font-size: 11px; color: #6dd4a8; font-family: 'DM Mono', monospace;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(109,212,168,0.15);
+  display: none;
+}
 
 /* ── Boot ────────────────────────────────────────────────────────────────── */
 .boot-wrap { text-align: center; padding: 4px 0 16px; }

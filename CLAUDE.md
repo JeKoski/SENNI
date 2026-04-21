@@ -137,6 +137,69 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-21 #2 (Setup Wizard — QA fixes + extras architecture)
+
+**Config overwrite fixed. Features install architecture reworked. Multimodal download wired. Setup_complete flag added. Multiple wizard bugs fixed.**
+
+### Key architecture decisions
+
+**Extras install: single shared `./features/packages/` dir**
+- All extras (kokoro, chromadb) install to one shared dir via `pip install --target`
+- No duplicates — shared numpy etc.
+- `server.py` adds `./features/packages/` to `sys.path` before tts/memory router imports (chromadb in-process)
+- `tts_server.py` injects `PYTHONPATH=./features/packages/` into the tts.py subprocess env (subprocess doesn't inherit parent sys.path)
+- `config["tts"]["python_path"]` = empty → uses sys.executable; PYTHONPATH carries the packages
+
+**espeak-ng:** system binary, not pip. Wizard detects via PATH / `config["tts"]["espeak_path"]`. Not installed by wizard. Bundle with Tauri package in Phase 3.
+
+**Voices:** Kokoro downloads `.pt` voice files to `~/.cache/` on first use. `voices_path` config for custom location. Auto-discovered by `discover_voices()`. No wizard action needed.
+
+**`setup_complete` flag** in config (default: `True` for legacy compat):
+- `api_setup` sets it `False` at boot start
+- `POST /api/setup/complete` sets it `True` (called by wizard on boot ready)
+- Root route redirects to wizard if `False`
+
+### What changed
+
+**`scripts/server.py`:**
+- `api_setup` — now calls `load_config()` + patches only wizard fields (config overwrite bug fixed)
+- sys.path patch uses `./features/packages/` (single dir, was `./features/*/`)
+- `setup_complete = False` written at boot start
+- Root route checks both `model_path` and `setup_complete`
+
+**`scripts/setup_router.py`:**
+- `FEATURES_PACKAGES_DIR = PROJECT_ROOT / "features" / "packages"` (shared dir)
+- MODELS updated: both models have `subfolder`, `mmproj_url`, `mmproj_filename`, `multimodal: True`
+- `_detect_extra()` checks `./features/packages/<pkg>/` then importlib fallback
+- `_detect_espeak()` — checks config path then PATH (`shutil.which`)
+- `GET /api/setup/extras-status` — includes espeak detection
+- `GET /api/setup/extras-status` — local-only sets skip flag; system Python shows warning
+- `POST /api/setup/complete` — sets `setup_complete: True`
+- `install-extras` uses `--target ./features/packages/` for all packages
+- `download-model` — uses `./models/<subfolder>/`, streams model then mmproj in sequence with `phase` field
+
+**`scripts/tts_server.py`:**
+- `_FEATURES_PACKAGES` path constant
+- `_start_tts_process()` — builds env with `PYTHONPATH=./features/packages/` before `Popen`
+
+**`static/wizard.html`:**
+- Model step: mm-toggle moved out of browse tab, now shared below both tabs, default ON; mmproj picker stays browse-only
+- Extras step: "Install locally" toggle + espeak status row added
+
+**`static/js/wizard.js`:**
+- `multimodal = true` default
+- `_modelDownloading = false` on download success (continue button bug fixed)
+- `navContinue` skips re-download if `modelPath` already set
+- `enabledFn` for model step: `||modelPath` fallback
+- `toggleMultimodal` + `switchModelTab` — mmproj picker only on browse tab
+- `startModelDownload` — passes `include_mmproj`, handles `phase` in progress, stores `mmprojPath`
+- `_applyExtrasStatus` — local/system/espeak all surfaced; `localInstall` toggle controls skip logic
+- `toggleLocalInstall()` function
+- Boot: ring + button only show after TTS boot completes (`_markBootDone`)
+- `fetch('/api/setup/complete')` called on boot ready
+
+---
+
 ## Session notes — 2026-04-21 (Quick wins + duplicate bubble fix)
 
 **Chara card fields wired. first_mes injected. Duplicate bubble fixed. Species color-shift. Image lightbox. Voice warning.**

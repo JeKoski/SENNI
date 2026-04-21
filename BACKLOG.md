@@ -22,7 +22,7 @@ Goal: zero-dependency install for end users. Double-click → runs. Auto-updates
 Visual redesign + step structure complete (`wizard.html` / `wizard.css` / `wizard.js` rewritten 2026-04-19).
 Backend wiring complete (2026-04-19 session 2): `scripts/setup_router.py` added with all 4 endpoints live.
 Remaining Phase 1 work:
-- **Multimodal toggle + mmproj** — add multimodal toggle to model step, mmproj download/browse, wire into `_startBoot()`. See existing `multimodal`/`mmprojPath` state already in wizard.js.
+- **espeak-ng install/bundle** — espeak is a system binary (not pip). Wizard detects and warns if missing. For distribution: bundle a portable espeak-ng binary inside the Tauri package, auto-set `config["tts"]["espeak_path"]`. Deferred to Phase 3 / Tauri packaging.
 - **Checksum verify on downloads** — not yet implemented. llama.cpp releases don't publish checksums; could do size check only.
 - **Senni companion folder** (`companions/senni/`) — create with config + avatar so Meet Senni step shows real portrait. Portrait placeholder JPG already at `static/images/senni_placeholder.jpg`.
 - **End-to-end test** — run wizard on a clean install to verify binary download + extraction + model download + extras install flow
@@ -55,6 +55,12 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ---
 
+## Bugs
+
+- **Companion Wizard summary orb** — summary screen orb still renders old emoji placeholder instead of the new silhouette SVG. Fix: wire `_getSilhouette()` into the summary orb render path same as portrait orb.
+
+---
+
 ## Quick Wins
 
 *Ready to build — no design conversation needed.*
@@ -65,6 +71,13 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 - **Tool settings UI** — global enable/disable per tool + per-companion overrides. Settings > Tools tab. See `design/FEATURES.md`.
 - **llama-server args drift** — launch args in `server.py` may have drifted from current llama.cpp API. Needs a pass against current docs.
 - **Import QA round-trip** — ongoing edge case testing as real use surfaces issues.
+- **Companion Wizard appearance step titles** — swap subtitle/heading order. Currently: small="Step 02 - face", large="How do they look?". Should be: small="Step 02 - How do they look?", large="Face". Apply to all appearance sub-steps.
+- **Companion Wizard avatar PNG normalization** — on compile, convert avatar to PNG regardless of upload format (JPG, WEBP, etc.) so embedded card image is always PNG. If no avatar uploaded, render the current silhouette SVG to a PNG canvas and use that. Prevents blank avatar slot.
+- **Default sidebar avatar** — when no `sidebar_avatar_path` is set, use the same transparent orb-style default as the orb's default avatar rather than a solid placeholder. Consistent visual language between orb and sidebar.
+- **Setup Wizard — model step downloaded state on load** — `_applyModelStatus` runs during system check, but if user navigates directly to model step without running check (e.g. back-nav from engine step), downloaded state won't be applied. Consider calling `_applyModelStatus` also on `goTo('model')` with a lightweight fetch, or caching last status.
+- **Setup Wizard — system check extras reporting** — extend the system check step to detect extras (same logic as `GET /api/setup/extras-status`). Show result inline only if found ("✓ Kokoro found at …"). Loading label "Checking for extras…" disappears silently if nothing found.
+- **Settings — show resolved paths for extras** — after wizard or detection, Settings should display `./features/packages/` path and espeak binary path so user can verify what's actually being used. Paths already stored in config; just needs Settings UI wiring.
+- **Setup Wizard — skip steps on rerun** — when wizard is launched a second time (not first-run), allow skipping steps where existing valid config is already detected. Each step should show a "Skip — already configured" option when the relevant asset is present.
 
 ---
 
@@ -78,6 +91,9 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 *Too open-ended to task out. Need a dedicated design conversation first.*
 
+- **Companion Wizard orb animations** — the orb needs to feel alive throughout the whole wizard (currently too static). Requirements gathered: orb present on every step; gentle idle bounce + swirling energy effect; first step shows empty orb (no silhouette, just the circle + ambient color/glow). Silhouette appears only after type/gender chosen, disappears if deselected. Each user selection optionally streams particles into the orb. Needs reference images, animation spec, and a discussion of what's feasible in CSS/canvas vs. too resource-heavy. Design conversation before any implementation.
+- **Companion type card theming + orb color absorption** — each companion type card (Assistant / Friend / Companion / Role-play) should have its own color theme. Selecting a type changes the orb's color scheme, as if the orb absorbs that "energy" and takes that shape. If particle streaming is implemented, the color shift should be delayed until particles start arriving and fade in until they stop. Each type also ships with a corresponding default Presence preset baked in. Needs color palette decisions and animation timing spec. Ties into orb animation design session above.
+- **Companion Templates section** — premade companions that ship with SENNI, plus a way for users to recreate existing companions from within the app. Entry point: a button near the Import button that opens a selection window. Needs design: how templates are stored (JSON? partial config? full companion folder zip?), how they're browsed, whether user can submit community templates. See `design/FEATURES.md` → Companion section.
 - **Main Chat UI redesign** — "smoother, fuller, cozier". The companion wizard has established the visual language — now apply it to the main app. Known starting points: sidebar companion state card (mood, recent memory), memory viewer/editor panel. Do this before Tauri so the app Tauri wraps is already polished. See `design/FEATURES.md` → Sidebar/UI section.
 - **Memory viewer/editor** — browse/edit/delete soul/, mind/, and ChromaDB notes. Duplicate dedup UI. Can roll into chat UI design session. See `design/FEATURES.md` → Memory section.
 - **Closeness/relationship progression** — may become gamified (develop closeness over time). Wizard closeness step is partially blocked on this.

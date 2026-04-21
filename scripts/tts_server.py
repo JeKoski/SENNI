@@ -46,8 +46,9 @@ router = APIRouter()
 
 # ── Resolve paths ──────────────────────────────────────────────────────────────
 
-_HERE        = Path(__file__).parent          # scripts/
-_TTS_SCRIPT  = _HERE / "tts.py"
+_HERE              = Path(__file__).parent          # scripts/
+_TTS_SCRIPT        = _HERE / "tts.py"
+_FEATURES_PACKAGES = _HERE.parent / "features" / "packages"
 
 
 # ── Process state ──────────────────────────────────────────────────────────────
@@ -164,6 +165,13 @@ def _start_tts_process() -> bool:
 
     log.info("Starting TTS subprocess: %s %s", python, _TTS_SCRIPT)
 
+    # Inject ./features/packages/ into subprocess PYTHONPATH so locally
+    # installed kokoro is visible even though parent's sys.path doesn't transfer.
+    env = os.environ.copy()
+    if _FEATURES_PACKAGES.is_dir():
+        existing = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = str(_FEATURES_PACKAGES) + (os.pathsep + existing if existing else "")
+
     try:
         proc = subprocess.Popen(
             [python, str(_TTS_SCRIPT)],
@@ -172,6 +180,7 @@ def _start_tts_process() -> bool:
             stderr=subprocess.PIPE,
             bufsize=0,          # unbuffered — critical for the protocol
             encoding=None,      # binary mode
+            env=env,
         )
     except FileNotFoundError:
         _tts_unavailable = True
