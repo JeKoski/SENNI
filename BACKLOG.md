@@ -46,10 +46,6 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ---
 
-## Bugs
-
-- **First unprompted message bubble duplicated** — first companion message (triggered before user input) shows two bubbles: one from the streaming pass and one from finalization. Same root cause as previous streaming/finalized bubble duplication. Investigate `chat.js` — check if the initial message is being added twice (once on stream start, once on stream end).
-
 ---
 
 ## Housekeeping
@@ -63,18 +59,10 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 *Ready to build — no design conversation needed.*
 
-- **Species color-shifting** — tint silhouettes per species via CSS `color` (vampire=charcoal, demon=dark red, elf=forest green etc.). Lookup table only, ~10 min.
-- **`first_mes`** — static injection as first companion bubble on new chat. Design in `design/CHARA_CARD.md` → first_mes section.
-- **`system_prompt` + `post_history_instructions`** — write at compile, inject in `buildSystemPrompt`. Design in `design/CHARA_CARD.md`.
-- **`scenario` field fix** — current mapping in `wizard_compile.py` is wrong. See `design/CHARA_CARD.md`.
-- **`description` field** — personality prose not wired into birth certificate. See `design/CHARA_CARD.md`.
-- **`creator_notes`** — one line in `wizard_compile.py`. See `design/CHARA_CARD.md`.
 - **Mood → TTS override UI** — speed/blend per mood in Companion Settings Mood tab. Schema already in config, just needs UI. See `design/TTS.md`.
-- **Image click-to-expand** — `.msg-img` thumbnails in chat show inline but click-to-fullsize not yet implemented. See `design/FEATURES.md`.
 - **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`.
 - **Mid-session gap detection** — long idle → re-inject updated timestamp into system prompt. Piggyback on consolidation idle timer. Low priority.
 - **Tool settings UI** — global enable/disable per tool + per-companion overrides. Settings > Tools tab. See `design/FEATURES.md`.
-- **Voice discovery silent failure** — no feedback shown when Kokoro finds no voices. Small UX fix.
 - **llama-server args drift** — launch args in `server.py` may have drifted from current llama.cpp API. Needs a pass against current docs.
 - **Import QA round-trip** — ongoing edge case testing as real use surfaces issues.
 

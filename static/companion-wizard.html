@@ -1222,7 +1222,17 @@ function _getTarget(name) {
   return _data[name];
 }
 
-const SPECIES_EMOJI = { elf:'🌿', vampire:'🌑', orc:'⚔️', spirit:'✨', fae:'🍄', android:'⚡', demon:'🔥', angel:'🕊️' };
+const SPECIES_EMOJI  = { elf:'🌿', vampire:'🌑', orc:'⚔️', spirit:'✨', fae:'🍄', android:'⚡', demon:'🔥', angel:'🕊️' };
+const SPECIES_COLORS = {
+  elf:     '#4a7c59',
+  vampire: '#3d3450',
+  orc:     '#5c7a3e',
+  spirit:  '#7c6fb0',
+  fae:     '#9b59b6',
+  android: '#4a8fa8',
+  demon:   '#8b2020',
+  angel:   '#c8a84b',
+};
 
 // Neutral humanoid silhouette — shown when no special species is selected.
 // Filled shape (not line art) so it reads clearly at any orb size.
@@ -1910,7 +1920,7 @@ function _updatePortrait() {
 
   const el       = document.getElementById('portrait-text');
   const emojiEl  = document.getElementById('portrait-emoji');
-  const newEmoji = SPECIES_EMOJI[a.species] || '\u2736';
+  const speciesColor = SPECIES_COLORS[a.species] || 'var(--indigo)';
 
   el.style.opacity      = '0';
   emojiEl.style.opacity = '0';
@@ -1921,8 +1931,14 @@ function _updatePortrait() {
       const s = parts.join(', ');
       el.textContent = s.charAt(0).toUpperCase() + s.slice(1) + '.';
     }
-    emojiEl.innerHTML = newEmoji === '\u2736' ? _getSilhouette() : newEmoji;
-    document.getElementById('wiz-orb-icon').innerHTML = newEmoji === '\u2736' ? _getSilhouette() : newEmoji;
+    const silHtml = _getSilhouette();
+    emojiEl.innerHTML = silHtml;
+    const orbIcon = document.getElementById('wiz-orb-icon');
+    orbIcon.innerHTML = silHtml;
+    [emojiEl, orbIcon].forEach(c => {
+      const svg = c?.querySelector('.wiz-silhouette');
+      if (svg) svg.style.color = speciesColor;
+    });
     el.style.opacity      = '1';
     emojiEl.style.opacity = '1';
   }, 400);

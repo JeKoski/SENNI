@@ -97,6 +97,19 @@ function _cpTtsRenderAll() {
   unavailEl.style.display = 'none';
   contentEl.style.display = 'block';
 
+  // Warn if TTS is available but no voices were discovered
+  let noVoicesWarn = contentEl.querySelector('.cp-tts-no-voices');
+  if (_cpTtsInitDone && _cpTtsVoiceList.length === 0) {
+    if (!noVoicesWarn) {
+      noVoicesWarn = document.createElement('div');
+      noVoicesWarn.className = 'cp-tts-no-voices cp-tts-unavailable';
+      noVoicesWarn.innerHTML = '<strong>No voices discovered.</strong> Kokoro may be installed but voice files are missing. Try restarting SENNI or reinstalling Kokoro.';
+      contentEl.insertBefore(noVoicesWarn, contentEl.firstChild);
+    }
+  } else if (noVoicesWarn) {
+    noVoicesWarn.remove();
+  }
+
   // If cpTtsPopulate() was already called (from cpPopulate on window open),
   // _cpTtsSlots already has the right data — just render them.
   // Otherwise fall back to reading from cpSettings directly.
