@@ -266,30 +266,67 @@
         <!-- Download tab -->
         <div id="model-dl-tab">
           <div class="model-list">
+
             <div class="model-card" data-model="gemma4-e4b-q4km" onclick="selectModelCard(this)">
-              <div class="model-card-top">
-                <span class="model-name">Gemma 4 E4B</span>
-                <span class="model-badge recommended">Recommended</span>
+              <div class="model-card-body">
+                <div class="model-card-info">
+                  <div class="model-card-top">
+                    <span class="model-name">Gemma 4 E4B</span>
+                    <span class="model-badge recommended">Recommended</span>
+                  </div>
+                  <span class="model-desc">SENNI's primary model. Fast, capable, and great at being a companion.</span>
+                  <div class="model-meta">
+                    <span class="model-size">~3 GB</span>
+                    <span class="model-dot">·</span>
+                    <span class="model-time">~10 min on average connection</span>
+                  </div>
+                </div>
+                <div class="model-card-side">
+                  <button class="model-dl-btn" style="display:none" onclick="event.stopPropagation();startModelDownload()">Download →</button>
+                  <span class="model-available" style="display:none">&#10003; Available</span>
+                </div>
               </div>
-              <span class="model-desc">SENNI's primary model. Fast, capable, and great at being a companion.</span>
-              <div class="model-meta">
-                <span class="model-size">~3 GB</span>
-                <span class="model-dot">·</span>
-                <span class="model-time">~10 min on average connection</span>
+              <div class="model-card-mm" style="display:none">
+                <div class="model-card-mm-inner" onclick="event.stopPropagation();toggleMultimodal()">
+                  <div class="toggle-track on mm-toggle-track"><div class="toggle-thumb"></div></div>
+                  <div>
+                    <div class="toggle-label"><strong>Image support</strong> — multimodal (mmproj)</div>
+                    <div class="toggle-sub">Adds ~1 GB. Needs 8 GB+ VRAM.</div>
+                  </div>
+                </div>
               </div>
             </div>
+
             <div class="model-card" data-model="qwen35-9b-q4km" onclick="selectModelCard(this)">
-              <div class="model-card-top">
-                <span class="model-name">Qwen 3.5 9B</span>
-                <span class="model-badge capable">More capable</span>
+              <div class="model-card-body">
+                <div class="model-card-info">
+                  <div class="model-card-top">
+                    <span class="model-name">Qwen 3.5 9B</span>
+                    <span class="model-badge capable">More capable</span>
+                  </div>
+                  <span class="model-desc">Better reasoning and more expressive. Needs more memory or VRAM.</span>
+                  <div class="model-meta">
+                    <span class="model-size">~5.5 GB</span>
+                    <span class="model-dot">·</span>
+                    <span class="model-time">~18 min on average connection</span>
+                  </div>
+                </div>
+                <div class="model-card-side">
+                  <button class="model-dl-btn" style="display:none" onclick="event.stopPropagation();startModelDownload()">Download →</button>
+                  <span class="model-available" style="display:none">&#10003; Available</span>
+                </div>
               </div>
-              <span class="model-desc">Better reasoning and more expressive. Needs more memory or VRAM.</span>
-              <div class="model-meta">
-                <span class="model-size">~5.5 GB</span>
-                <span class="model-dot">·</span>
-                <span class="model-time">~18 min on average connection</span>
+              <div class="model-card-mm" style="display:none">
+                <div class="model-card-mm-inner" onclick="event.stopPropagation();toggleMultimodal()">
+                  <div class="toggle-track on mm-toggle-track"><div class="toggle-thumb"></div></div>
+                  <div>
+                    <div class="toggle-label"><strong>Image support</strong> — multimodal (mmproj)</div>
+                    <div class="toggle-sub">Adds ~1 GB. Needs 8 GB+ VRAM.</div>
+                  </div>
+                </div>
               </div>
             </div>
+
             <div class="model-card-note">Larger models coming soon — pending hardware testing.</div>
           </div>
           <div class="dl-progress" id="model-dl-progress" style="display:none">
@@ -299,10 +336,6 @@
               <span class="dl-eta" id="model-dl-eta"></span>
             </div>
             <button class="btn-cancel" onclick="cancelModelDownload()">Cancel download</button>
-          </div>
-          <div class="step-actions" id="model-dl-actions">
-            <div></div>
-            <button class="btn-primary" id="btn-model-dl-next" onclick="startModelDownload()" disabled>Download →</button>
           </div>
         </div>
 
@@ -316,26 +349,31 @@
             <button class="btn-secondary" id="scan-btn" onclick="scanForModels()">Scan</button>
           </div>
           <div class="scan-results" id="scan-results"></div>
-
-          <div class="toggle-row" onclick="toggleMultimodal()" style="margin-top:8px">
-            <div class="toggle-track" id="mm-toggle"><div class="toggle-thumb"></div></div>
-            <span class="toggle-label"><strong>Multimodal</strong> — enable image support (requires an mmproj file)</span>
-          </div>
-          <div class="mmproj-section" id="mmproj-section">
-            <span class="field-label" style="margin-bottom:9px">Vision projector (mmproj)</span>
-            <div class="file-chip-row">
-              <div class="file-chip empty" id="mmproj-chip" onclick="browseFile('mmproj')">
-                <span class="file-chip-icon">🔭</span>
-                <span class="file-chip-name" id="mmproj-chip-name">Click to select…</span>
-              </div>
-            </div>
-            <div id="mmproj-candidates-wrap" style="display:none">
-              <div style="font-size:11.5px;color:var(--text-muted);margin:8px 0 6px">Possible matches in same folder:</div>
-              <div id="mmproj-candidate-list"></div>
-            </div>
-            <p class="mmproj-note">Must match your model's embedding size exactly.</p>
-          </div>
           <div class="error-msg" id="err-model"></div>
+
+          <div class="toggle-row mm-toggle-row" onclick="toggleMultimodal()" style="margin-top:12px">
+            <div class="toggle-track on mm-toggle-track"><div class="toggle-thumb"></div></div>
+            <div>
+              <div class="toggle-label"><strong>Image support</strong> — multimodal (mmproj)</div>
+              <div class="toggle-sub">Needs 8 GB+ VRAM.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- mmproj file picker: browse tab only -->
+        <div class="mmproj-section" id="mmproj-section">
+          <span class="field-label" style="margin-bottom:9px">Vision projector (mmproj)</span>
+          <div class="file-chip-row">
+            <div class="file-chip empty" id="mmproj-chip" onclick="browseFile('mmproj')">
+              <span class="file-chip-icon">🔭</span>
+              <span class="file-chip-name" id="mmproj-chip-name">Click to select…</span>
+            </div>
+          </div>
+          <div id="mmproj-candidates-wrap" style="display:none">
+            <div style="font-size:11.5px;color:var(--text-muted);margin:8px 0 6px">Possible matches in same folder:</div>
+            <div id="mmproj-candidate-list"></div>
+          </div>
+          <p class="mmproj-note">Must match your model's embedding size exactly.</p>
         </div>
       </div>
 
@@ -356,10 +394,11 @@
               <div class="feature-text">
                 <div class="feature-name">Voice responses</div>
                 <div class="feature-desc">I can speak to you out loud using Kokoro TTS — runs locally, no internet needed once set up.</div>
-                <div class="feature-size">~300 MB download</div>
+                <div class="feature-size" id="tts-feat-size">~300 MB download</div>
               </div>
               <div class="toggle-track on" id="tts-toggle"><div class="toggle-thumb"></div></div>
             </div>
+            <div class="feature-status" id="tts-feat-status"></div>
           </div>
 
           <div class="feature-card enabled" id="feat-memory" onclick="toggleFeature('memory')">
@@ -372,12 +411,23 @@
               <div class="feature-text">
                 <div class="feature-name">Memory</div>
                 <div class="feature-desc">I'll remember our conversations across sessions. Everything stays on your PC — nothing leaves your machine.</div>
-                <div class="feature-size">Small install</div>
+                <div class="feature-size" id="memory-feat-size">Small install</div>
               </div>
               <div class="toggle-track on" id="memory-toggle"><div class="toggle-thumb"></div></div>
             </div>
+            <div class="feature-status" id="memory-feat-status"></div>
           </div>
         </div>
+
+        <div class="toggle-row" onclick="toggleLocalInstall()" style="margin-top:4px;margin-bottom:4px">
+          <div class="toggle-track on" id="local-install-toggle"><div class="toggle-thumb"></div></div>
+          <div>
+            <div class="toggle-label"><strong>Install locally for Senni</strong></div>
+            <div class="toggle-sub">Keeps Senni's packages separate from your system Python. Recommended.</div>
+          </div>
+        </div>
+
+        <div class="feature-status" id="espeak-status" style="display:none;color:#fbbf24;border-top-color:rgba(251,191,36,0.15)"></div>
 
         <div class="dl-progress" id="extras-dl-progress" style="display:none">
           <div class="dl-bar"><div class="dl-fill" id="extras-dl-fill"></div></div>

@@ -39,6 +39,7 @@ DEFAULTS = {
     "port_bridge":      8000,
     "port_model":       8081,
     "first_run":        True,
+    "setup_complete":   True,   # True = legacy compat; wizard sets False at boot start, True on completion
 
     # Per-OS paths — populated progressively as the user sets up on each OS
     # Keys match platform.system(): "Linux", "Windows", "Darwin"

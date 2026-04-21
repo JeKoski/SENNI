@@ -37,7 +37,6 @@ from scripts.config import (
     CONFIG_FILE,
     COMPANIONS_DIR,
     DEFAULTS,
-    build_initial_config,
     build_server_command,
     delete_avatar_files,
     detect_gpu,
@@ -72,6 +71,17 @@ app.add_middleware(
 # ── Setup router ───────────────────────────────────────────────────────────────
 from scripts.setup_router import router as setup_router
 app.include_router(setup_router)
+
+# ── Features sys.path patch ────────────────────────────────────────────────────
+# Extras (kokoro, chromadb) installed by wizard land in ./features/packages/.
+# Patch sys.path before tts/memory router imports so chromadb is findable.
+# tts.py subprocess gets PYTHONPATH set in tts_server._start_tts_process instead.
+import sys as _sys
+_features_packages = PROJECT_ROOT / "features" / "packages"
+if _features_packages.is_dir():
+    _fp = str(_features_packages)
+    if _fp not in _sys.path:
+        _sys.path.insert(0, _fp)
 
 # ── TTS router ─────────────────────────────────────────────────────────────────
 try:
@@ -218,9 +228,10 @@ def _kill_llama_server() -> None:
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    config = load_config()
-    model  = config.get("model_path", "")
-    if model and Path(model).exists():
+    config         = load_config()
+    model          = config.get("model_path", "")
+    setup_complete = config.get("setup_complete", True)
+    if model and Path(model).exists() and setup_complete:
         return FileResponse(str(STATIC_DIR / "chat.html"))
     return FileResponse(str(STATIC_DIR / "wizard.html"))
 
@@ -494,18 +505,38 @@ async def api_status():
 @app.post("/api/setup")
 async def api_setup(request: Request):
     body   = await request.json()
-    config = build_initial_config(
-        model_path  = body.get("model_path", ""),
-        mmproj_path = body.get("mmproj_path", ""),
-        gpu_type    = body.get("gpu_type"),
-        ngl         = int(body.get("ngl", 99)),
-        port_bridge = int(body.get("port_bridge", 8000)),
-        port_model  = int(body.get("port_model", 8081)),
-    )
+    system = platform.system()
+
+    # Start from existing config so user settings aren't wiped on rerun.
+    # load_config() returns DEFAULTS on first run (no config.json yet).
+    config = load_config()
+
+    model_path  = body.get("model_path", "")
+    mmproj_path = body.get("mmproj_path", "")
+    gpu_type    = body.get("gpu_type") or detect_gpu()
+
+    config["model_path"]  = model_path
+    config["mmproj_path"] = mmproj_path
+    config["gpu_type"]    = gpu_type
+    config["ngl"]         = int(body.get("ngl", 99))
+    config["port_bridge"] = int(body.get("port_bridge", config.get("port_bridge", 8000)))
+    config["port_model"]  = int(body.get("port_model", config.get("port_model", 8081)))
+    config["first_run"]     = False
+    config["setup_complete"] = False  # marked True by POST /api/setup/complete after boot succeeds
+
+    if not isinstance(config.get("model_paths"),  dict): config["model_paths"]  = {}
+    if not isinstance(config.get("mmproj_paths"), dict): config["mmproj_paths"] = {}
+    if not isinstance(config.get("gpu_types"),    dict): config["gpu_types"]    = {}
+
+    if model_path:  config["model_paths"][system]  = model_path
+    if mmproj_path: config["mmproj_paths"][system] = mmproj_path
+    config["gpu_types"][system] = gpu_type
+
     if "tts_enabled" in body:
         config["tts"]["enabled"] = bool(body["tts_enabled"])
     if "memory_enabled" in body:
         config["memory"]["enabled"] = bool(body["memory_enabled"])
+
     get_companion_paths(config["companion_folder"])
     save_config(config)
     log.info("Config saved. Companion folder: %s", config["companion_folder"])
