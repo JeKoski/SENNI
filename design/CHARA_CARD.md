@@ -317,13 +317,13 @@ Prioritized by impact and implementation complexity:
 
 | Feature | Impact | Complexity | Notes |
 |---------|--------|-----------|-------|
-| `first_mes` — new chat opening message | High | Low | Static injection, no model call |
-| `system_prompt` field — character instruction block | High | Low | Write at compile, inject in buildSystemPrompt |
-| `post_history_instructions` — cognitive stack at prompt end | High | Low | Move stack framing to end of system prompt |
-| `creator_notes` — auto-populated export note | Low | Trivial | One line in wizard_compile.py |
-| `description` — add personality to prose | Medium | Low | Extend _build_birth_certificate() |
-| `scenario` — generate from relationship data | Medium | Low | Fix current wrong mapping |
-| `first_mes` auto-generation at compile | Medium | Medium | Archetype + closeness → opening line |
+| `first_mes` — new chat opening message | High | Low | ✅ Done 2026-04-21 |
+| `system_prompt` field — character instruction block | High | Low | ✅ Done 2026-04-21 |
+| `post_history_instructions` — cognitive stack at prompt end | High | Low | ✅ Done 2026-04-21 |
+| `creator_notes` — auto-populated export note | Low | Trivial | ✅ Done 2026-04-21 |
+| `description` — add personality to prose | Medium | Low | ✅ Done 2026-04-21 |
+| `scenario` — generate from relationship data | Medium | Low | ✅ Done 2026-04-21 |
+| `first_mes` auto-generation at compile | Medium | Medium | ✅ Done 2026-04-21 — archetype × closeness band |
 | `alternate_greetings` UI | Low | Medium | Wizard Step 9 or companion settings |
 | `mes_example` generation | Low | Medium | Auto-generate from voice style + traits |
 | Lorebook editor UI | Medium | Medium | New companion settings tab |

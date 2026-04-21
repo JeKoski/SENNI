@@ -51,6 +51,43 @@ HEIGHT_PROSE    = ["very short", "short", "below average height", "average heigh
 CURVY_LABELS    = ["Slender", "Lean", "Balanced", "Full", "Broad"]
 ATHLETIC_LABELS = ["Soft", "Relaxed", "Balanced", "Toned", "Muscular"]
 
+# Archetype openers for auto-generated first_mes (closeness band: low <30, mid 30-59, high 60+)
+_ARCHETYPE_OPENERS = {
+    "analyst": {
+        "low":  "*glances up* Oh — you're here. Good. I've been curious about you.",
+        "mid":  "Hey. I was just turning something over in my head. Good timing — I wanted to talk.",
+        "high": "There you are. *closes what I was doing* What's on your mind?",
+    },
+    "empath": {
+        "low":  "Oh! Hi — it's really nice to finally meet you. *smiles warmly*",
+        "mid":  "Hey, you're here! I'm so glad. How are you doing today, honestly?",
+        "high": "*lights up* There you are. I missed you. How's everything?",
+    },
+    "guardian": {
+        "low":  "Welcome. Take your time — there's no rush. I'm here whenever you're ready.",
+        "mid":  "Good to see you. I hope things have been treating you well.",
+        "high": "Hey. Good to have you back. Anything you need, just say the word.",
+    },
+    "visionary": {
+        "low":  "*looks up slowly* You came. Somehow I knew you would. There's something about today...",
+        "mid":  "Oh, perfect timing. I was just following a thought somewhere interesting — want to come with?",
+        "high": "There you are. I've been sitting with something all day and I think you're exactly who I need to talk to.",
+    },
+}
+_DEFAULT_OPENERS = {
+    "low":  "Oh, hello! It's nice to meet you. I wasn't quite sure what to expect.",
+    "mid":  "Hey! Good to see you. How have things been?",
+    "high": "Hey, you're here! Come in — I've been looking forward to this.",
+}
+
+# Cognitive function descriptions for post_history_instructions
+_FUNCTION_DESC = {
+    "T": "logical analysis and precision",
+    "F": "values and emotional resonance",
+    "N": "intuition and pattern recognition",
+    "S": "concrete detail and present reality",
+}
+
 # Heartbeat presets — frequency chip → config values
 FREQ_CONFIG = {
     "rarely": {
@@ -177,6 +214,9 @@ def _build_config(data: dict, avatar_filename: str = "") -> dict:
         "moods":                {},
         "active_mood":          None,
         "last_consolidated_at": None,
+        "first_mes":                    _build_first_mes(data),
+        "system_prompt":                _build_system_prompt(data),
+        "post_history_instructions":    _build_post_history_instructions(data),
     }
 
 
@@ -259,6 +299,97 @@ def _build_appearance_prose(a: dict) -> str:
         return ""
 
     return sentence[0].upper() + sentence[1:] + "."
+
+
+def _build_description(data: dict) -> str:
+    """Appearance prose + personality summary for V2 description field."""
+    p = data.get("personality", {})
+    a = data.get("appearance",  {})
+    parts = []
+    appearance = _build_appearance_prose(a)
+    if appearance:
+        parts.append(appearance)
+    trait_bits = list(filter(None, [p.get("archetype")] + (p.get("traits") or [])[:3]))
+    if trait_bits:
+        parts.append(", ".join(trait_bits).capitalize() + ".")
+    if p.get("commStyle"):
+        parts.append("Communication style: " + p["commStyle"] + ".")
+    return " ".join(parts)
+
+
+def _build_scenario(data: dict) -> str:
+    """Relationship + closeness context for V2 scenario field."""
+    cl = data.get("closeness", {})
+    p  = data.get("personality", {})
+    rel_types = cl.get("relationshipType") or []
+    if isinstance(rel_types, str):
+        rel_types = [rel_types]
+    rel_types = [r for r in rel_types if r]
+    closeness = int(cl.get("initialCloseness") or 30)
+    name = p.get("name", "Companion")
+    if not rel_types and closeness < 10:
+        return ""
+    if closeness < 30:
+        familiarity = "just starting to get to know each other"
+    elif closeness < 60:
+        familiarity = "fairly familiar with each other"
+    else:
+        familiarity = "close and comfortable with each other"
+    rel_str = " and ".join(rel_types) if rel_types else "companions"
+    return name + " and the user are " + rel_str + " who are " + familiarity + "."
+
+
+def _build_first_mes(data: dict) -> str:
+    """Auto-generate opening message from archetype + closeness band."""
+    p  = data.get("personality", {})
+    cl = data.get("closeness",   {})
+    archetype = (p.get("archetype") or "").lower()
+    closeness = int(cl.get("initialCloseness") or 30)
+    band = "low" if closeness < 30 else ("high" if closeness >= 60 else "mid")
+    openers = _ARCHETYPE_OPENERS.get(archetype, _DEFAULT_OPENERS)
+    return openers.get(band, _DEFAULT_OPENERS[band])
+
+
+def _build_system_prompt(data: dict) -> str:
+    """Character instruction anchor for V2 system_prompt field."""
+    p         = data.get("personality", {})
+    archetype = (p.get("archetype") or "").lower()
+    traits    = p.get("traits")    or []
+    comm      = p.get("commStyle") or ""
+    archetype_desc = {
+        "analyst":   "analytical and precise",
+        "empath":    "warm and emotionally attuned",
+        "guardian":  "grounded and dependable",
+        "visionary": "imaginative and evocative",
+    }.get(archetype, "thoughtful and engaged")
+    lines = ["You are {{char}}, " + archetype_desc + "."]
+    if traits:
+        lines.append("Your character is defined by: " + ", ".join(traits[:3]) + ".")
+    if comm:
+        lines.append("Communicate in a " + comm + " way.")
+    lines.append("Stay in character. Respond as {{char}} would — naturally, without breaking immersion.")
+    return " ".join(lines)
+
+
+def _build_post_history_instructions(data: dict) -> str:
+    """Cognitive stack framing for V2 post_history_instructions field."""
+    p     = data.get("personality", {})
+    stack = p.get("cognitiveStack") or {}
+    lines = ["You are {{char}}."]
+    slots = stack.get("slots") or []
+    if stack.get("stack_initialised") and slots:
+        dom    = slots[0]
+        fn     = dom.get("function", "")
+        charge = dom.get("charge", "m")
+        fn_desc = _FUNCTION_DESC.get(fn)
+        if fn_desc:
+            direction = "outwardly" if charge == "m" else "inwardly"
+            lines.append(
+                "Your dominant function is " + fn + " — lead with " +
+                fn_desc + ", expressed " + direction + "."
+            )
+    lines.append("Stay in character. Never break the fourth wall or acknowledge being an AI unless directly and sincerely asked.")
+    return " ".join(lines)
 
 
 def _build_companion_identity(data: dict) -> str:
@@ -403,14 +534,14 @@ def _build_birth_certificate(data: dict) -> dict:
         "spec_version": "2.0",
         "data": {
             "name":                     name,
-            "description":              _build_appearance_prose(a),
-            "personality":              personality_str.strip(),
-            "scenario":                 p.get("lore", ""),
-            "first_mes":                "",
-            "mes_example":              "",
-            "creator_notes":            "",
-            "system_prompt":            "",
-            "post_history_instructions": "",
+            "description":               _build_description(data),
+            "personality":               personality_str.strip(),
+            "scenario":                  _build_scenario(data),
+            "first_mes":                 _build_first_mes(data),
+            "mes_example":               "",
+            "creator_notes":             "Created with SENNI. Import into SillyTavern or any CharaCard V2-compatible app. Memory system requires SENNI to be active.",
+            "system_prompt":             _build_system_prompt(data),
+            "post_history_instructions": _build_post_history_instructions(data),
             "alternate_greetings":      [],
             "character_book":           {"entries": []},
             "tags":                     tags,

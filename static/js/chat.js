@@ -550,6 +550,37 @@ async function seedTemplates() {
   }
 }
 
+// ── Image lightbox ────────────────────────────────────────────────────────────
+function _openImageLightbox(src, alt) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = alt || '';
+  img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6)';
+  overlay.appendChild(img);
+  overlay.addEventListener('click', () => overlay.remove());
+  document.addEventListener('keydown', function esc(e) {
+    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+  });
+  document.body.appendChild(overlay);
+}
+
+// ── Template resolution ───────────────────────────────────────────────────────
+function _resolveTemplate(str) {
+  return str
+    .replace(/\{\{char\}\}/g, companionName || 'Companion')
+    .replace(/\{\{user\}\}/g, 'you');
+}
+
+function _injectFirstMes() {
+  if (!config.first_mes || conversationHistory.length > 0) return;
+  const row = appendMessage('companion', config.first_mes);
+  _attachMessageControls(row, 'companion');
+  conversationHistory.push({ role: 'assistant', content: config.first_mes });
+  _saveCurrentTabState();
+}
+
 // ── Session start ─────────────────────────────────────────────────────────────
 async function startSession() {
   removeEmptyState();
@@ -578,6 +609,7 @@ async function startSession() {
   } else if (!hasSetup) {
     triggerFirstRun();
   } else {
+    _injectFirstMes();
     enableInput();
   }
 
@@ -643,6 +675,7 @@ function newChat(keepVisible) {
     renderTabList();
     saveTabs();
     appendSystemNote('New conversation started -- ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+    _injectFirstMes();
   } else {
     _saveCurrentTabState();
     saveTabs();
@@ -741,7 +774,10 @@ async function triggerFirstRun() {
   if (firstMsg) {
     conversationHistory.push(bootstrapMsg);
     conversationHistory.push({ role: 'assistant', content: firstMsg });
-    appendMessage('companion', firstMsg);
+    if (!streamWasRendered()) {
+      const row = appendMessage('companion', firstMsg);
+      _attachMessageControls(row, 'companion');
+    }
     _saveCurrentTabState(); saveTabs();
   }
   enableInput();
@@ -813,6 +849,7 @@ async function sendMessage() {
         img.setAttribute('data-img-ref', name);
         img.src = `data:${a.mimeType};base64,${a.content}`;
         img.alt = a.name;
+        img.onclick = () => _openImageLightbox(img.src, img.alt);
         bubble.appendChild(img);
       });
     }
@@ -913,7 +950,9 @@ function buildSystemPrompt(mode) {
     if (text && text.trim()) identity += '\n\n[' + fname + ']\n' + text.trim();
   }
 
-  let p = 'Your name is ' + name + '. Today is ' + date + ', ' + time + '.';
+  let p = '';
+  if (config.system_prompt) p += _resolveTemplate(config.system_prompt) + '\n\n';
+  p += 'Your name is ' + name + '. Today is ' + date + ', ' + time + '.';
   if (identity) p += '\n\nYour identity:\n' + identity;
 
   // Memory context — session-start retrieval from ChromaDB (empty when unavailable)
@@ -1127,6 +1166,10 @@ RELATIONAL STATE — use update_relational_state only when the relationship itse
     p += '\n\nFirst conversation: introduce yourself briefly, ask the user\'s name. Once they tell you, save it to soul/user_profile.md using the memory tool\'s read-then-write flow. Build their profile naturally over the conversation.';
   } else {
     p += '\n\nBe warm and concise. Plain prose -- no bullet points or headers in your replies unless asked.';
+  }
+
+  if (config.post_history_instructions && mode !== 'heartbeat') {
+    p += '\n\n' + _resolveTemplate(config.post_history_instructions);
   }
 
   return p;

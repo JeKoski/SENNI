@@ -137,6 +137,37 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-21 (Quick wins + duplicate bubble fix)
+
+**Chara card fields wired. first_mes injected. Duplicate bubble fixed. Species color-shift. Image lightbox. Voice warning.**
+
+### What changed
+
+**`scripts/wizard_compile.py`:**
+- 5 new builder functions: `_build_description`, `_build_scenario`, `_build_first_mes`, `_build_system_prompt`, `_build_post_history_instructions`
+- `scenario` field fixed — was wrongly using `personality.lore`; now generates from relationship type + closeness band
+- `description` field extended — appearance prose + archetype + traits + comm style
+- `first_mes` auto-generated at compile — archetype × closeness band templates (12 variants). Stored in `config.json` + V2 card
+- `system_prompt` — character anchor instruction block, `{{char}}` placeholder, stored in `config.json` + V2 card
+- `post_history_instructions` — cognitive stack framing at prompt end, `{{char}}` placeholder, stored in `config.json` + V2 card
+- `creator_notes` — auto-populated SENNI export note
+
+**`static/js/chat.js`:**
+- `_resolveTemplate(str)` — substitutes `{{char}}` → companionName, `{{user}}` → "you"
+- `_injectFirstMes()` — injects `config.first_mes` as first companion bubble when `conversationHistory.length === 0`; called in `startSession()` (fresh load) and `newChat()` (!keepVisible only)
+- `buildSystemPrompt()` — `config.system_prompt` prepended; `config.post_history_instructions` appended (skipped for heartbeat mode)
+- `triggerFirstRun()` — fixed duplicate bubble bug: missing `streamWasRendered()` guard caused streaming bubble + `appendMessage` both firing. Added `_attachMessageControls` on non-streaming fallback path too
+- `_openImageLightbox(src, alt)` — fullscreen overlay on `msg-img` click; close via click or Escape
+
+**`static/companion-wizard.html`:**
+- `SPECIES_COLORS` lookup table (8 species → hex)
+- `_updatePortrait()` — always shows silhouette now; species color applied via `svg.style.color`. Emojis no longer shown in portrait/orb (still used in review header + compile orb)
+
+**`static/js/companion-tts.js`:**
+- `_cpTtsRenderAll()` — injects warning banner when TTS available but voice list empty after init
+
+---
+
 ## Session notes — 2026-04-19 #4 (Setup Wizard — extras install, TTS boot, intro redesign)
 
 **Extras install wired. TTS startup on boot. Model continue button fixed. Intro layout redesigned.**
