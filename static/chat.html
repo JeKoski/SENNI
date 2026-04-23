@@ -771,9 +771,11 @@
       <div class="sp-section-label" style="margin-top:18px">Paths</div>
       <div class="sp-mono-block" id="about-paths">—</div>
       <div class="sp-btn-row" style="margin-top:20px">
+        <button class="sp-btn-ghost" id="btn-run-diagnostics" onclick="spRunDiagnostics()">⬡ Run diagnostics</button>
         <button class="sp-btn-ghost" onclick="spRestartServer()">↺ Restart server</button>
         <button class="sp-btn-ghost" onclick="window.location.href='/wizard?rerun=1'">✦ Re-run wizard</button>
       </div>
+      <div id="diagnostics-results" style="display:none;margin-top:14px"></div>
       <div style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(248,113,113,0.2)">
         <div class="sp-section-label" style="color:rgba(248,113,113,0.6);margin-bottom:8px">Danger zone</div>
         <p style="font-size:12.5px;color:var(--text-muted);line-height:1.6;margin-bottom:14px">

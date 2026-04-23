@@ -8,8 +8,8 @@ Serves:
 - POST /api/setup     → save wizard config, returns {ok, companion_folder}
 - GET  /api/status    → current config + tool list (for the UI)
 - GET  /api/scan      → scan for .gguf files + detect GPU (wizard step 1)
-- POST /api/boot      → start llama-server subprocess
-- GET  /api/boot/log  → SSE stream of llama-server log lines
+- POST /api/boot      → start llama-server subprocess (boot_service)
+- GET  /api/boot/log  → SSE stream of llama-server log lines (boot_service)
 - POST /irina/message → MCP endpoint (tool calls from the model)
 """
 
@@ -19,27 +19,24 @@ import json
 import logging
 import os
 import platform
-import shlex
 import shutil
 import subprocess
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from scripts.boot_service import get_boot_status, kill_llama_server
+from scripts.boot_service import router as boot_router
 from scripts.config import (
     PROJECT_ROOT,
     CONFIG_FILE,
     COMPANIONS_DIR,
     TEMPLATES_DIR,
     DEFAULTS,
-    build_server_command,
-    delete_avatar_files,
     detect_gpu,
     find_gguf_files,
     find_mmproj_candidates,
@@ -52,6 +49,13 @@ from scripts.config import (
     save_companion_config,
     save_config,
     write_avatar_file,
+)
+from scripts.diagnostics import (
+    log_results,
+    results_to_dict,
+    run_full_checks,
+    run_startup_checks,
+    setup_file_logging,
 )
 from scripts.history_router import router as history_router
 from scripts.settings_router import create_settings_router
@@ -75,6 +79,7 @@ app.add_middleware(
 # ── Setup router ───────────────────────────────────────────────────────────────
 from scripts.setup_router import router as setup_router
 app.include_router(setup_router)
+app.include_router(boot_router)
 app.include_router(history_router)
 
 # ── Features sys.path patch ────────────────────────────────────────────────────
@@ -102,6 +107,13 @@ STATIC_DIR = PROJECT_ROOT / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+# ── File logging ───────────────────────────────────────────────────────────────
+# One timestamped log file per boot, last 10 kept. Set up early so all startup
+# output (including router imports above) lands in the file.
+logging.basicConfig(level=logging.INFO)
+_log_file = setup_file_logging(PROJECT_ROOT / "logs", keep=10)
+log.info("Logging to %s", _log_file)
+
 # ── Memory  ─────────────────────────────────────────────────────────────────
 
 try:
@@ -118,20 +130,6 @@ except ImportError:
 # ── Global state ───────────────────────────────────────────────────────────────
 
 _tool_manifest: list[dict] = []
-_llama_process: subprocess.Popen | None = None
-_boot_log:      list[str]  = []
-_boot_ready:    bool       = False
-
-# Distinct from _boot_ready: True from the moment _build_and_launch fires until
-# the subprocess exits (or is killed). This closes the TOCTOU window where
-# _llama_process is still None but a thread has already been started — a second
-# /api/boot call arriving in that window used to spawn a second process.
-_boot_launching: bool = False
-
-# Serialises all boot state mutations. _boot_launching is set inside this lock
-# before it is released, so any concurrent /api/boot call that acquires the lock
-# after us sees the flag immediately.
-_boot_lock = threading.Lock()
 
 # Thread pool for synchronous work (tool handlers, tkinter file dialogs).
 # tkinter on Windows must not run on the asyncio event loop thread.
@@ -146,6 +144,10 @@ async def on_startup():
     _tool_manifest = load_tools()
     log.info("Server ready. %d tools loaded.", len(_tool_manifest))
 
+    cfg = load_config()
+    results = run_startup_checks(cfg, PROJECT_ROOT, COMPANIONS_DIR)
+    log_results(results, label="Startup diagnostics")
+
     # Seed default companion from template on first boot
     cfg = load_config()
     default_folder = cfg.get("companion_folder", DEFAULTS["companion_folder"])
@@ -157,7 +159,7 @@ async def on_startup():
             log.warning("No template found for companion '%s' — skipping seed.", default_folder)
 
     # Belt-and-suspenders: also kill on abnormal Python exit
-    atexit.register(_kill_llama_server)
+    atexit.register(kill_llama_server)
     atexit.register(kill_tts_server)
     atexit.register(kill_memory_server)
 
@@ -172,71 +174,10 @@ async def on_startup():
 async def on_shutdown():
     """Called by uvicorn on clean exit (Ctrl+C, SIGTERM). Kills llama-server tree."""
     log.info("Shutting down — stopping llama-server…")
-    _kill_llama_server()
+    kill_llama_server()
     kill_tts_server()
     kill_memory_server()
     _executor.shutdown(wait=False)
-
-
-# ── Process management ─────────────────────────────────────────────────────────
-
-def _kill_process_tree(proc: subprocess.Popen) -> None:
-    """
-    Kill a process and all its children.
-
-    On Windows we use `taskkill /F /T` because proc.terminate() only signals
-    the direct child (cmd.exe when shell=True) and does not cascade to
-    grandchildren (the actual llama-server.exe). taskkill /T kills the whole
-    tree rooted at the given PID.
-
-    On Linux/macOS, terminate() + kill() on the process group is sufficient
-    because we use shell=False for non-Intel and exec for Intel (so the shell
-    replaces itself with llama-server).
-    """
-    if proc is None or proc.poll() is not None:
-        return
-
-    pid = proc.pid
-    try:
-        if IS_WIN:
-            # /F = force, /T = include child tree, /PID = target by PID
-            subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(pid)],
-                capture_output=True,   # suppress taskkill's own stdout/stderr
-            )
-            # Give the tree a moment to die, then wait on the direct child
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                pass  # taskkill already did its job; cmd.exe handle may linger
-        else:
-            proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                log.warning("llama-server did not exit after SIGTERM — sending SIGKILL (pid %s)", pid)
-                proc.kill()
-                proc.wait(timeout=2)
-    except Exception as e:
-        log.warning("Error killing process tree (pid %s): %s", pid, e)
-
-
-def _kill_llama_server() -> None:
-    """
-    Public kill entry-point. Kills the process tree and resets all boot state.
-    Safe to call from atexit, on_shutdown, or any API endpoint.
-    """
-    global _llama_process, _boot_launching, _boot_ready
-
-    proc = _llama_process
-    if proc is not None:
-        log.info("Killing llama-server tree (pid %s)…", proc.pid)
-        _kill_process_tree(proc)
-
-    # Reset state regardless — even if proc was already dead
-    _llama_process   = None
-    _boot_launching  = False
-    _boot_ready      = False
 
 
 # ── UI routes ──────────────────────────────────────────────────────────────────
@@ -483,12 +424,7 @@ app.include_router(create_settings_router(_merged_presence_presets, _tts_availab
 async def api_status():
     config = load_config()
 
-    process_alive = (
-        _llama_process is not None and
-        _llama_process.poll() is None
-    )
-    model_running = process_alive and _boot_ready
-
+    boot          = get_boot_status()
     comp_folder   = config.get("companion_folder", "default")
     companion_cfg = load_companion_config(comp_folder)
     companion_cfg = migrate_avatar(comp_folder, companion_cfg)
@@ -505,10 +441,8 @@ async def api_status():
     return {
         "config":                    cfg_out,
         "tools":                     [t["name"] for t in _tool_manifest],
-        "model_running":             model_running,
-        # Also expose whether we're mid-launch — chat.js uses this to avoid
-        # calling /api/boot a second time while the model is still loading.
-        "model_launching":           _boot_launching and not _boot_ready,
+        "model_running":             boot["model_running"],
+        "model_launching":           boot["model_launching"],
         "avatar_url":                f"/api/companion/{comp_folder}/avatar" if companion_cfg.get("avatar_path") else "",
         "sidebar_avatar_url":        f"/api/companion/{comp_folder}/avatar?slot=sidebar" if companion_cfg.get("sidebar_avatar_path") else "",
         "companion_name":            companion_cfg.get("companion_name", config.get("companion_name", "")),
@@ -521,6 +455,17 @@ async def api_status():
         "moods":                     companion_cfg.get("moods", {}),
         "active_mood":               companion_cfg.get("active_mood", None),
     }
+
+
+# ── API: diagnostics ──────────────────────────────────────────────────────────
+
+@app.get("/api/diagnostics")
+async def api_diagnostics():
+    """Run full diagnostic suite and return results. Also emits to log file."""
+    cfg = load_config()
+    results = run_full_checks(cfg, PROJECT_ROOT, COMPANIONS_DIR)
+    log_results(results, label="On-demand diagnostics")
+    return results_to_dict(results)
 
 
 # ── API: setup (wizard final step) ────────────────────────────────────────────
@@ -564,239 +509,6 @@ async def api_setup(request: Request):
     save_config(config)
     log.info("Config saved. Companion folder: %s", config["companion_folder"])
     return {"ok": True, "companion_folder": config["companion_folder"]}
-
-
-# ── API: boot llama-server ─────────────────────────────────────────────────────
-
-@app.post("/api/boot")
-async def api_boot(request: Request):
-    """
-    Start llama-server if not already running or launching.
-
-    Returns:
-      {ok: true,  already_running: true}  — process is up and ready, do nothing
-      {ok: true,  already_running: true}  — process is still loading, attach to
-                                            existing SSE log stream and wait
-      {ok: true,  already_running: false} — fresh launch started
-      {ok: false, error: "..."}           — misconfiguration
-
-    Pass {"force": true} to kill any running/launching process and restart.
-    """
-    global _llama_process, _boot_log, _boot_ready, _boot_launching
-
-    config = load_config()
-    if not config.get("model_path"):
-        return {"ok": False, "error": "No model path configured."}
-
-    force = False
-    try:
-        body  = await request.json()
-        force = bool(body.get("force", False))
-    except Exception:
-        pass
-
-    with _boot_lock:
-        # ── Already fully up ──────────────────────────────────────────────────
-        if not force and _boot_ready and _llama_process and _llama_process.poll() is None:
-            log.info("llama-server already ready (pid %s), skipping boot", _llama_process.pid)
-            return {"ok": True, "already_running": True}
-
-        # ── Mid-launch (process started but model not yet ready) ──────────────
-        # This is the key fix: a second /api/boot that arrives while the first
-        # launch is still loading the model must NOT start a second process.
-        if not force and _boot_launching:
-            log.info("llama-server is still launching — attaching to existing boot")
-            return {"ok": True, "already_running": True}
-
-        # ── Kill any existing process (forced restart or crashed) ─────────────
-        if _llama_process is not None or _boot_launching:
-            log.info("Stopping existing llama-server before relaunch…")
-            _kill_llama_server()  # resets _llama_process, _boot_launching, _boot_ready
-
-        # ── Fresh launch ──────────────────────────────────────────────────────
-        _boot_log      = []
-        _boot_ready    = False
-        _boot_launching = True   # set BEFORE releasing the lock so any concurrent
-                                  # call that acquires it next sees the flag immediately
-
-        _build_and_launch(config)
-
-    log.info("llama-server launching…")
-    return {"ok": True, "already_running": False}
-
-
-def _build_and_launch(config: dict) -> None:
-    """
-    Resolve the binary, build the command, and start the watcher thread.
-    Must be called with _boot_lock held.
-    """
-    IS_MAC = platform.system() == "Darwin"
-    gpu    = config.get("gpu_type", "cpu")
-
-    # ── Resolve binary ────────────────────────────────────────────────────────
-    # Priority: 1) explicit config  2) next to model  3) PATH
-    server_exe = "llama-server.exe" if IS_WIN else "llama-server"
-    binary     = config.get("server_binary", "").strip() or None
-
-    if not binary:
-        model_dir  = Path(config["model_path"]).parent
-        candidates = [
-            model_dir / server_exe,
-            model_dir.parent / "bin" / server_exe,
-            model_dir.parent.parent / "build" / "bin" / server_exe,
-            Path("/usr/local/bin") / server_exe,
-            Path("/opt/homebrew/bin") / server_exe,
-            Path.home() / "llama.cpp" / "build" / "bin" / server_exe,
-        ]
-        binary = next((str(c) for c in candidates if c.exists()), None)
-
-    if not binary:
-        binary = shutil.which(server_exe) or server_exe
-
-    log.info("llama-server binary: %s", binary)
-
-    cmd_args = build_server_command(config, binary)
-
-    # ── OS / GPU launch parameters ────────────────────────────────────────────
-    env = os.environ.copy()
-
-    if IS_WIN:
-        if gpu == "intel":
-            # Intel SYCL requires oneAPI env sourced via setvars.bat.
-            # shell=True + cmd.exe chaining is unavoidable here.
-            # CREATE_NO_WINDOW suppresses the console popup.
-            oneapi  = r"C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
-            cmd_str = " ".join(f'"{a}"' for a in cmd_args)
-            full_cmd   = f'"{oneapi}" intel64 && {cmd_str}'
-            shell_args = {"shell": True, "creationflags": subprocess.CREATE_NO_WINDOW}
-            env["ONEAPI_DEVICE_SELECTOR"] = "level_zero:gpu"
-        else:
-            # List + shell=False handles paths with spaces correctly on Windows
-            full_cmd   = cmd_args
-            shell_args = {"shell": False, "creationflags": subprocess.CREATE_NO_WINDOW}
-            if gpu == "nvidia":
-                env.setdefault("CUDA_VISIBLE_DEVICES", "0")
-
-    elif IS_MAC:
-        full_cmd   = cmd_args
-        shell_args = {"shell": False}
-
-    else:  # Linux
-        if gpu == "intel":
-            oneapi_sh = "/opt/intel/oneapi/setvars.sh"
-            safe_cmd  = " ".join(shlex.quote(a) for a in cmd_args)
-            # exec replaces the shell with llama-server so the pid IS the target process
-            full_cmd  = f". {oneapi_sh} --force ; exec {safe_cmd}"
-            shell_args = {"shell": True, "executable": "/bin/bash"}
-            env["ONEAPI_DEVICE_SELECTOR"] = "level_zero:gpu"
-        else:
-            full_cmd   = cmd_args
-            shell_args = {"shell": False}
-            if gpu == "nvidia":
-                env.setdefault("CUDA_VISIBLE_DEVICES", "0")
-
-    threading.Thread(
-        target=_run_subprocess,
-        args=(full_cmd, shell_args, env),
-        daemon=True,
-        name="llama-server-watcher",
-    ).start()
-
-
-def _run_subprocess(full_cmd, shell_args: dict, env: dict) -> None:
-    """
-    Launch llama-server, tee every output line to _boot_log and stdout.
-    Clears _boot_launching when the process exits (success or failure).
-    """
-    global _llama_process, _boot_log, _boot_ready, _boot_launching
-
-    try:
-        proc = subprocess.Popen(
-            full_cmd,
-            **shell_args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=1,
-            universal_newlines=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-        )
-        _llama_process = proc
-        print(f"\n[llama-server] started (pid {proc.pid})", flush=True)
-
-        for line in iter(proc.stdout.readline, ""):
-            line = line.rstrip()
-            if not line:
-                continue
-
-            print(f"[llama-server] {line}", flush=True)
-            _boot_log.append(line)
-            if len(_boot_log) > 2000:
-                _boot_log = _boot_log[-1000:]
-
-            lower = line.lower()
-            if "server is listening" in lower or "http server listening" in lower:
-                _boot_ready    = True
-                _boot_launching = False   # model is up — launch phase is over
-
-        proc.stdout.close()
-        rc = proc.wait()
-        print(f"[llama-server] exited (code {rc})", flush=True)
-        _boot_log.append(f"[exited with code {rc}]")
-
-    except FileNotFoundError:
-        exe = full_cmd[0] if isinstance(full_cmd, list) else str(full_cmd).split()[0]
-        msg = (
-            f"[launcher error] llama-server not found: {exe!r}\n"
-            f"Set the binary path in Settings → Server, or add llama-server to your PATH."
-        )
-        print(msg, flush=True)
-        _boot_log.append(msg)
-
-    except Exception as e:
-        msg = f"[launcher error] {e}"
-        print(msg, flush=True)
-        _boot_log.append(msg)
-
-    finally:
-        # Always clear launching flag when the thread exits, whatever happened
-        _boot_launching = False
-
-
-# ── API: boot log SSE stream ───────────────────────────────────────────────────
-
-@app.get("/api/boot/log")
-async def api_boot_log():
-    """
-    SSE stream of llama-server log lines.
-    Multiple clients can attach simultaneously — they all read from _boot_log.
-    Sends {ready: true} once when _boot_ready becomes True, then slows polling.
-    """
-    async def generate() -> AsyncGenerator[str, None]:
-        sent       = 0
-        ready_sent = False
-
-        while True:
-            while sent < len(_boot_log):
-                yield f"data: {json.dumps({'line': _boot_log[sent]})}\n\n"
-                sent += 1
-
-            if _boot_ready and not ready_sent:
-                yield f"data: {json.dumps({'ready': True})}\n\n"
-                ready_sent = True
-
-            await asyncio.sleep(1.0 if ready_sent else 0.2)
-
-            # Stop streaming if process has exited after being ready
-            if ready_sent and _llama_process and _llama_process.poll() is not None:
-                break
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
 
 
 # ── MCP endpoint ───────────────────────────────────────────────────────────────
@@ -872,8 +584,6 @@ async def mcp_handler(request: Request):
 
 
 # ── Templates ─────────────────────────────────────────────────────────────────
-
-TEMPLATES_DIR = PROJECT_ROOT / "templates"
 
 @app.get("/api/templates")
 async def api_list_templates():
@@ -956,7 +666,7 @@ async def api_wizard_export_png(folder: str):
 
 @app.post("/api/factory-reset")
 async def api_factory_reset():
-    _kill_llama_server()
+    kill_llama_server()
 
     errors = []
     if COMPANIONS_DIR.exists():
@@ -983,5 +693,5 @@ async def api_factory_reset():
 
 @app.post("/api/shutdown-model")
 async def api_shutdown_model():
-    _kill_llama_server()
+    kill_llama_server()
     return {"ok": True}

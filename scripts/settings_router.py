@@ -235,9 +235,9 @@ def create_settings_router(
         files = {}
         if soul_dir.exists():
             for file in sorted(soul_dir.glob("*.md")) + sorted(soul_dir.glob("*.txt")):
-                content = file.read_text(encoding="utf-8").strip()
-                if content:
-                    files[file.name] = file.read_text(encoding="utf-8")
+                content = file.read_text(encoding="utf-8")
+                if content.strip():
+                    files[file.name] = content
         return {"files": files}
 
     @router.post("/api/settings/soul/{folder}/delete")

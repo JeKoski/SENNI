@@ -510,6 +510,44 @@ async function restartServer() {
   }
 }
 
+async function spRunDiagnostics() {
+  const btn = document.getElementById('btn-run-diagnostics');
+  const out = document.getElementById('diagnostics-results');
+  btn.disabled = true;
+  btn.textContent = '⬡ Running…';
+  out.style.display = 'none';
+
+  let data;
+  try {
+    const res = await fetch('/api/diagnostics');
+    data = await res.json();
+  } catch (e) {
+    out.innerHTML = `<div class="sp-mono-block" style="color:var(--red)">Failed to reach /api/diagnostics: ${e.message}</div>`;
+    out.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '⬡ Run diagnostics';
+    return;
+  }
+
+  const rows = data.checks.map(c => {
+    const ok = c.ok;
+    const color = ok ? 'var(--text-muted)' : 'var(--red)';
+    const badge = ok
+      ? '<span style="color:#4ade80;font-weight:600">PASS</span>'
+      : '<span style="color:var(--red);font-weight:600">FAIL</span>';
+    const detail = c.detail ? `<span style="opacity:0.6">  — ${c.detail}</span>` : '';
+    return `<div style="color:${color}">[${badge}]  ${c.name}${detail}</div>`;
+  }).join('');
+
+  const summary = `<div style="margin-bottom:8px;font-weight:600;color:${data.failed ? 'var(--red)' : '#4ade80'}">` +
+    `${data.passed} passed, ${data.failed} failed</div>`;
+
+  out.innerHTML = `<div class="sp-mono-block">${summary}${rows}</div>`;
+  out.style.display = 'block';
+  btn.disabled = false;
+  btn.textContent = '⬡ Run diagnostics';
+}
+
 async function spRestartServer() {
   if (!confirm('Restart llama-server with current settings?')) return;
   spShowSavedToast('Restarting…');
