@@ -137,6 +137,34 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-23 (Packaging-oriented modular refactor start)
+
+**History/settings routes extracted. Launcher dependency check fixed.**
+
+### What changed
+
+**Backend modular refactor:**
+
+- `scripts/history_router.py` created — owns `/api/history/*`
+- `scripts/settings_router.py` created — owns settings, companion, avatar, and soul-file routes
+- `scripts/server.py` now registers both routers directly
+- History and settings route bodies removed from `server.py`
+- `design/ARCHITECTURE.md` updated with both completed extractions
+- `BACKLOG.md` updated with the packaging-oriented modular refactor section and completed sub-items
+
+**Launcher fix:**
+
+- `start.bat` no longer runs silent `pip install -r requirements.txt --quiet` on every launch
+- Launcher now does a fast import check first and only runs `python -m pip install -r requirements.txt` when core packages are missing
+- Unicode decorative batch comments replaced with plain ASCII `REM` comments so `cmd.exe` does not misparse them
+
+### Verification
+
+- `python -m py_compile scripts\\server.py scripts\\history_router.py scripts\\settings_router.py`
+- `cmd /c start.bat` now passes dependency check and starts the app without the previous apparent hang at "Checking dependencies..."
+
+---
+
 ## Session notes — 2026-04-21 #2 (Setup Wizard — QA fixes + extras architecture)
 
 **Config overwrite fixed. Features install architecture reworked. Multimodal download wired. Setup_complete flag added. Multiple wizard bugs fixed.**

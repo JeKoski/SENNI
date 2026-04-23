@@ -1,7 +1,7 @@
 @echo off
 title SENNI
 
-:: ── Check Python ─────────────────────────────────────────────────────────────
+REM Check Python
 python --version >nul 2>&1
 if errorlevel 1 (
     echo.
@@ -13,20 +13,26 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: ── Install / verify dependencies ────────────────────────────────────────────
+REM Install / verify dependencies
 echo.
 echo  Checking dependencies...
-pip install -r requirements.txt --quiet
+python -c "import fastapi, uvicorn, multipart" >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo  [!] Failed to install dependencies.
-    echo      Try running: pip install -r requirements.txt
-    echo.
-    pause
-    exit /b 1
+    echo  Missing core packages. Installing requirements...
+    python -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo.
+        echo  [!] Failed to install dependencies.
+        echo      Try running: python -m pip install -r requirements.txt
+        echo.
+        pause
+        exit /b 1
+    )
+) else (
+    echo  Dependencies already available.
 )
 
-:: ── Launch ────────────────────────────────────────────────────────────────────
+REM Launch
 echo.
 echo  Starting SENNI...
 echo  The browser will open automatically.

@@ -14,9 +14,11 @@ When creating a new module, it should:
 
 ## Refactors completed
 
-- `static/js/orb.js` — extracted from chat-ui.js ✓
-- `static/js/tool-parser.js` — extracted from api.js ✓
-- `static/js/message-renderer.js` — extracted from chat-ui.js ✓
+- `scripts/history_router.py` - extracted persistent chat history logic from `server.py`; `/api/history/*` is now registered directly via `app.include_router(history_router)` ✓
+- `scripts/settings_router.py` - extracted settings/companion/soul routes from `server.py`; registered via `create_settings_router(...)` so shared TTS/runtime hooks stay explicit ✓
+- `static/js/orb.js` - extracted from chat-ui.js ✓
+- `static/js/tool-parser.js` - extracted from api.js ✓
+- `static/js/message-renderer.js` - extracted from chat-ui.js ✓
 - `static/js/companion-presence.js` — extracted from companion.js ✓
 - `static/css/chat.css` → split into base/messages/orb/companion-panel.css ✓
 - `static/js/settings.js` → split into coordinator + server/generation/companion tab files ✓

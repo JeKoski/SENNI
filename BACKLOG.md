@@ -7,7 +7,43 @@ Update at end of each session. Completed items get deleted, not struck through.
 
 ## High Priority
 
-### Tauri distribution — phased roadmap
+### Packaging-oriented modular refactor
+
+Goal: reduce packaging risk before PyInstaller + Tauri by shrinking the biggest hotspots, making runtime/resource boundaries explicit, and keeping behaviour stable while structure improves.
+
+**Refactor guardrails:**
+- Refactor for packaging readiness, not for abstract code cleanliness.
+- Keep endpoint shapes and UI behaviour stable unless a change is required.
+- Prefer extraction and boundary cleanup over rewrites.
+- Avoid deep subsystem redesigns before the first packaged build works.
+
+**Phase A - Backend modular split**
+- **History router extraction complete** - `scripts/history_router.py` now owns persistent chat history logic and is registered directly from `server.py` via `include_router()`.
+- **Settings router extraction complete** - `scripts/settings_router.py` now owns settings/companion/soul routes and is registered from `server.py` through `create_settings_router(...)`.
+- **Split `scripts/server.py` by domain** - move routes into focused modules (`settings`, `history`, `companions`, `setup`, `boot/runtime`) while keeping the current API contract intact.
+- **Isolate process lifecycle / boot logic** - extract llama/TTS/memory startup and shutdown orchestration into service helpers so packaging and runtime boot paths have one clear home.
+- **Centralize runtime path resolution** - one place for project root, static/template/features paths, source-mode vs packaged-mode handling, and sidecar-safe resource lookup.
+- **Harden file/path boundaries** - tighten folder/filename handling around companion, soul, history, and asset operations before the app is shipped as a desktop package.
+
+**Phase B - Frontend chat modular split**
+- **Extract `buildSystemPrompt()` from `static/js/chat.js`** - move to a dedicated module as already noted in `design/ARCHITECTURE.md`.
+- **Split chat startup/session flow** - separate startup/bootstrap, session/tab state, and model boot orchestration from the main chat coordinator.
+- **Split send/stream/message pipeline** - isolate send flow, reply handling, and history sanitisation so message behaviour is easier to reason about before desktop wrapping.
+- **Keep script load order intentional** - update `design/ARCHITECTURE.md` and `chat.html` load order as modules move.
+
+**Phase C - Packaging prep**
+- **PyInstaller resource audit** - verify static files, templates, features packages, companions defaults, and wizard/compiler assets resolve correctly when bundled.
+- **Sidecar runtime contract** - define how Tauri launches, monitors, and shuts down the Python backend sidecar without changing the current HTTP model.
+- **Packaging-sensitive config audit** - check assumptions around writable directories, default output paths, caches, and bundled binaries (including future espeak packaging).
+- **First packaged smoke test** - source install and packaged build should both boot wizard/chat and exercise the main happy path.
+
+**Do later - after first packaged build works**
+- **Deep memory subsystem cleanup**
+- **Major UI architecture redesign**
+- **Large-scale wizard internals cleanup**
+- **Broad “clean up everything” pass**
+
+### Tauri distribution - phased roadmap
 
 Goal: zero-dependency install for end users. Double-click → runs. Auto-updates. No terminal, no Python knowledge required.
 
