@@ -36,6 +36,7 @@ from scripts.config import (
     PROJECT_ROOT,
     CONFIG_FILE,
     COMPANIONS_DIR,
+    TEMPLATES_DIR,
     DEFAULTS,
     build_server_command,
     delete_avatar_files,
@@ -43,6 +44,7 @@ from scripts.config import (
     find_gguf_files,
     find_mmproj_candidates,
     get_companion_paths,
+    instantiate_companion_template,
     list_companions,
     load_companion_config,
     load_config,
@@ -140,6 +142,16 @@ async def on_startup():
     global _tool_manifest
     _tool_manifest = load_tools()
     log.info("Server ready. %d tools loaded.", len(_tool_manifest))
+
+    # Seed default companion from template on first boot
+    cfg = load_config()
+    default_folder = cfg.get("companion_folder", DEFAULTS["companion_folder"])
+    if not (COMPANIONS_DIR / default_folder).exists():
+        result = instantiate_companion_template(default_folder, default_folder)
+        if result["ok"]:
+            log.info("Seeded companion '%s' from template.", default_folder)
+        elif result["reason"] == "not_found":
+            log.warning("No template found for companion '%s' — skipping seed.", default_folder)
 
     # Belt-and-suspenders: also kill on abnormal Python exit
     atexit.register(_kill_llama_server)
@@ -479,8 +491,13 @@ async def api_status():
     companion_gen = companion_cfg.get("generation", {})
     effective_gen = {**global_gen, **companion_gen}
 
+    cfg_out = {k: v for k, v in config.items() if k != "first_run"}
+    # Companion-level first_mes overrides global config
+    if companion_cfg.get("first_mes"):
+        cfg_out["first_mes"] = companion_cfg["first_mes"]
+
     return {
-        "config":                    {k: v for k, v in config.items() if k != "first_run"},
+        "config":                    cfg_out,
         "tools":                     [t["name"] for t in _tool_manifest],
         "model_running":             model_running,
         # Also expose whether we're mid-launch — chat.js uses this to avoid

@@ -1985,10 +1985,15 @@ function _openCustomInput(grid, chip) {
         if (group === 'species') _onSpeciesChange(val);
       }
     } else {
+      const oldVal = chip.dataset.val !== 'custom' ? chip.dataset.val : null;
       chip.dataset.val = 'custom';
       chip.textContent = 'Custom\u2026';
       if (isArray) {
-        // nothing to remove — value was never added
+        if (oldVal && target[group]) {
+          const oi = target[group].indexOf(oldVal);
+          if (oi >= 0) target[group].splice(oi, 1);
+        }
+        chip.classList.remove('selected');
       } else {
         grid.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
         delete target[group];
