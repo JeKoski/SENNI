@@ -16,6 +16,8 @@ config.json
 
 # Optional: Ignore your memory folders if you want them separate
 companions/
+!templates/companions/
+!templates/companions/**
 backups/
 
 # Optional: For Python or other runtime caches (if applicable)

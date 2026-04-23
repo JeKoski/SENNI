@@ -23,14 +23,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_FILE  = PROJECT_ROOT / "config.json"
 
 # Companion data lives here — one subfolder per companion
-COMPANIONS_DIR = PROJECT_ROOT / "companions"
+COMPANIONS_DIR  = PROJECT_ROOT / "companions"
+TEMPLATES_DIR   = PROJECT_ROOT / "templates" / "companions"
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
 
 DEFAULTS = {
     # Identity
     "companion_name":   "your companion",
-    "companion_folder": "default",
+    "companion_folder": "senni",
 
     # Model / hardware — flat values (active OS)
     "model_path":       "",
@@ -389,6 +390,28 @@ def get_companion_paths(companion_folder: str) -> dict[str, Path]:
     for p in paths.values():
         p.mkdir(parents=True, exist_ok=True)
     return paths
+
+
+# ── Companion templates ────────────────────────────────────────────────────────
+
+def instantiate_companion_template(template_name: str, dest_folder: str) -> dict:
+    """
+    Copy a companion template into the companions/ directory.
+
+    Returns {"ok": True} on success.
+    Returns {"ok": False, "reason": "exists"} if dest already exists.
+    Returns {"ok": False, "reason": "not_found"} if template missing.
+    Raises on unexpected copy errors.
+    """
+    import shutil
+    src  = TEMPLATES_DIR / template_name
+    dest = COMPANIONS_DIR / dest_folder
+    if not src.exists():
+        return {"ok": False, "reason": "not_found"}
+    if dest.exists():
+        return {"ok": False, "reason": "exists"}
+    shutil.copytree(str(src), str(dest))
+    return {"ok": True}
 
 
 # ── Convenience: build everything from scratch ─────────────────────────────────

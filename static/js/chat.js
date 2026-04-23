@@ -573,11 +573,31 @@ function _resolveTemplate(str) {
     .replace(/\{\{user\}\}/g, 'you');
 }
 
-function _injectFirstMes() {
-  if (!config.first_mes || conversationHistory.length > 0) return;
-  const row = appendMessage('companion', config.first_mes);
-  _attachMessageControls(row, 'companion');
-  conversationHistory.push({ role: 'assistant', content: config.first_mes });
+async function _injectFirstMes() {
+  if (!config.first_mes) return;
+  const activeTab = _tabs.find(t => t.id === _activeTabId);
+  if (activeTab?.messages?.length > 0) return;
+  const text = config.first_mes;
+
+  if (typeof _createStreamBubble === 'function' && typeof ttsStartGeneration === 'function') {
+    ttsStartGeneration();
+    const bh = _createStreamBubble();
+    if (typeof setPresenceState === 'function') setPresenceState('streaming');
+    let accumulated = '';
+    for (const word of text.split(' ')) {
+      accumulated += (accumulated ? ' ' : '') + word;
+      _updateStreamBubble(bh, accumulated);
+      if (typeof onTtsToken === 'function') onTtsToken(word + ' ');
+      await new Promise(r => setTimeout(r, 40));
+    }
+    _finaliseStreamBubble(bh, text);
+    ttsEndGeneration();
+  } else {
+    const row = appendMessage('companion', text);
+    _attachMessageControls(row, 'companion');
+  }
+
+  conversationHistory.push({ role: 'assistant', content: text });
   _saveCurrentTabState();
 }
 
@@ -609,7 +629,7 @@ async function startSession() {
   } else if (!hasSetup) {
     triggerFirstRun();
   } else {
-    _injectFirstMes();
+    await _injectFirstMes();
     enableInput();
   }
 
@@ -659,7 +679,7 @@ function clearHistory() {
 }
 
 // ── Reset and new chat ────────────────────────────────────────────────────────
-function newChat(keepVisible) {
+async function newChat(keepVisible) {
   conversationHistory = [];
   _contextTokens = 0;
   _assocTurnsSinceLast = 0;
@@ -675,7 +695,8 @@ function newChat(keepVisible) {
     renderTabList();
     saveTabs();
     appendSystemNote('New conversation started -- ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
-    _injectFirstMes();
+    await _injectFirstMes();
+    if (typeof heartbeatOnSessionStart === 'function') heartbeatOnSessionStart();
   } else {
     _saveCurrentTabState();
     saveTabs();

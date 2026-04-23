@@ -1,0 +1,3 @@
+# Session Notes
+
+*Nothing yet.*

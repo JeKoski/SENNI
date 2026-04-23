@@ -517,9 +517,12 @@ def _build_birth_certificate(data: dict) -> dict:
 
     # Strip avatar base64 from wizard_selections — the PNG image IS the avatar;
     # embedding it again in the JSON chunk would roughly double the file size.
+    # Also strip adult data when adultContent is disabled so it doesn't leak into the card.
     selections = copy.deepcopy(data)
     if isinstance(selections.get("review"), dict):
         selections["review"].pop("avatarData", None)
+    if not selections.get("adultContent"):
+        selections.pop("adult", None)
 
     personality_str = ""
     if p.get("traits"):
