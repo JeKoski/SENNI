@@ -17,7 +17,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import FileResponse
 
-from scripts.config import COMPANIONS_DIR
+from scripts.config import COMPANIONS_DIR, sanitize_folder
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ router = APIRouter()
 
 
 def _history_dir(companion_folder: str, tab_id: str) -> Path:
-    return COMPANIONS_DIR / companion_folder / "history" / tab_id
+    return COMPANIONS_DIR / sanitize_folder(companion_folder) / "history" / _sanitise_tab_id(tab_id)
 
 
 def _session_ts() -> str:
@@ -188,6 +188,7 @@ async def api_history_media(
 ):
     """Serve a media file (image etc.) from a session folder."""
     tab_id = _sanitise_tab_id(tab_id)
+    session_id = _sanitise_tab_id(session_id)
     filename = re.sub(r"[^a-zA-Z0-9_\-.]", "_", filename)[:80]
     path = _history_dir(companion_folder, tab_id) / session_id / filename
     if not path.exists():

@@ -41,10 +41,7 @@ log = logging.getLogger("senni.memory")
 
 router = APIRouter()
 
-# ── Resolve paths ──────────────────────────────────────────────────────────────
-
-_HERE = Path(__file__).parent          # scripts/
-_ROOT = _HERE.parent                   # project root
+from scripts.paths import COMPANIONS_DIR as _COMPANIONS_DIR_DEFAULT
 
 
 # ── Store state ────────────────────────────────────────────────────────────────
@@ -83,7 +80,7 @@ def _companions_dir() -> Path:
         from scripts.config import COMPANIONS_DIR
         return COMPANIONS_DIR
     except Exception:
-        return _ROOT / "companions"
+        return _COMPANIONS_DIR_DEFAULT
 
 
 def _is_memory_enabled(config: dict) -> bool:

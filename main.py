@@ -78,8 +78,13 @@ check_deps()
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
+import threading
+import time
+
 import uvicorn
 from scripts.config import load_config
+from scripts.server import app  # direct import — friendlier for PyInstaller static analysis
+
 
 def main():
     config = load_config()
@@ -94,18 +99,16 @@ def main():
     print("     Press Ctrl+C to stop.")
     print()
 
-    # Open the browser slightly after uvicorn starts
-    import threading, time
     def _open():
         time.sleep(1.2)
         webbrowser.open(url)
     threading.Thread(target=_open, daemon=True).start()
 
     uvicorn.run(
-        "scripts.server:app",
+        app,
         host="127.0.0.1",
         port=port,
-        log_level="warning",   # keep console clean; server has its own logging
+        log_level="warning",
         reload=False,
     )
 

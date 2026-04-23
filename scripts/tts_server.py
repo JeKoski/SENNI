@@ -46,9 +46,10 @@ router = APIRouter()
 
 # ── Resolve paths ──────────────────────────────────────────────────────────────
 
-_HERE              = Path(__file__).parent          # scripts/
-_TTS_SCRIPT        = _HERE / "tts.py"
-_FEATURES_PACKAGES = _HERE.parent / "features" / "packages"
+from scripts.paths import DATA_ROOT, FEATURES_PACKAGES_DIR, SCRIPTS_DIR
+
+_TTS_SCRIPT        = SCRIPTS_DIR / "tts.py"
+_FEATURES_PACKAGES = FEATURES_PACKAGES_DIR
 
 
 # ── Process state ──────────────────────────────────────────────────────────────
@@ -108,9 +109,9 @@ def discover_voices(voices_path: str = "") -> list[str]:
     search_dirs = []
     if voices_path:
         search_dirs.append(Path(voices_path))
-    # Standard Kokoro layout — voices/ sibling to scripts/
-    search_dirs.append(_HERE.parent / "voices")
-    search_dirs.append(_HERE / "voices")
+    # Standard Kokoro layout — voices/ next to project root, or inside scripts/
+    search_dirs.append(DATA_ROOT / "voices")
+    search_dirs.append(SCRIPTS_DIR / "voices")
 
     for d in search_dirs:
         if d.is_dir():

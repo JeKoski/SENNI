@@ -13,18 +13,43 @@ import base64
 import json
 import os
 import platform
+import re
 import subprocess
 from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 
-# The project root is always the parent of this file's folder (scripts/)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CONFIG_FILE  = PROJECT_ROOT / "config.json"
+from scripts.paths import (  # noqa: E402
+    PROJECT_ROOT,
+    CONFIG_FILE,
+    COMPANIONS_DIR,
+    TEMPLATES_DIR,
+)
 
-# Companion data lives here — one subfolder per companion
-COMPANIONS_DIR  = PROJECT_ROOT / "companions"
-TEMPLATES_DIR   = PROJECT_ROOT / "templates" / "companions"
+# ── Path safety helpers ────────────────────────────────────────────────────────
+
+def sanitize_folder(name: str) -> str:
+    """Restrict companion folder names to [a-z0-9_-], max 64 chars."""
+    clean = re.sub(r"[^a-z0-9_\-]", "", name.lower().strip())[:64].strip("-_")
+    return clean or "companion"
+
+
+def sanitize_filename(name: str) -> str:
+    """Restrict soul/history filenames to safe chars. Returns '' on anything suspicious."""
+    name = name.strip()
+    if not name or ".." in name:
+        return ""
+    return re.sub(r"[^a-zA-Z0-9_.\-]", "_", name)[:200]
+
+
+def confine_path(path: Path, root: Path) -> Path:
+    """Raise ValueError if resolved path escapes root directory."""
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        raise ValueError(f"Path escape detected: {path!r} is outside {root!r}")
+    return path
+
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
 

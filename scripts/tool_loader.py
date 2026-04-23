@@ -12,10 +12,9 @@ import importlib.util
 import logging
 from pathlib import Path
 
-log = logging.getLogger(__name__)
+from scripts.paths import TOOLS_DIR
 
-# tools/ lives at the project root, next to scripts/
-TOOLS_DIR = Path(__file__).resolve().parent.parent / "tools"
+log = logging.getLogger(__name__)
 
 # Required attributes every tool module must export
 REQUIRED = ("TOOL_NAME", "DESCRIPTION", "INPUT_SCHEMA", "run")

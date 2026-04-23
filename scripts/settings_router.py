@@ -18,11 +18,14 @@ from scripts.config import (
     COMPANIONS_DIR,
     CONFIG_FILE,
     DEFAULTS,
+    confine_path,
     get_companion_paths,
     list_companions,
     load_companion_config,
     load_config,
     migrate_avatar,
+    sanitize_filename,
+    sanitize_folder,
     save_companion_config,
     save_config,
     write_avatar_file,
@@ -213,7 +216,7 @@ def create_settings_router(
     async def api_new_companion(request: Request):
         body = await request.json()
         name = body.get("name", "new companion").strip()
-        folder = name.lower().replace(" ", "_")[:32]
+        folder = sanitize_folder(name)
 
         base_folder = folder
         i = 2
@@ -231,6 +234,7 @@ def create_settings_router(
 
     @router.get("/api/settings/soul/{folder}")
     async def api_get_soul_files(folder: str):
+        folder = sanitize_folder(folder)
         soul_dir = COMPANIONS_DIR / folder / "soul"
         files = {}
         if soul_dir.exists():
@@ -242,9 +246,10 @@ def create_settings_router(
 
     @router.post("/api/settings/soul/{folder}/delete")
     async def api_delete_soul_file(folder: str, request: Request):
+        folder = sanitize_folder(folder)
         body = await request.json()
-        filename = body.get("filename", "").strip()
-        if not filename or "/" in filename or "\\" in filename:
+        filename = sanitize_filename(body.get("filename", ""))
+        if not filename:
             return {"ok": False, "error": "Invalid filename"}
         protected = {"companion_identity.md", "user_profile.md"}
         if filename in protected:
@@ -256,14 +261,17 @@ def create_settings_router(
 
     @router.post("/api/settings/soul/{folder}")
     async def api_save_soul_file(folder: str, request: Request):
+        folder = sanitize_folder(folder)
         body = await request.json()
-        filename = body.get("filename", "").strip()
+        filename = sanitize_filename(body.get("filename", ""))
         content = body.get("content", "")
         if not filename:
             return {"ok": False, "error": "filename required"}
         soul_dir = COMPANIONS_DIR / folder / "soul"
         soul_dir.mkdir(parents=True, exist_ok=True)
-        (soul_dir / filename).write_text(content, encoding="utf-8")
+        target = soul_dir / filename
+        confine_path(target, COMPANIONS_DIR)
+        target.write_text(content, encoding="utf-8")
         return {"ok": True}
 
     return router
