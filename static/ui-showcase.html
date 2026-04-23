@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SENNI — Design System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300;1,9..40,400&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/wizard.css">
+  <link rel="stylesheet" href="css/orb.css">
+  <style>
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       STYLEGUIDE PAGE
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+    #page-styleguide {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Sidebar */
+    .sc-sidebar {
+      width: 196px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 28px 0 28px 20px;
+      border-right: 1px solid var(--border);
+      background: rgba(28,30,38,0.88);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+    }
+    .sc-sidebar-logo {
+      font: 400 15px/1 'Lora', serif;
+      color: var(--text-bright);
+      margin-bottom: 24px;
+      letter-spacing: -0.01em;
+    }
+    .sc-sidebar-logo span {
+      background: linear-gradient(135deg, #a5b4fc, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .sc-nav-group { margin-bottom: 18px; }
+    .sc-nav-group-label {
+      font: 400 10px/1 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: .15em;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .sc-nav-link {
+      display: block;
+      font: 400 13px/1 'DM Sans', sans-serif;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 5px 0;
+      transition: color .15s;
+    }
+    .sc-nav-link:hover { color: var(--text); }
+    .sc-nav-link.active { color: var(--indigo-hi); }
+
+    .sc-sidebar-studio-btn {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      padding-right: 20px;
+    }
+    .sc-sidebar-studio-btn button {
+      width: 100%;
+      font: 500 13px/1 'DM Sans', sans-serif;
+      background: rgba(129,140,248,0.1);
+      border: 1px solid rgba(129,140,248,0.25);
+      border-radius: 9px;
+      color: var(--indigo-hi);
+      padding: 9px 12px;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: left;
+    }
+    .sc-sidebar-studio-btn button:hover {
+      background: rgba(129,140,248,0.18);
+      border-color: var(--indigo);
+    }
+
+    /* Main scroll area */
+    .sc-main {
+      flex: 1;
+      padding: 48px 64px 80px;
+      min-width: 0;
+      overflow-y: auto;
+    }
+
+    /* Section headers */
+    .sc-section { margin-bottom: 64px; scroll-margin-top: 32px; }
+    .sc-section-eyebrow {
+      font: 400 10px/1 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: .2em;
+      color: var(--indigo);
+      margin-bottom: 8px;
+    }
+    .sc-section-title {
+      font: 400 28px/1.2 'Lora', serif;
+      color: var(--text-bright);
+      margin-bottom: 24px;
+      letter-spacing: -0.01em;
+    }
+    .sc-divider { height: 1px; background: var(--border); margin: 64px 0; }
+
+    /* Util */
+    .sc-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin-bottom: 20px; }
+    .sc-row-label {
+      font: 400 11px/1 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .sc-state-label {
+      font: 400 10px/1 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--text-dim);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    /* Color swatches */
+    .sc-swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 10px; }
+    .sc-swatch { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+    .sc-swatch-color { height: 52px; }
+    .sc-swatch-info { padding: 8px 10px; background: var(--surface); }
+    .sc-swatch-name { font: 400 11px/1.4 'DM Mono', monospace; color: var(--text); margin-bottom: 2px; }
+    .sc-swatch-value { font: 400 10px/1.4 'DM Mono', monospace; color: var(--text-dim); }
+
+    /* Typography */
+    .sc-type-row {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+    }
+    .sc-type-row:last-child { border-bottom: none; }
+    .sc-type-meta { width: 160px; flex-shrink: 0; font: 400 10.5px/1.5 'DM Mono', monospace; color: var(--text-dim); }
+
+    /* Cards grid */
+    .sc-card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+    /* Orb state grid */
+    .sc-orb-grid { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-end; }
+    .sc-orb-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .sc-orb-item .sc-state-label { margin-bottom: 0; }
+
+    /* Showcase orb defaults */
+    .showcase-orb {
+      --orb-size: 52px;
+      --dot-color: #818cf8;
+      --orb-bg: rgba(129,140,248,0.12);
+      --orb-border: rgba(129,140,248,0.35);
+      --glow-color: rgba(129,140,248,0.4);
+      --glow-min: 6px;
+      --glow-max: 16px;
+      --glow-speed: 2s;
+      --ring-color: rgba(129,140,248,0.3);
+      --ring-speed: 1.8s;
+      --dot-speed: 1.2s;
+      --breath-speed: 3s;
+    }
+    .showcase-orb.idle { --glow-speed: 4s; --breath-speed: 5s; --ring-speed: 4s; }
+
+    /* Animation demos */
+    .sc-anim-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 12px; }
+    .sc-anim-demo {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 16px 14px;
+      text-align: center;
+    }
+    .sc-anim-box {
+      width: 48px; height: 48px;
+      background: rgba(129,140,248,0.15);
+      border: 1px solid rgba(129,140,248,0.3);
+      border-radius: 10px;
+      margin: 0 auto 10px;
+      opacity: 0;
+    }
+    .sc-anim-name { font: 400 11px/1.4 'DM Mono', monospace; color: var(--text-muted); margin-bottom: 4px; }
+    .sc-anim-detail { font: 400 10px/1.4 'DM Mono', monospace; color: var(--text-dim); margin-bottom: 10px; }
+    .sc-anim-replay {
+      font: 500 11px/1 'DM Sans', sans-serif;
+      color: var(--indigo);
+      background: rgba(129,140,248,0.08);
+      border: 1px solid rgba(129,140,248,0.2);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .sc-anim-replay:hover { background: rgba(129,140,248,0.18); }
+    .play-stepIn { animation: stepIn .65s cubic-bezier(.22,1,.36,1) forwards; }
+    .play-fadeUp { animation: fadeUp .25s ease forwards; }
+    .play-popIn  { animation: popIn .5s cubic-bezier(.175,.885,.32,1.275) forwards; }
+
+    /* Icon grid */
+    .sc-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px,1fr)); gap: 10px; }
+    .sc-icon-item {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      padding: 14px 10px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    }
+    .sc-icon-item svg { color: var(--indigo); }
+    .sc-icon-label { font: 400 10px/1 'DM Mono', monospace; color: var(--text-dim); text-align: center; }
+
+    /* Progress bar */
+    .sc-progress-wrap { max-width: 400px; }
+
+    /* Animated progress */
+    @keyframes progressGrow {
+      0%   { width: 0%; }
+      85%  { width: 100%; }
+      100% { width: 100%; }
+    }
+    .dl-fill-loop { animation: progressGrow 20s linear infinite; }
+
+    /* Step dots */
+    .sc-dots-row { display: flex; align-items: center; gap: 8px; }
+    .sc-dot-line { width: 20px; height: 1px; background: var(--border); }
+
+    /* Toggle on state */
+    .toggle-track.on { background: #6366f1; }
+    .toggle-thumb.on { transform: translateX(16px); }
+
+    /* File chip */
+    .file-chip { display: flex; align-items: center; gap: 10px; }
+
+    /* Static hover state */
+    .state-hover { opacity: .88; transform: translateY(-1px); }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       STUDIO PAGE
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+    #page-studio {
+      display: none;
+      position: fixed;
+      inset: 0;
+      flex-direction: column;
+      z-index: 10;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    #page-studio.active { display: flex; }
+
+    /* Studio background (behind everything) */
+    #page-studio .studio-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+    #page-studio .studio-bg-mesh {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 900px 600px at 20% 50%, rgba(99,102,241,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 600px 800px at 80% 30%, rgba(124,58,237,0.05) 0%, transparent 65%),
+        radial-gradient(ellipse 400px 400px at 60% 80%, rgba(109,212,168,0.03) 0%, transparent 60%);
+      animation: meshShift 14s ease-in-out infinite alternate;
+    }
+    #page-studio .studio-bg-grain {
+      position: absolute; inset: 0; opacity: 0.018;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+    }
+    #page-studio .studio-bg-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(140,145,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(140,145,220,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Studio header bar */
+    .studio-header {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 48px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(28,30,38,0.7);
+      backdrop-filter: blur(12px);
+      flex-shrink: 0;
+    }
+    .studio-back-btn {
+      font: 400 13px/1 'DM Sans', sans-serif;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px 0;
+      transition: color .15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .studio-back-btn:hover { color: var(--text); }
+    .studio-header-title {
+      font: 400 13px/1 'Lora', serif;
+      color: var(--text-bright);
+    }
+    .studio-preview-btn {
+      font: 500 12px/1 'DM Sans', sans-serif;
+      background: linear-gradient(135deg, #6366f1, #7c3aed);
+      color: #eef0fb;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .studio-preview-btn:hover { opacity: .88; }
+
+    /* Studio body */
+    .studio-body {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Canvas zone */
+    .studio-canvas-zone {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    /* The actual canvas */
+    .studio-canvas {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      transition: background .3s, border-radius .3s;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+
+    /* Aspect ratio sizing */
+    .studio-canvas[data-ratio="1:1"]  { aspect-ratio: 1/1; height: min(calc(100vh - 120px), calc(100vw - 380px)); width: auto; }
+    .studio-canvas[data-ratio="4:5"]  { aspect-ratio: 4/5; height: min(calc(100vh - 120px), calc(100vw - 380px)); width: auto; }
+    .studio-canvas[data-ratio="16:9"] { aspect-ratio: 16/9; width: min(calc(100vw - 380px), calc((100vh - 120px) * 16 / 9)); height: auto; }
+    .studio-canvas[data-ratio="9:16"] { aspect-ratio: 9/16; height: min(calc(100vh - 120px), calc(100vw - 380px)); width: auto; }
+
+    /* Background options */
+    .studio-canvas[data-bg="dark"]        { background: #1c1e26; }
+    .studio-canvas[data-bg="mesh"]        { background: #1c1e26; }
+    .studio-canvas[data-bg="solid"]       { background: var(--studio-solid-bg, #1c1e26); }
+    .studio-canvas[data-bg="transparent"] { background: transparent; border-style: dashed; }
+
+    /* Canvas internal background layers (mesh mode) */
+    .canvas-bg-layer {
+      display: none;
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      overflow: hidden;
+    }
+    .studio-canvas[data-bg="mesh"] .canvas-bg-layer { display: block; }
+    .canvas-bg-mesh {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 900px 600px at 20% 50%, rgba(99,102,241,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 600px 800px at 80% 30%, rgba(124,58,237,0.05) 0%, transparent 65%),
+        radial-gradient(ellipse 400px 400px at 60% 80%, rgba(109,212,168,0.03) 0%, transparent 60%);
+      animation: meshShift 14s ease-in-out infinite alternate;
+    }
+    .canvas-bg-grain {
+      position: absolute; inset: 0; opacity: 0.018;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+    }
+    .canvas-bg-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(140,145,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(140,145,220,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Studio orb */
+    #studio-orb {
+      --orb-size: 140px;
+      --dot-color: #818cf8;
+      --orb-bg: rgba(129,140,248,0.12);
+      --orb-border: rgba(129,140,248,0.35);
+      --glow-color: rgba(129,140,248,0.4);
+      --glow-min: 10px;
+      --glow-max: 30px;
+      --glow-speed: 4s;
+      --ring-color: rgba(129,140,248,0.3);
+      --ring-speed: 4s;
+      --dot-speed: 1.2s;
+      --breath-speed: 5s;
+      position: relative;
+      z-index: 1;
+      flex-shrink: 0;
+    }
+
+    /* Animation disable rules for studio orb */
+    #studio-orb[data-no-glow]   .orb-body  { animation: none !important; box-shadow: none !important; }
+    #studio-orb[data-no-breath] .orb-body  { animation: none !important; }
+    #studio-orb[data-no-ring]   .orb-ring  { animation: none !important; opacity: 0 !important; }
+    #studio-orb[data-no-dots]   .orb-dots span { animation: none !important; opacity: 0.08 !important; }
+    #studio-orb[data-no-breath]:not([data-no-glow]) .orb-body {
+      animation: orbGlow var(--glow-speed, 4s) ease-in-out infinite !important;
+    }
+    #studio-orb[data-no-glow]:not([data-no-breath]) .orb-body {
+      animation: orbBreath var(--breath-speed, 5s) ease-in-out infinite !important;
+      box-shadow: none !important;
+    }
+
+    /* Text overlay */
+    .studio-text-overlay {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      display: none;
+      margin-top: 12px;
+    }
+    .studio-text-overlay.visible { display: block; }
+    .studio-name-text {
+      font: 400 28px/1.2 'Lora', serif;
+      color: var(--studio-name-color, #eef0fb);
+      margin-bottom: 6px;
+    }
+    .studio-tagline-text {
+      font: 400 14px/1.6 'DM Sans', sans-serif;
+      color: var(--studio-tagline-color, rgba(221,225,240,0.55));
+    }
+
+    /* Controls panel (scrollable) */
+    .studio-controls-panel {
+      width: 300px;
+      flex-shrink: 0;
+      height: 100%;
+      overflow-y: auto;
+      padding: 16px;
+      border-left: 1px solid var(--border);
+      background: rgba(28,30,38,0.7);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .studio-ctrl-group { display: flex; flex-direction: column; gap: 8px; }
+    .studio-ctrl-group-label {
+      font: 400 10px/1 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: .15em;
+      color: var(--indigo);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .studio-chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+    .studio-chip {
+      font: 500 11px/1 'DM Sans', sans-serif;
+      color: var(--text-muted);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 5px 9px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .studio-chip:hover { border-color: rgba(129,140,248,0.4); color: var(--text); }
+    .studio-chip.active { background: rgba(129,140,248,0.12); border-color: var(--indigo); color: var(--indigo-hi); }
+
+    .studio-slider-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 40px;
+      align-items: center;
+      gap: 8px;
+    }
+    .studio-slider-label { font: 400 11px/1 'DM Sans', sans-serif; color: var(--text-muted); }
+    .studio-slider {
+      -webkit-appearance: none; appearance: none;
+      height: 4px; border-radius: 2px;
+      background: var(--border); outline: none; cursor: pointer;
+    }
+    .studio-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: var(--indigo); cursor: pointer;
+    }
+    .studio-slider-val { font: 400 10px/1 'DM Mono', monospace; color: var(--text-dim); text-align: right; }
+
+    .studio-color-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 26px;
+      align-items: center;
+      gap: 8px;
+    }
+    .studio-color-input {
+      -webkit-appearance: none; width: 26px; height: 26px;
+      border: none; border-radius: 6px; cursor: pointer; padding: 0; background: none;
+    }
+    .studio-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .studio-color-input::-webkit-color-swatch { border: 1px solid var(--border); border-radius: 6px; }
+
+    .studio-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .studio-toggle-label { font: 400 12px/1 'DM Sans', sans-serif; color: var(--text-muted); }
+
+    .studio-text-input {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 7px 10px;
+      font: 400 13px/1 'DM Sans', sans-serif;
+      color: var(--text);
+      outline: none;
+      transition: border-color .15s;
+    }
+    .studio-text-input:focus { border-color: rgba(129,140,248,0.4); }
+    .studio-text-input::placeholder { color: var(--text-dim); }
+
+    /* Avatar upload */
+    .studio-avatar-zone {
+      border: 1.5px dashed rgba(129,140,248,0.3);
+      background: rgba(129,140,248,0.06);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .studio-avatar-zone:hover { border-color: rgba(129,140,248,0.5); background: rgba(129,140,248,0.1); }
+    .studio-avatar-zone.has-avatar { border-style: solid; border-color: rgba(109,212,168,0.4); background: rgba(109,212,168,0.06); }
+    .studio-avatar-zone input { display: none; }
+    .studio-avatar-zone-text { font: 400 12px/1.4 'DM Sans', sans-serif; color: var(--text-muted); }
+    .studio-avatar-clear {
+      margin-left: auto;
+      font: 400 11px/1 'DM Mono', monospace;
+      color: var(--red);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 4px;
+      display: none;
+    }
+    .studio-avatar-zone.has-avatar .studio-avatar-clear { display: block; }
+
+    .studio-btn-reset {
+      font: 500 12px/1 'DM Sans', sans-serif;
+      background: none;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: all .15s;
+      width: 100%;
+    }
+    .studio-btn-reset:hover { border-color: rgba(129,140,248,0.35); color: var(--text); }
+
+    /* ── Clean preview mode ─────────────────────────────────────────────── */
+    #page-studio.preview-mode .studio-header,
+    #page-studio.preview-mode .studio-controls-panel { display: none; }
+
+    #page-studio.preview-mode .studio-body { padding: 0; }
+    #page-studio.preview-mode .studio-canvas-zone { padding: 0; }
+
+    #page-studio.preview-mode .studio-canvas {
+      width: 100vw !important;
+      height: 100vh !important;
+      aspect-ratio: unset !important;
+      border-radius: 0 !important;
+      border: none !important;
+    }
+
+    .studio-exit-preview {
+      display: none;
+      position: fixed;
+      top: 14px;
+      right: 16px;
+      z-index: 100;
+      font: 500 12px/1 'DM Sans', sans-serif;
+      background: rgba(28,30,38,0.88);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+    #page-studio.preview-mode .studio-exit-preview { display: block; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(140,145,220,0.2); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PAGE: STYLEGUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="bg-layer">
+  <div class="bg-mesh"></div>
+  <div class="bg-grain"></div>
+  <div class="bg-grid"></div>
+</div>
+
+<div id="page-styleguide">
+
+  <!-- Sidebar -->
+  <nav class="sc-sidebar">
+    <div class="sc-sidebar-logo"><span>SENNI</span> Design</div>
+
+    <div class="sc-nav-group">
+      <div class="sc-nav-group-label">Foundations</div>
+      <a class="sc-nav-link" href="#colors">Colors</a>
+      <a class="sc-nav-link" href="#typography">Typography</a>
+      <a class="sc-nav-link" href="#background">Background</a>
+    </div>
+    <div class="sc-nav-group">
+      <div class="sc-nav-group-label">Components</div>
+      <a class="sc-nav-link" href="#buttons">Buttons</a>
+      <a class="sc-nav-link" href="#cards">Cards</a>
+      <a class="sc-nav-link" href="#badges">Badges</a>
+      <a class="sc-nav-link" href="#controls">Controls</a>
+      <a class="sc-nav-link" href="#progress">Progress</a>
+      <a class="sc-nav-link" href="#tabsdots">Tabs & Dots</a>
+      <a class="sc-nav-link" href="#notices">Notices</a>
+    </div>
+    <div class="sc-nav-group">
+      <div class="sc-nav-group-label">Orb & Motion</div>
+      <a class="sc-nav-link" href="#orb">Orb States</a>
+      <a class="sc-nav-link" href="#animations">Animations</a>
+      <a class="sc-nav-link" href="#icons">Iconography</a>
+    </div>
+
+    <div class="sc-sidebar-studio-btn">
+      <button onclick="showStudio()">⬡ Open Studio →</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="sc-main" id="sc-main">
+
+    <!-- COLORS -->
+    <section class="sc-section" id="colors">
+      <div class="sc-section-eyebrow">01 — Foundations</div>
+      <div class="sc-section-title">Color Tokens</div>
+
+      <div class="sc-row-label">Background & Surface</div>
+      <div class="sc-swatch-grid" style="margin-bottom:20px;">
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#1c1e26;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--bg</div><div class="sc-swatch-value">#1c1e26</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#21232e;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--bg2</div><div class="sc-swatch-value">#21232e</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:rgba(255,255,255,0.04);border-bottom:1px solid var(--border);"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--surface</div><div class="sc-swatch-value">rgba(255,255,255,0.04)</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:rgba(255,255,255,0.07);border-bottom:1px solid var(--border);"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--surface2</div><div class="sc-swatch-value">rgba(255,255,255,0.07)</div></div></div>
+      </div>
+
+      <div class="sc-row-label">Accent</div>
+      <div class="sc-swatch-grid" style="margin-bottom:20px;">
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#818cf8;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--indigo</div><div class="sc-swatch-value">#818cf8</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#a5b4fc;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--indigo-hi</div><div class="sc-swatch-value">#a5b4fc</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#a78bfa;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--purple</div><div class="sc-swatch-value">#a78bfa</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:linear-gradient(135deg,#6366f1,#7c3aed);"></div><div class="sc-swatch-info"><div class="sc-swatch-name">CTA gradient</div><div class="sc-swatch-value">135° #6366f1 → #7c3aed</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:linear-gradient(90deg,#6366f1,#a78bfa);"></div><div class="sc-swatch-info"><div class="sc-swatch-name">Progress gradient</div><div class="sc-swatch-value">90° #6366f1 → #a78bfa</div></div></div>
+      </div>
+
+      <div class="sc-row-label">Semantic</div>
+      <div class="sc-swatch-grid" style="margin-bottom:20px;">
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#6dd4a8;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--green</div><div class="sc-swatch-value">#6dd4a8</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#f87171;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--red</div><div class="sc-swatch-value">#f87171</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#fbbf24;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--amber</div><div class="sc-swatch-value">#fbbf24</div></div></div>
+      </div>
+
+      <div class="sc-row-label">Text</div>
+      <div class="sc-swatch-grid">
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#dde1f0;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--text</div><div class="sc-swatch-value">#dde1f0</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:#eef0fb;"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--text-bright</div><div class="sc-swatch-value">#eef0fb</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:rgba(221,225,240,0.45);"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--text-muted</div><div class="sc-swatch-value">rgba(..,0.45)</div></div></div>
+        <div class="sc-swatch"><div class="sc-swatch-color" style="background:rgba(221,225,240,0.22);"></div><div class="sc-swatch-info"><div class="sc-swatch-name">--text-dim</div><div class="sc-swatch-value">rgba(..,0.22)</div></div></div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- TYPOGRAPHY -->
+    <section class="sc-section" id="typography">
+      <div class="sc-section-eyebrow">02 — Foundations</div>
+      <div class="sc-section-title">Typography</div>
+      <div class="sc-type-row"><div class="sc-type-meta">Lora 400 46px<br>Intro heading</div><div style="font:400 46px/1.25 'Lora',serif;color:var(--text-bright);letter-spacing:-0.02em;">Companion</div></div>
+      <div class="sc-type-row"><div class="sc-type-meta">Lora 400 38px<br>Step heading</div><div style="font:400 38px/1.25 'Lora',serif;color:var(--text-bright);letter-spacing:-0.02em;">Choose your model</div></div>
+      <div class="sc-type-row"><div class="sc-type-meta">Lora italic<br>Narrative</div><div style="font:400 italic 17px/1.6 'Lora',serif;color:var(--text);">A presence that adapts, remembers, and grows.</div></div>
+      <div class="sc-type-row"><div class="sc-type-meta">DM Mono 11px<br>Eyebrow label</div><div style="font:400 11px/1 'DM Mono',monospace;text-transform:uppercase;letter-spacing:.2em;color:var(--indigo);">Step 02 — Hardware</div></div>
+      <div class="sc-type-row"><div class="sc-type-meta">DM Sans 400 15px<br>Body</div><div style="font:400 15px/1.7 'DM Sans',sans-serif;color:var(--text-muted);">Select the GPU you'll be running the model on. This determines which binary gets downloaded.</div></div>
+      <div class="sc-type-row"><div class="sc-type-meta">DM Sans 500 14px<br>Button</div><div style="font:500 14px/1 'DM Sans',sans-serif;color:var(--text-bright);">Continue</div></div>
+      <div class="sc-type-row"><div class="sc-type-meta">DM Sans 11px<br>Control label</div><div style="font:400 11px/1 'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.09em;color:var(--label);">Companion name</div></div>
+      <div class="sc-type-row"><div class="sc-type-meta">DM Mono 11.5px<br>Metadata</div><div style="font:400 11.5px/1.5 'DM Mono',monospace;color:var(--text-dim);">Gemma-4-E4B-Q4_K_M · 4.2 GB · ~3 min</div></div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- BACKGROUND -->
+    <section class="sc-section" id="background">
+      <div class="sc-section-eyebrow">03 — Foundations</div>
+      <div class="sc-section-title">Background System</div>
+      <p style="color:var(--text-muted);margin-bottom:20px;font-size:14px;">Three composited layers — the page background is a live demo.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;max-width:420px;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;"><div style="font:500 13px/1 'DM Sans',sans-serif;color:var(--text);margin-bottom:4px;">.bg-mesh</div><div style="font:400 12px/1.5 'DM Sans',sans-serif;color:var(--text-muted);">Three radial gradients (indigo/purple/green), animated <code style="font:400 11px/1 'DM Mono',monospace;color:var(--indigo);">meshShift</code> 14s alternate</div></div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;"><div style="font:500 13px/1 'DM Sans',sans-serif;color:var(--text);margin-bottom:4px;">.bg-grain</div><div style="font:400 12px/1.5 'DM Sans',sans-serif;color:var(--text-muted);">SVG fractal noise at opacity 0.018</div></div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;"><div style="font:500 13px/1 'DM Sans',sans-serif;color:var(--text);margin-bottom:4px;">.bg-grid</div><div style="font:400 12px/1.5 'DM Sans',sans-serif;color:var(--text-muted);">60×60px CSS grid lines at <code style="font:400 11px/1 'DM Mono',monospace;color:var(--indigo);">rgba(140,145,220,0.04)</code></div></div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- BUTTONS -->
+    <section class="sc-section" id="buttons">
+      <div class="sc-section-eyebrow">04 — Components</div>
+      <div class="sc-section-title">Buttons</div>
+
+      <div class="sc-row-label">Primary</div>
+      <div class="sc-row" style="margin-bottom:24px;">
+        <div><div class="sc-state-label">Default</div><button class="btn-primary">Continue</button></div>
+        <div><div class="sc-state-label">Hover</div><button class="btn-primary state-hover">Continue</button></div>
+        <div><div class="sc-state-label">Disabled</div><button class="btn-primary" disabled>Continue</button></div>
+      </div>
+
+      <div class="sc-row-label">Ghost</div>
+      <div class="sc-row" style="margin-bottom:24px;">
+        <div><div class="sc-state-label">Default</div><button class="btn-ghost">Back</button></div>
+        <div><div class="sc-state-label">Hover</div><button class="btn-ghost" style="border-color:rgba(129,140,248,0.35);color:var(--text);">Back</button></div>
+      </div>
+
+      <div class="sc-row-label">Secondary</div>
+      <div class="sc-row" style="margin-bottom:24px;">
+        <div><div class="sc-state-label">Default</div><button class="btn-secondary">Retry download</button></div>
+        <div><div class="sc-state-label">Hover</div><button class="btn-secondary" style="background:rgba(129,140,248,0.18);">Retry download</button></div>
+      </div>
+
+      <div class="sc-row-label">Download (dashed)</div>
+      <div style="max-width:300px;">
+        <button class="btn-download" style="display:flex;align-items:center;gap:10px;text-align:left;width:100%;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--indigo-hi);flex-shrink:0;"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <span style="font:500 13px/1.4 'DM Sans',sans-serif;color:var(--text);">Gemma-4-E4B-Q4_K_M<br><span style="font-size:11px;color:var(--text-muted);">4.2 GB</span></span>
+        </button>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- CARDS -->
+    <section class="sc-section" id="cards">
+      <div class="sc-section-eyebrow">05 — Components</div>
+      <div class="sc-section-title">Cards</div>
+
+      <div class="sc-row-label" style="margin-bottom:12px;">Model Card</div>
+      <div class="sc-card-grid" style="margin-bottom:28px;">
+        <div>
+          <div class="sc-state-label">Default</div>
+          <div class="model-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;"><div style="font:500 14px/1.2 'DM Sans',sans-serif;color:var(--text);">Gemma 4 E4B</div><span class="model-badge recommended">Recommended</span></div>
+            <div style="font:400 11.5px/1.5 'DM Mono',monospace;color:var(--text-dim);margin-top:6px;">Q4_K_M · 4.2 GB</div>
+          </div>
+        </div>
+        <div>
+          <div class="sc-state-label">Hover</div>
+          <div class="model-card" style="border-color:rgba(129,140,248,0.38);background:rgba(129,140,248,0.05);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;"><div style="font:500 14px/1.2 'DM Sans',sans-serif;color:var(--text);">Gemma 4 E4B</div><span class="model-badge recommended">Recommended</span></div>
+            <div style="font:400 11.5px/1.5 'DM Mono',monospace;color:var(--text-dim);margin-top:6px;">Q4_K_M · 4.2 GB</div>
+          </div>
+        </div>
+        <div>
+          <div class="sc-state-label">Selected</div>
+          <div class="model-card" style="border-color:rgba(129,140,248,0.55);background:rgba(129,140,248,0.1);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;"><div style="font:500 14px/1.2 'DM Sans',sans-serif;color:var(--text);">Gemma 4 E4B</div><span class="model-badge recommended">Recommended</span></div>
+            <div style="font:400 11.5px/1.5 'DM Mono',monospace;color:var(--text-dim);margin-top:6px;">Q4_K_M · 4.2 GB</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sc-row-label" style="margin-bottom:12px;">Feature Card</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:480px;">
+        <div>
+          <div class="sc-state-label">Default</div>
+          <div class="feature-card">
+            <div style="width:40px;height:40px;background:rgba(129,140,248,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/><path d="M3 12c0 1.657 4.03 3 9 3s9-1.343 9-3"/></svg></div>
+            <div style="font:500 14px/1.2 'DM Sans',sans-serif;color:var(--text);margin-top:12px;">Memory</div>
+            <div style="font:400 12px/1.5 'DM Sans',sans-serif;color:var(--text-muted);margin-top:4px;">Persistent episodic store</div>
+          </div>
+        </div>
+        <div>
+          <div class="sc-state-label">Enabled</div>
+          <div class="feature-card" style="border-color:rgba(129,140,248,0.35);background:rgba(129,140,248,0.07);">
+            <div style="width:40px;height:40px;background:rgba(129,140,248,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--indigo);"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/><path d="M3 12c0 1.657 4.03 3 9 3s9-1.343 9-3"/></svg></div>
+            <div style="font:500 14px/1.2 'DM Sans',sans-serif;color:var(--text);margin-top:12px;">Memory</div>
+            <div style="font:400 12px/1.5 'DM Sans',sans-serif;color:var(--text-muted);margin-top:4px;">Persistent episodic store</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- BADGES -->
+    <section class="sc-section" id="badges">
+      <div class="sc-section-eyebrow">06 — Components</div>
+      <div class="sc-section-title">Badges</div>
+      <div class="sc-row">
+        <span class="model-badge recommended">Recommended</span>
+        <span class="model-badge capable">Capable</span>
+        <span class="model-badge light">Light</span>
+        <span class="model-badge fallback">Fallback</span>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- CONTROLS -->
+    <section class="sc-section" id="controls">
+      <div class="sc-section-eyebrow">07 — Components</div>
+      <div class="sc-section-title">Form Controls</div>
+
+      <div class="sc-row-label">Toggle</div>
+      <div class="sc-row" style="margin-bottom:24px;gap:32px;">
+        <div style="display:flex;align-items:center;gap:10px;"><div class="sc-state-label" style="margin-bottom:0;">Off</div><label style="pointer-events:none;"><div class="toggle-track"><div class="toggle-thumb"></div></div></label></div>
+        <div style="display:flex;align-items:center;gap:10px;"><div class="sc-state-label" style="margin-bottom:0;">On</div><label style="pointer-events:none;"><div class="toggle-track on"><div class="toggle-thumb on"></div></div></label></div>
+        <div style="display:flex;align-items:center;gap:10px;"><div class="sc-state-label" style="margin-bottom:0;">Interactive</div><label onclick="this.querySelector('.toggle-track').classList.toggle('on');this.querySelector('.toggle-thumb').classList.toggle('on');" style="cursor:pointer;"><div class="toggle-track"><div class="toggle-thumb"></div></div></label></div>
+      </div>
+
+      <div class="sc-row-label">File Chip</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div><div class="sc-state-label">Empty</div><div class="file-chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--indigo);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span style="font:400 13px/1 'DM Sans',sans-serif;color:var(--text-muted);">Choose avatar…</span></div></div>
+        <div><div class="sc-state-label">Set</div><div class="file-chip" style="border-style:solid;border-color:rgba(109,212,168,0.45);background:rgba(109,212,168,0.07);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--green);"><polyline points="20 6 9 17 4 12"/></svg><span style="font:400 13px/1 'DM Sans',sans-serif;color:var(--green);">senni_avatar.jpg</span></div></div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- PROGRESS -->
+    <section class="sc-section" id="progress">
+      <div class="sc-section-eyebrow">08 — Components</div>
+      <div class="sc-section-title">Progress Bar</div>
+      <div class="sc-progress-wrap">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font:400 12px/1 'DM Sans',sans-serif;color:var(--text-muted);">Static (63%)</span><span style="font:400 12px/1 'DM Mono',monospace;color:var(--indigo);">63%</span></div>
+        <div class="dl-progress"><div class="dl-bar"><div class="dl-fill" style="width:63%;"></div></div></div>
+        <div style="font:400 11px/1 'DM Mono',monospace;color:var(--text-dim);margin-top:6px;">2.6 GB / 4.2 GB · ~2 min remaining</div>
+
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;margin-top:20px;"><span style="font:400 12px/1 'DM Sans',sans-serif;color:var(--text-muted);">Animated (20s loop)</span><span id="pct-display" style="font:400 12px/1 'DM Mono',monospace;color:var(--indigo);">0%</span></div>
+        <div class="dl-progress"><div class="dl-bar"><div class="dl-fill dl-fill-loop" id="dl-anim-fill"></div></div></div>
+        <div style="font:400 11px/1 'DM Mono',monospace;color:var(--text-dim);margin-top:6px;">Gemma-4-E4B-Q4_K_M · 4.2 GB</div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- TABS & DOTS -->
+    <section class="sc-section" id="tabsdots">
+      <div class="sc-section-eyebrow">09 — Components</div>
+      <div class="sc-section-title">Tabs & Step Indicator</div>
+
+      <div class="sc-row-label">Tabs</div>
+      <div style="border-bottom:1px solid var(--border);display:flex;gap:4px;margin-bottom:24px;">
+        <div class="cp-tab active">Overview</div>
+        <div class="cp-tab">Soul</div>
+        <div class="cp-tab">Mind</div>
+        <div class="cp-tab">Presence</div>
+      </div>
+
+      <div class="sc-row-label">Step Navigation Dots</div>
+      <div class="sc-dots-row">
+        <div class="wiz-dot done">01</div>
+        <div class="sc-dot-line"></div>
+        <div class="wiz-dot active">02</div>
+        <div class="sc-dot-line"></div>
+        <div class="wiz-dot">03</div>
+        <div class="sc-dot-line"></div>
+        <div class="wiz-dot">04</div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- NOTICES -->
+    <section class="sc-section" id="notices">
+      <div class="sc-section-eyebrow">10 — Components</div>
+      <div class="sc-section-title">Notices</div>
+      <div class="sc-row-label" style="margin-bottom:10px;">Info Note (amber)</div>
+      <div class="info-note" style="max-width:480px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--amber);flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div style="font:400 13px/1.6 'DM Sans',sans-serif;color:var(--text-muted);">Downloading requires a stable internet connection. The model will be saved locally and won't need to be downloaded again.</div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- ORB STATES -->
+    <section class="sc-section" id="orb">
+      <div class="sc-section-eyebrow">11 — Orb & Motion</div>
+      <div class="sc-section-title">Orb States</div>
+
+      <div class="sc-orb-grid">
+        <div class="sc-orb-item">
+          <div class="companion-orb idle showcase-orb"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div><div class="orb-icon">✦</div></div></div>
+          <div class="sc-state-label">idle</div>
+        </div>
+        <div class="sc-orb-item">
+          <div class="companion-orb thinking showcase-orb"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div><div class="orb-icon">✦</div></div></div>
+          <div class="sc-state-label">thinking</div>
+        </div>
+        <div class="sc-orb-item">
+          <div class="companion-orb streaming showcase-orb"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div><div class="orb-icon">✦</div></div></div>
+          <div class="sc-state-label">streaming</div>
+        </div>
+        <div class="sc-orb-item">
+          <div class="companion-orb heartbeat showcase-orb"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div><div class="orb-icon">✦</div></div></div>
+          <div class="sc-state-label">heartbeat</div>
+        </div>
+        <div class="sc-orb-item">
+          <div class="companion-orb chaos showcase-orb"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div><div class="orb-icon">✦</div></div></div>
+          <div class="sc-state-label">chaos</div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;max-width:480px;">
+        <div style="font:400 11px/1 'DM Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-bottom:12px;">Mood color examples (same state classes, different CSS vars)</div>
+        <div style="display:flex;gap:20px;align-items:flex-end;">
+          <div class="sc-orb-item"><div class="companion-orb idle showcase-orb" style="--dot-color:#6dd4a8;--orb-bg:rgba(109,212,168,0.1);--orb-border:rgba(109,212,168,0.4);--glow-color:rgba(109,212,168,0.35);--ring-color:rgba(109,212,168,0.3);"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div><div class="orb-icon">✦</div></div></div><div class="sc-state-label">green</div></div>
+          <div class="sc-orb-item"><div class="companion-orb thinking showcase-orb" style="--dot-color:#f87171;--orb-bg:rgba(248,113,113,0.1);--orb-border:rgba(248,113,113,0.4);--glow-color:rgba(248,113,113,0.35);--ring-color:rgba(248,113,113,0.3);"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div><div class="orb-icon">✦</div></div></div><div class="sc-state-label">red</div></div>
+          <div class="sc-orb-item"><div class="companion-orb idle showcase-orb" style="--dot-color:#fbbf24;--orb-bg:rgba(251,191,36,0.1);--orb-border:rgba(251,191,36,0.35);--glow-color:rgba(251,191,36,0.3);--ring-color:rgba(251,191,36,0.25);"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div><div class="orb-icon">✦</div></div></div><div class="sc-state-label">amber</div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- ANIMATIONS -->
+    <section class="sc-section" id="animations">
+      <div class="sc-section-eyebrow">12 — Orb & Motion</div>
+      <div class="sc-section-title">Animations</div>
+      <div class="sc-anim-grid">
+        <div class="sc-anim-demo"><div class="sc-anim-box" id="anim-stepIn"></div><div class="sc-anim-name">stepIn</div><div class="sc-anim-detail">0.65s · spring</div><button class="sc-anim-replay" onclick="replayAnim('anim-stepIn','play-stepIn')">Replay</button></div>
+        <div class="sc-anim-demo"><div class="sc-anim-box" id="anim-fadeUp"></div><div class="sc-anim-name">fadeUp</div><div class="sc-anim-detail">0.25s · ease</div><button class="sc-anim-replay" onclick="replayAnim('anim-fadeUp','play-fadeUp')">Replay</button></div>
+        <div class="sc-anim-demo"><div class="sc-anim-box" id="anim-popIn"></div><div class="sc-anim-name">popIn</div><div class="sc-anim-detail">0.5s · bounce</div><button class="sc-anim-replay" onclick="replayAnim('anim-popIn','play-popIn')">Replay</button></div>
+        <div class="sc-anim-demo">
+          <div style="width:48px;height:48px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;">
+            <div class="companion-orb thinking showcase-orb" style="--orb-size:36px;--glow-speed:2s;--breath-speed:3s;--ring-speed:1.8s;--dot-speed:1.2s;"><div class="orb-dots"><span></span><span></span><span></span></div><div class="orb-body"><div class="orb-ring"></div></div></div>
+          </div>
+          <div class="sc-anim-name">orbGlow + orbBreath</div><div class="sc-anim-detail">loops · thinking</div>
+        </div>
+        <div class="sc-anim-demo">
+          <div style="height:48px;margin-bottom:10px;display:flex;flex-direction:column;justify-content:flex-end;padding:0 8px;">
+            <div class="dl-progress" style="margin:0;"><div class="dl-bar"><div class="dl-fill" style="width:70%;"></div></div></div>
+          </div>
+          <div class="sc-anim-name">shimmer</div><div class="sc-anim-detail">1.6s · progress</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="sc-divider"></div>
+
+    <!-- ICONS -->
+    <section class="sc-section" id="icons">
+      <div class="sc-section-eyebrow">13 — Orb & Motion</div>
+      <div class="sc-section-title">Iconography</div>
+      <p style="font:400 13px/1.6 'DM Sans',sans-serif;color:var(--text-muted);margin-bottom:20px;">Stroke only · <code style="font:400 11.5px/1 'DM Mono',monospace;color:var(--indigo);">stroke-width 1.5</code> · rounded caps/joins · <code style="font:400 11.5px/1 'DM Mono',monospace;color:var(--indigo);">currentColor</code> · viewBox 0 0 24 24</p>
+      <div class="sc-icon-grid">
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><div class="sc-icon-label">GPU</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg><div class="sc-icon-label">CPU</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/><path d="M3 12c0 1.657 4.03 3 9 3s9-1.343 9-3"/></svg><div class="sc-icon-label">Memory</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg><div class="sc-icon-label">Voice / TTS</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div class="sc-icon-label">Upload</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg><div class="sc-icon-label">Download</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><div class="sc-icon-label">Check</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div class="sc-icon-label">Info</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg><div class="sc-icon-label">Edit</div></div>
+        <div class="sc-icon-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><div class="sc-icon-label">Affection</div></div>
+      </div>
+    </section>
+
+  </main>
+</div><!-- end page-styleguide -->
+
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PAGE: SOCIAL MEDIA STUDIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div id="page-studio">
+
+  <!-- Three-layer background always behind studio -->
+  <div class="studio-bg">
+    <div class="studio-bg-mesh"></div>
+    <div class="studio-bg-grain"></div>
+    <div class="studio-bg-grid"></div>
+  </div>
+
+  <!-- Clean-preview exit (only shown in preview mode) -->
+  <button class="studio-exit-preview" onclick="exitPreview()">← Back to Controls</button>
+
+  <!-- Header bar -->
+  <div class="studio-header">
+    <button class="studio-back-btn" onclick="showStyleguide()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Design System
+    </button>
+    <div class="studio-header-title">Social Media Studio</div>
+    <button class="studio-preview-btn" onclick="enterPreview()">⬡ Clean Preview</button>
+  </div>
+
+  <!-- Body -->
+  <div class="studio-body">
+
+    <!-- Canvas zone -->
+    <div class="studio-canvas-zone">
+      <div class="studio-canvas" data-ratio="1:1" data-bg="mesh" id="studio-canvas">
+
+        <!-- Internal bg layers (mesh only) -->
+        <div class="canvas-bg-layer">
+          <div class="canvas-bg-mesh"></div>
+          <div class="canvas-bg-grain"></div>
+          <div class="canvas-bg-grid"></div>
+        </div>
+
+        <!-- Studio orb -->
+        <div class="companion-orb idle" id="studio-orb">
+          <div class="orb-dots"><span></span><span></span><span></span></div>
+          <div class="orb-body">
+            <div class="orb-ring"></div>
+            <div class="orb-icon" id="studio-orb-icon">✦</div>
+          </div>
+        </div>
+
+        <!-- Text overlay -->
+        <div class="studio-text-overlay" id="studio-text-overlay">
+          <div class="studio-name-text" id="studio-name-display"></div>
+          <div class="studio-tagline-text" id="studio-tagline-display"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Controls panel (scrollable) -->
+    <div class="studio-controls-panel">
+
+      <!-- Aspect ratio -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Aspect Ratio</div>
+        <div class="studio-chip-group" id="ratio-chips">
+          <button class="studio-chip active" data-ratio="1:1" onclick="setRatio(this)">1:1</button>
+          <button class="studio-chip" data-ratio="4:5" onclick="setRatio(this)">4:5</button>
+          <button class="studio-chip" data-ratio="16:9" onclick="setRatio(this)">16:9</button>
+          <button class="studio-chip" data-ratio="9:16" onclick="setRatio(this)">9:16</button>
+        </div>
+      </div>
+
+      <!-- Background -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Background</div>
+        <div class="studio-chip-group" id="bg-chips">
+          <button class="studio-chip active" data-bg="mesh" onclick="setBg(this)">Mesh</button>
+          <button class="studio-chip" data-bg="dark" onclick="setBg(this)">Dark</button>
+          <button class="studio-chip" data-bg="solid" onclick="setBg(this)">Solid</button>
+          <button class="studio-chip" data-bg="transparent" onclick="setBg(this)">Transparent</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+          <span class="studio-slider-label" style="font-size:11px;width:auto;">Custom</span>
+          <input type="color" class="studio-color-input" id="bg-solid-color" value="#1c1e26" oninput="setSolidBg(this.value); setBgChip('solid');">
+        </div>
+      </div>
+
+      <!-- Orb state -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Orb State</div>
+        <div class="studio-chip-group" id="state-chips">
+          <button class="studio-chip active" data-state="idle" onclick="setOrbState(this)">idle</button>
+          <button class="studio-chip" data-state="thinking" onclick="setOrbState(this)">thinking</button>
+          <button class="studio-chip" data-state="streaming" onclick="setOrbState(this)">streaming</button>
+          <button class="studio-chip" data-state="heartbeat" onclick="setOrbState(this)">heartbeat</button>
+          <button class="studio-chip" data-state="chaos" onclick="setOrbState(this)">chaos</button>
+        </div>
+      </div>
+
+      <!-- Orb color + size -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Orb</div>
+        <div class="studio-slider-row">
+          <span class="studio-slider-label">Size</span>
+          <input type="range" class="studio-slider" id="sl-size" min="60" max="280" value="140" oninput="setOrbSize(this.value); document.getElementById('val-size').textContent=this.value+'px';">
+          <span class="studio-slider-val" id="val-size">140px</span>
+        </div>
+        <div class="studio-color-row">
+          <span class="studio-slider-label">Orb Color</span>
+          <div></div>
+          <input type="color" class="studio-color-input" id="orb-color-pick" value="#818cf8" oninput="applyOrbColor(this.value)">
+        </div>
+      </div>
+
+      <!-- Glow & ring tuning -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Glow & Ring</div>
+        <div class="studio-slider-row">
+          <span class="studio-slider-label">Glow size</span>
+          <input type="range" class="studio-slider" id="sl-glow-max" min="4" max="80" value="30" oninput="setOrbVar('--glow-max',this.value+'px'); document.getElementById('val-glow-max').textContent=this.value+'px';">
+          <span class="studio-slider-val" id="val-glow-max">30px</span>
+        </div>
+        <div class="studio-slider-row">
+          <span class="studio-slider-label">Glow opacity</span>
+          <input type="range" class="studio-slider" id="sl-glow-a" min="0" max="100" value="40" oninput="updateGlowAlpha(this.value); document.getElementById('val-glow-a').textContent=this.value+'%';">
+          <span class="studio-slider-val" id="val-glow-a">40%</span>
+        </div>
+        <div class="studio-slider-row">
+          <span class="studio-slider-label">Glow speed</span>
+          <input type="range" class="studio-slider" id="sl-glow-spd" min="0.5" max="12" step="0.5" value="4" oninput="setOrbVar('--glow-speed',this.value+'s'); document.getElementById('val-glow-spd').textContent=this.value+'s';">
+          <span class="studio-slider-val" id="val-glow-spd">4s</span>
+        </div>
+        <div class="studio-slider-row">
+          <span class="studio-slider-label">Ring opacity</span>
+          <input type="range" class="studio-slider" id="sl-ring-a" min="0" max="100" value="30" oninput="updateRingAlpha(this.value); document.getElementById('val-ring-a').textContent=this.value+'%';">
+          <span class="studio-slider-val" id="val-ring-a">30%</span>
+        </div>
+        <div class="studio-slider-row">
+          <span class="studio-slider-label">Ring speed</span>
+          <input type="range" class="studio-slider" id="sl-ring-spd" min="0.5" max="12" step="0.5" value="4" oninput="setOrbVar('--ring-speed',this.value+'s'); document.getElementById('val-ring-spd').textContent=this.value+'s';">
+          <span class="studio-slider-val" id="val-ring-spd">4s</span>
+        </div>
+        <div class="studio-slider-row">
+          <span class="studio-slider-label">Breath speed</span>
+          <input type="range" class="studio-slider" id="sl-breath" min="0.5" max="12" step="0.5" value="5" oninput="setOrbVar('--breath-speed',this.value+'s'); document.getElementById('val-breath').textContent=this.value+'s';">
+          <span class="studio-slider-val" id="val-breath">5s</span>
+        </div>
+        <div class="studio-slider-row">
+          <span class="studio-slider-label">Dot speed</span>
+          <input type="range" class="studio-slider" id="sl-dot-spd" min="0.3" max="3" step="0.1" value="1.2" oninput="setOrbVar('--dot-speed',this.value+'s'); document.getElementById('val-dot-spd').textContent=this.value+'s';">
+          <span class="studio-slider-val" id="val-dot-spd">1.2s</span>
+        </div>
+      </div>
+
+      <!-- Animation toggles -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Animations</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="tog-glow" checked onchange="toggleAnim('glow',this.checked)" style="accent-color:var(--indigo);"><span class="studio-toggle-label">Glow</span></label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="tog-breath" checked onchange="toggleAnim('breath',this.checked)" style="accent-color:var(--indigo);"><span class="studio-toggle-label">Breath</span></label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="tog-ring" checked onchange="toggleAnim('ring',this.checked)" style="accent-color:var(--indigo);"><span class="studio-toggle-label">Ring</span></label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="tog-dots" checked onchange="toggleAnim('dots',this.checked)" style="accent-color:var(--indigo);"><span class="studio-toggle-label">Dots</span></label>
+        </div>
+      </div>
+
+      <!-- Avatar upload -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Avatar</div>
+        <label class="studio-avatar-zone" id="avatar-zone">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--indigo);flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="studio-avatar-zone-text" id="avatar-zone-text">Upload image…<br><span style="font-size:10px;color:var(--text-dim);">Cropped circular in orb</span></span>
+          <input type="file" id="avatar-input" accept="image/*" onchange="loadAvatar(this)">
+          <button class="studio-avatar-clear" id="avatar-clear-btn" onclick="event.stopPropagation();clearAvatar()">✕ Clear</button>
+        </label>
+      </div>
+
+      <!-- Text overlay -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Text Overlay</div>
+        <input type="text" class="studio-text-input" placeholder="Name (e.g. SENNI)" id="studio-name-input" oninput="updateText()">
+        <input type="text" class="studio-text-input" placeholder="Tagline…" id="studio-tagline-input" oninput="updateText()" style="margin-top:6px;">
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+          <span class="studio-slider-label" style="font-size:11px;">Name</span>
+          <input type="color" class="studio-color-input" value="#eef0fb" oninput="document.getElementById('studio-name-display').style.color=this.value">
+          <span class="studio-slider-label" style="font-size:11px;">Tagline</span>
+          <input type="color" class="studio-color-input" value="#818cf8" oninput="document.getElementById('studio-tagline-display').style.color=this.value">
+        </div>
+      </div>
+
+      <!-- Quick presets -->
+      <div class="studio-ctrl-group">
+        <div class="studio-ctrl-group-label">Quick Presets</div>
+        <div class="studio-chip-group">
+          <button class="studio-chip" onclick="applyPreset('default')">Default</button>
+          <button class="studio-chip" onclick="applyPreset('green')">Verdant</button>
+          <button class="studio-chip" onclick="applyPreset('amber')">Ember</button>
+          <button class="studio-chip" onclick="applyPreset('red')">Crimson</button>
+          <button class="studio-chip" onclick="applyPreset('purple')">Dusk</button>
+        </div>
+      </div>
+
+      <button class="studio-btn-reset" onclick="resetStudio()">Reset All</button>
+
+    </div><!-- end controls panel -->
+  </div><!-- end studio-body -->
+
+</div><!-- end page-studio -->
+
+
+<script>
+/* ── Page switching ────────────────────────────────────────────────────── */
+function showStudio()     { document.getElementById('page-studio').classList.add('active'); }
+function showStyleguide() { document.getElementById('page-studio').classList.remove('active'); exitPreview(); }
+
+/* ── Animation replay ──────────────────────────────────────────────────── */
+function replayAnim(id, cls) {
+  const el = document.getElementById(id);
+  el.classList.remove(cls);
+  el.style.opacity = '0';
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+window.addEventListener('load', () => {
+  setTimeout(() => replayAnim('anim-stepIn','play-stepIn'), 300);
+  setTimeout(() => replayAnim('anim-fadeUp','play-fadeUp'), 500);
+  setTimeout(() => replayAnim('anim-popIn','play-popIn'),  700);
+});
+
+/* ── Sidebar active link (scroll-based) ────────────────────────────────── */
+const sections  = document.querySelectorAll('.sc-section[id]');
+const navLinks  = document.querySelectorAll('.sc-nav-link');
+const scMain    = document.getElementById('sc-main');
+function updateActiveNav() {
+  let current = '';
+  sections.forEach(s => {
+    if (s.getBoundingClientRect().top - 80 <= 0) current = s.id;
+  });
+  if (!current && sections.length) current = sections[0].id;
+  navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + current));
+}
+scMain.addEventListener('scroll', updateActiveNav, { passive: true });
+updateActiveNav();
+
+/* Smooth scroll for sidebar links */
+navLinks.forEach(l => {
+  l.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(l.getAttribute('href'));
+    if (target) target.scrollIntoView({ behavior: 'smooth' });
+  });
+});
+
+/* ── Animated progress bar percentage display ──────────────────────────── */
+(function() {
+  const fill = document.getElementById('dl-anim-fill');
+  const pct  = document.getElementById('pct-display');
+  if (!fill || !pct) return;
+  const DURATION = 20000;
+  const HOLD_PCT = 85;
+  let start = null;
+  function tick(ts) {
+    if (!start) start = ts;
+    const elapsed = (ts - start) % DURATION;
+    const raw = elapsed / DURATION;
+    const v = raw < HOLD_PCT / 100 ? raw / (HOLD_PCT / 100) * 100 : 100;
+    pct.textContent = Math.round(v) + '%';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+
+/* ── Studio orb controller ─────────────────────────────────────────────── */
+const studioOrb    = document.getElementById('studio-orb');
+const studioCanvas = document.getElementById('studio-canvas');
+const ORB_STATES   = ['idle','thinking','streaming','heartbeat','chaos'];
+
+/* Current base color (hex) for recomputing alphas */
+let currentOrbHex  = '#818cf8';
+let currentGlowAlpha = 0.40;
+let currentRingAlpha = 0.30;
+
+function hexToRgb(hex) {
+  return {
+    r: parseInt(hex.slice(1,3), 16),
+    g: parseInt(hex.slice(3,5), 16),
+    b: parseInt(hex.slice(5,7), 16),
+  };
+}
+
+function setOrbVar(prop, val) {
+  studioOrb.style.setProperty(prop, val);
+}
+
+function applyOrbColor(hex) {
+  currentOrbHex = hex;
+  const {r,g,b} = hexToRgb(hex);
+  studioOrb.style.setProperty('--dot-color',  hex);
+  studioOrb.style.setProperty('--orb-border', `rgba(${r},${g},${b},0.4)`);
+  studioOrb.style.setProperty('--orb-bg',     `rgba(${r},${g},${b},0.12)`);
+  studioOrb.style.setProperty('--glow-color', `rgba(${r},${g},${b},${currentGlowAlpha.toFixed(2)})`);
+  studioOrb.style.setProperty('--ring-color', `rgba(${r},${g},${b},${currentRingAlpha.toFixed(2)})`);
+}
+
+function updateGlowAlpha(pct) {
+  currentGlowAlpha = pct / 100;
+  const {r,g,b} = hexToRgb(currentOrbHex);
+  studioOrb.style.setProperty('--glow-color', `rgba(${r},${g},${b},${currentGlowAlpha.toFixed(2)})`);
+}
+
+function updateRingAlpha(pct) {
+  currentRingAlpha = pct / 100;
+  const {r,g,b} = hexToRgb(currentOrbHex);
+  studioOrb.style.setProperty('--ring-color', `rgba(${r},${g},${b},${currentRingAlpha.toFixed(2)})`);
+}
+
+function setOrbSize(px) {
+  setOrbVar('--orb-size', px + 'px');
+  /* Ensure canvas padding accommodates glow + ring overflow */
+  const glowMax = parseInt(studioOrb.style.getPropertyValue('--glow-max') || '30');
+  const pad = Math.max(60, px * 0.4 + glowMax + 20);
+  studioCanvas.style.padding = pad + 'px';
+}
+
+function setOrbState(btn) {
+  document.querySelectorAll('#state-chips .studio-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ORB_STATES.forEach(s => studioOrb.classList.remove(s));
+  studioOrb.classList.add(btn.dataset.state);
+}
+
+function toggleAnim(name, enabled) {
+  if (enabled) studioOrb.removeAttribute('data-no-' + name);
+  else         studioOrb.setAttribute('data-no-' + name, '');
+}
+
+/* Aspect ratio */
+function setRatio(btn) {
+  document.querySelectorAll('#ratio-chips .studio-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  studioCanvas.dataset.ratio = btn.dataset.ratio;
+}
+
+/* Background */
+function setBg(btn) {
+  document.querySelectorAll('#bg-chips .studio-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  studioCanvas.dataset.bg = btn.dataset.bg;
+}
+function setBgChip(bgVal) {
+  document.querySelectorAll('#bg-chips .studio-chip').forEach(b =>
+    b.classList.toggle('active', b.dataset.bg === bgVal)
+  );
+  studioCanvas.dataset.bg = bgVal;
+}
+function setSolidBg(hex) {
+  studioCanvas.style.setProperty('--studio-solid-bg', hex);
+}
+
+/* Avatar */
+function loadAvatar(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const icon = document.getElementById('studio-orb-icon');
+  icon.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+  icon.appendChild(img);
+  const zone = document.getElementById('avatar-zone');
+  zone.classList.add('has-avatar');
+  document.getElementById('avatar-zone-text').innerHTML = file.name + '<br><span style="font-size:10px;color:var(--text-dim);">Click to replace</span>';
+}
+function clearAvatar() {
+  const icon = document.getElementById('studio-orb-icon');
+  icon.innerHTML = '✦';
+  const zone = document.getElementById('avatar-zone');
+  zone.classList.remove('has-avatar');
+  document.getElementById('avatar-zone-text').innerHTML = 'Upload image…<br><span style="font-size:10px;color:var(--text-dim);">Cropped circular in orb</span>';
+  document.getElementById('avatar-input').value = '';
+}
+
+/* Text overlay */
+function updateText() {
+  const name = document.getElementById('studio-name-input').value.trim();
+  const tag  = document.getElementById('studio-tagline-input').value.trim();
+  document.getElementById('studio-name-display').textContent = name;
+  document.getElementById('studio-tagline-display').textContent = tag;
+  document.getElementById('studio-text-overlay').classList.toggle('visible', !!(name || tag));
+}
+
+/* Presets */
+const PRESETS = {
+  default: '#818cf8',
+  green:   '#6dd4a8',
+  amber:   '#fbbf24',
+  red:     '#f87171',
+  purple:  '#a78bfa',
+};
+function applyPreset(name) {
+  const hex = PRESETS[name];
+  if (!hex) return;
+  document.getElementById('orb-color-pick').value = hex;
+  applyOrbColor(hex);
+}
+
+/* Clean preview */
+function enterPreview() { document.getElementById('page-studio').classList.add('preview-mode'); }
+function exitPreview()  { document.getElementById('page-studio').classList.remove('preview-mode'); }
+
+/* Reset */
+function resetStudio() {
+  applyPreset('default');
+  /* Reset size */
+  const sl = document.getElementById('sl-size');
+  sl.value = 140;
+  setOrbSize(140);
+  document.getElementById('val-size').textContent = '140px';
+  /* Reset glow/ring sliders */
+  document.getElementById('sl-glow-max').value = 30;   setOrbVar('--glow-max','30px');    document.getElementById('val-glow-max').textContent='30px';
+  document.getElementById('sl-glow-a').value   = 40;   updateGlowAlpha(40);               document.getElementById('val-glow-a').textContent='40%';
+  document.getElementById('sl-glow-spd').value = 4;    setOrbVar('--glow-speed','4s');    document.getElementById('val-glow-spd').textContent='4s';
+  document.getElementById('sl-ring-a').value   = 30;   updateRingAlpha(30);               document.getElementById('val-ring-a').textContent='30%';
+  document.getElementById('sl-ring-spd').value = 4;    setOrbVar('--ring-speed','4s');    document.getElementById('val-ring-spd').textContent='4s';
+  document.getElementById('sl-breath').value   = 5;    setOrbVar('--breath-speed','5s');  document.getElementById('val-breath').textContent='5s';
+  document.getElementById('sl-dot-spd').value  = 1.2;  setOrbVar('--dot-speed','1.2s');   document.getElementById('val-dot-spd').textContent='1.2s';
+  /* Reset state */
+  document.querySelectorAll('#state-chips .studio-chip')[0].click();
+  /* Reset bg */
+  document.querySelectorAll('#bg-chips .studio-chip')[0].click();
+  /* Reset ratio */
+  document.querySelectorAll('#ratio-chips .studio-chip')[0].click();
+  /* Reset canvas padding */
+  studioCanvas.style.padding = '';
+  /* Clear text */
+  document.getElementById('studio-name-input').value = '';
+  document.getElementById('studio-tagline-input').value = '';
+  document.getElementById('studio-text-overlay').classList.remove('visible');
+  /* Re-enable anims */
+  ['glow','breath','ring','dots'].forEach(a => {
+    document.getElementById('tog-'+a).checked = true;
+    studioOrb.removeAttribute('data-no-'+a);
+  });
+  /* Clear avatar */
+  clearAvatar();
+}
+
+/* Init: apply canvas padding on load */
+setOrbSize(140);
+</script>
+
+</body>
+</html>
