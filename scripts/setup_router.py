@@ -21,17 +21,13 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from scripts.config import PROJECT_ROOT, detect_gpu, load_config, save_config
+from scripts.config import detect_gpu, load_config, save_config
+from scripts.paths import BINARY_DIR, FEATURES_DIR, FEATURES_PACKAGES_DIR, MODELS_DIR
 
 router = APIRouter()
 
 IS_WIN = platform.system() == "Windows"
 SYSTEM = platform.system()
-
-BINARY_DIR           = PROJECT_ROOT / "llama"
-MODELS_DIR           = PROJECT_ROOT / "models"
-FEATURES_DIR         = PROJECT_ROOT / "features"
-FEATURES_PACKAGES_DIR = FEATURES_DIR / "packages"   # single shared dir for all extras
 BINARY_NAME = "llama-server.exe" if IS_WIN else "llama-server"
 LLAMA_CPP_REPO = "ggml-org/llama.cpp"
 

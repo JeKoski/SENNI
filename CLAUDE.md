@@ -137,6 +137,39 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-23 #3 (Path centralization, boundary hardening, Phase 2 complete)
+
+**`scripts/paths.py` created. Path traversal hardened. Phase 2 PyInstaller prerequisites done.**
+
+### What changed
+
+**`scripts/paths.py` (new):**
+- Single source of truth for all path constants
+- `RESOURCE_ROOT` (read-only bundled assets) vs `DATA_ROOT` (writable user data) split — diverge in PyInstaller bundle (`sys._MEIPASS` vs `sys.executable.parent`), same in source mode
+- `PROJECT_ROOT` re-exported as `DATA_ROOT` alias for backward compat
+- Named constants: `STATIC_DIR`, `TEMPLATES_DIR`, `TOOLS_DIR`, `SCRIPTS_DIR`, `CONFIG_FILE`, `COMPANIONS_DIR`, `LOGS_DIR`, `BACKUPS_DIR`, `BINARY_DIR`, `MODELS_DIR`, `FEATURES_DIR`, `FEATURES_PACKAGES_DIR`
+- 6 files updated to import from here: `config.py`, `server.py`, `tool_loader.py`, `setup_router.py`, `memory_server.py`, `tts_server.py`
+
+**Path safety helpers in `scripts/config.py` (new):**
+- `sanitize_folder(name)` — strips to `[a-z0-9_-]`, max 64 chars
+- `sanitize_filename(name)` — rejects `..`, strips unsafe chars, max 200
+- `confine_path(path, root)` — raises `ValueError` if resolved path escapes root
+- Applied at all route boundaries: `history_router.py`, `settings_router.py`, `server.py`
+- `session_id` in history media route now sanitized (was missing)
+- Soul file save/delete both hardened; `api_new_companion` uses proper sanitizer
+
+**`main.py` updated:**
+- Switched from string import `"scripts.server:app"` to direct `from scripts.server import app` — PyInstaller static analysis friendlier
+- `wizard_compile.py` `output_dir` concern resolved — uses `COMPANIONS_DIR` from `scripts.paths`, resolves to `DATA_ROOT/companions` in bundled mode automatically
+
+**33/33 tests green throughout.**
+
+### Next session: Phase C (PyInstaller resource audit)
+- Audit all path accesses for bundled correctness
+- Write PyInstaller spec (`senni-backend.spec`)
+- First packaged smoke test
+
+
 ## Session notes — 2026-04-23 #2 (Diagnostics, test harness, boot service extraction)
 
 **Self-diagnostic suite added. pytest harness established (33 tests). Boot logic extracted.**

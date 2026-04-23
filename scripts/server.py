@@ -31,6 +31,7 @@ from fastapi.staticfiles import StaticFiles
 
 from scripts.boot_service import get_boot_status, kill_llama_server
 from scripts.boot_service import router as boot_router
+from scripts.paths import FEATURES_PACKAGES_DIR, LOGS_DIR, STATIC_DIR
 from scripts.config import (
     PROJECT_ROOT,
     CONFIG_FILE,
@@ -46,6 +47,7 @@ from scripts.config import (
     load_companion_config,
     load_config,
     migrate_avatar,
+    sanitize_folder,
     save_companion_config,
     save_config,
     write_avatar_file,
@@ -87,9 +89,8 @@ app.include_router(history_router)
 # Patch sys.path before tts/memory router imports so chromadb is findable.
 # tts.py subprocess gets PYTHONPATH set in tts_server._start_tts_process instead.
 import sys as _sys
-_features_packages = PROJECT_ROOT / "features" / "packages"
-if _features_packages.is_dir():
-    _fp = str(_features_packages)
+if FEATURES_PACKAGES_DIR.is_dir():
+    _fp = str(FEATURES_PACKAGES_DIR)
     if _fp not in _sys.path:
         _sys.path.insert(0, _fp)
 
@@ -103,7 +104,6 @@ except Exception as _tts_import_err:
     _tts_available  = False
     kill_tts_server = lambda: None  # noqa: E731
 
-STATIC_DIR = PROJECT_ROOT / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -111,7 +111,7 @@ if STATIC_DIR.exists():
 # One timestamped log file per boot, last 10 kept. Set up early so all startup
 # output (including router imports above) lands in the file.
 logging.basicConfig(level=logging.INFO)
-_log_file = setup_file_logging(PROJECT_ROOT / "logs", keep=10)
+_log_file = setup_file_logging(LOGS_DIR, keep=10)
 log.info("Logging to %s", _log_file)
 
 # ── Memory  ─────────────────────────────────────────────────────────────────
@@ -594,19 +594,24 @@ async def api_list_templates():
 
 @app.post("/api/templates/apply")
 async def api_apply_template(request: Request):
+    from scripts.config import sanitize_filename, confine_path
     body          = await request.json()
-    comp_folder   = body.get("companion_folder", "default")
+    comp_folder   = sanitize_folder(body.get("companion_folder", "default"))
     tname         = body.get("template_name", "")
-    filename      = body.get("filename") or tname
-    target_folder = body.get("target_folder", "soul")
+    filename      = sanitize_filename(body.get("filename") or tname)
+    target_folder = sanitize_folder(body.get("target_folder", "soul"))
 
+    if not filename:
+        return {"ok": False, "error": "Invalid filename"}
     src = TEMPLATES_DIR / tname
     if not src.exists():
         return {"ok": False, "error": f"Template {tname!r} not found"}
 
     dest_dir = COMPANIONS_DIR / comp_folder / target_folder
     dest_dir.mkdir(parents=True, exist_ok=True)
-    (dest_dir / filename).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    dest = dest_dir / filename
+    confine_path(dest, COMPANIONS_DIR)
+    dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     return {"ok": True}
 
 
@@ -614,6 +619,7 @@ async def api_apply_template(request: Request):
 
 @app.delete("/api/companions/{folder}")
 async def api_delete_companion(folder: str):
+    folder = sanitize_folder(folder)
     config = load_config()
     if config.get("companion_folder") == folder:
         return {"ok": False, "error": "Cannot delete the active companion. Switch to another first."}
@@ -655,6 +661,7 @@ async def api_wizard_export_png(folder: str):
     Written at compile time if avatar was uploaded and Pillow is available.
     Future: also generated from wizard SVG/silhouette when no avatar is present.
     """
+    folder = sanitize_folder(folder)
     png_path = COMPANIONS_DIR / folder / "character_card.png"
     if not png_path.exists():
         return JSONResponse({"ok": False, "error": "No character card found"}, status_code=404)

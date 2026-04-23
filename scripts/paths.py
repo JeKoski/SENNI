@@ -1,0 +1,43 @@
+"""
+paths.py — Centralized runtime path resolution
+
+Source mode:  RESOURCE_ROOT = DATA_ROOT = project root (parent of scripts/)
+Bundled mode: RESOURCE_ROOT = sys._MEIPASS  (read-only temp extraction dir)
+              DATA_ROOT     = directory containing the exe  (writable)
+
+Import named constants from here instead of computing paths in individual modules.
+"""
+
+import sys
+from pathlib import Path
+
+_bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
+if _bundled:
+    RESOURCE_ROOT = Path(sys._MEIPASS)
+    DATA_ROOT     = Path(sys.executable).parent
+else:
+    DATA_ROOT     = Path(__file__).resolve().parent.parent
+    RESOURCE_ROOT = DATA_ROOT
+
+# Backward-compat alias — code that received PROJECT_ROOT as a writable root
+# should prefer DATA_ROOT for new references.
+PROJECT_ROOT = DATA_ROOT
+
+# ── Resource paths (read-only, bundled into the binary) ───────────────────────
+
+STATIC_DIR    = RESOURCE_ROOT / "static"
+TEMPLATES_DIR = RESOURCE_ROOT / "templates" / "companions"
+TOOLS_DIR     = RESOURCE_ROOT / "tools"
+SCRIPTS_DIR   = RESOURCE_ROOT / "scripts"
+
+# ── Data paths (writable, next to the exe / project root in source mode) ──────
+
+CONFIG_FILE           = DATA_ROOT / "config.json"
+COMPANIONS_DIR        = DATA_ROOT / "companions"
+LOGS_DIR              = DATA_ROOT / "logs"
+BACKUPS_DIR           = DATA_ROOT / "backups"
+BINARY_DIR            = DATA_ROOT / "llama"
+MODELS_DIR            = DATA_ROOT / "models"
+FEATURES_DIR          = DATA_ROOT / "features"
+FEATURES_PACKAGES_DIR = DATA_ROOT / "features" / "packages"

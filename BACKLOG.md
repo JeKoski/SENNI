@@ -21,8 +21,8 @@ Goal: reduce packaging risk before PyInstaller + Tauri by shrinking the biggest 
 - **History router extraction complete** — `scripts/history_router.py` owns `/api/history/*`.
 - **Settings router extraction complete** — `scripts/settings_router.py` owns settings/companion/soul routes.
 - **Boot service extraction complete** — `scripts/boot_service.py` owns all llama-server lifecycle: state globals, `kill_llama_server()`, `get_boot_status()`, `_build_and_launch`, `_run_subprocess`, `POST /api/boot`, `GET /api/boot/log`. `server.py` lost ~200 lines.
-- **Centralize runtime path resolution** — one place for project root, static/template/features paths, source-mode vs packaged-mode handling, and sidecar-safe resource lookup.
-- **Harden file/path boundaries** — tighten folder/filename handling around companion, soul, history, and asset operations before the app is shipped as a desktop package.
+- **Centralize runtime path resolution** ✓ — `scripts/paths.py` owns all path constants. `RESOURCE_ROOT` (bundled assets) vs `DATA_ROOT` (writable user data) split handles PyInstaller correctly. All modules import from here.
+- **Harden file/path boundaries** ✓ — `sanitize_folder()`, `sanitize_filename()`, `confine_path()` added to `config.py`. Applied at all route boundaries in `history_router`, `settings_router`, `server.py`. Path traversal via `companion_folder`, `session_id`, `filename`, and `target_folder` inputs closed.
 
 **Phase B - Frontend chat modular split**
 - **Extract `buildSystemPrompt()` from `static/js/chat.js`** - move to a dedicated module as already noted in `design/ARCHITECTURE.md`.
@@ -87,8 +87,9 @@ Compile Python backend (`main.py` + all scripts + static files) into a single bi
 - Linux: `senni-backend`
 - GitHub Actions build step — never compiled manually
 - Prerequisite for Phase 3
-- **`main.py` entry point needed first** — PyInstaller compiles a single `.py` file as the executable root. Currently the app starts via `uvicorn scripts.server:app` from the CLI; a `main.py` that calls `uvicorn.run(...)` must exist before PyInstaller spec can be written. First task of Phase 2.
-- **`output_dir` refactor awareness** — `wizard_compile.py` currently outputs companion folders relative to `PROJECT_ROOT`. In a PyInstaller bundle `PROJECT_ROOT` resolves to a temp extraction dir, not a writable location. Verify or fix before Phase 2 smoke test, not just Phase 3.
+- **`main.py` entry point** ✓ — exists, uses direct `from scripts.server import app` import (PyInstaller-friendly).
+- **`output_dir` refactor** ✓ — `wizard_compile.py` uses `COMPANIONS_DIR` from `scripts.paths`, which resolves to `DATA_ROOT/companions` (writable) in bundled mode. No fix needed.
+- **Next: write PyInstaller spec** — after Phase C audit completes.
 
 **Phase 3 — Tauri shell**
 Tauri wraps the webview, manages the Python sidecar, provides tray icon + window chrome.
