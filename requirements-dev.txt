@@ -1,0 +1,4 @@
+# Dev / test dependencies — not required to run the app
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+# httpx is already in requirements.txt (used by web_scrape tool)
