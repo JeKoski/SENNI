@@ -7,7 +7,7 @@
     "top_k": 64,
     "min_p": 0,
     "repeat_penalty": 1,
-    "max_tokens": 1024,
+    "max_tokens": 2048,
     "presence_penalty": 0,
     "frequency_penalty": 0,
     "max_tool_rounds": 8,
