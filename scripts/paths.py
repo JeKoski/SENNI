@@ -41,3 +41,9 @@ BINARY_DIR            = DATA_ROOT / "llama"
 MODELS_DIR            = DATA_ROOT / "models"
 FEATURES_DIR          = DATA_ROOT / "features"
 FEATURES_PACKAGES_DIR = DATA_ROOT / "features" / "packages"
+
+# Embedded Python runtime — bundled for pip installs, lives in RESOURCE_ROOT.
+# Populated by scripts/build_prep.py before running PyInstaller.
+# Windows: full Python embeddable with pip bootstrapped in.
+# Linux:   not used — falls back to system Python at runtime.
+PYTHON_EMBED_DIR = RESOURCE_ROOT / "python-embed"

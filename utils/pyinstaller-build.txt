@@ -1,0 +1,8 @@
+## Run to get Python embed
+python scripts/build_prep.py
+
+## Run to build
+pyinstaller senni-backend.spec
+
+## Run executable from: 
+dist\senni-backend\senni-backend.exe

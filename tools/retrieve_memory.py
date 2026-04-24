@@ -23,6 +23,8 @@ import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts.paths import CONFIG_FILE
+
 TOOL_NAME   = "retrieve_memory"
 DESCRIPTION = (
     "Deliberately recall memories related to a topic or query. "
@@ -58,8 +60,7 @@ INPUT_SCHEMA = {
 def _get_port() -> int:
     """Read the configured port from config.json. Defaults to 8000."""
     try:
-        root = Path(__file__).resolve().parent.parent
-        cfg  = json.loads((root / "config.json").read_text(encoding="utf-8"))
+        cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         return int(cfg.get("port", 8000))
     except Exception:
         return 8000

@@ -30,11 +30,15 @@ Goal: reduce packaging risk before PyInstaller + Tauri by shrinking the biggest 
 - **Split send/stream/message pipeline** - isolate send flow, reply handling, and history sanitisation so message behaviour is easier to reason about before desktop wrapping.
 - **Keep script load order intentional** - update `design/ARCHITECTURE.md` and `chat.html` load order as modules move.
 
-**Phase C - Packaging prep**
-- **PyInstaller resource audit** - verify static files, templates, features packages, companions defaults, and wizard/compiler assets resolve correctly when bundled.
-- **Sidecar runtime contract** - define how Tauri launches, monitors, and shuts down the Python backend sidecar without changing the current HTTP model.
-- **Packaging-sensitive config audit** - check assumptions around writable directories, default output paths, caches, and bundled binaries (including future espeak packaging).
-- **First packaged smoke test** - source install and packaged build should both boot wizard/chat and exercise the main happy path.
+**Phase C - Packaging prep** *(largely complete 2026-04-24)*
+- **PyInstaller resource audit** ✓ — all `__file__` antipatterns fixed in tool files; `auto_backup.py` rewritten; `diagnostics.py` uses `STATIC_DIR`; `tts_server.py` + `setup_router.py` use `PYTHON_EMBED_DIR`
+- **`senni-backend.spec`** ✓ — one-dir mode, correct DATAS list, python-embed conditional, optional-extras excludes
+- **`build_prep.py` + `build.bat`** ✓ — python embeddable download + pip bootstrap; auto-runs if `python-embed/` missing
+- **First packaged smoke test** ✓ — bundle boots, wizard runs, TTS fully working end-to-end. ChromaDB smoke test pending (switched to embed mode — reinstall required).
+- **Extras install mode rule** ✓ — any extra with native extensions (.pyd/.so) must use `"embed"` mode (python-embed site-packages). `--target` breaks DLL loading on Windows. Both kokoro and chromadb confirmed. Pure-Python-only extras could use `"target"` but none exist currently.
+- **Sidecar runtime contract** — define how Tauri launches, monitors, and shuts down the Python backend sidecar without changing the current HTTP model.
+- **espeak bundling** — bundle a portable espeak-ng binary (like llama-server). Currently still a system dependency. Wizard warns if missing; auto-set `config["tts"]["espeak_path"]` on detection. Target: Phase 3 / Tauri packaging.
+- **Settings "Install features" button** — post-wizard install path for users who skipped features in the wizard. Triggers same pip flow as wizard extras step.
 
 **Do later - after first packaged build works**
 - **Deep memory subsystem cleanup**
@@ -85,8 +89,7 @@ Remaining Phase 1 work:
 Compile Python backend (`main.py` + all scripts + static files) into a single binary via PyInstaller.
 - Windows: `senni-backend.exe`
 - Linux: `senni-backend`
-- GitHub Actions build step — never compiled manually
-- Prerequisite for Phase 3
+- GitHub Actions build step — never compiled manually; prerequisite for Phase 3
 - **`main.py` entry point** ✓ — exists, uses direct `from scripts.server import app` import (PyInstaller-friendly).
 - **`output_dir` refactor** ✓ — `wizard_compile.py` uses `COMPANIONS_DIR` from `scripts.paths`, which resolves to `DATA_ROOT/companions` (writable) in bundled mode. No fix needed.
 - **Next: write PyInstaller spec** — after Phase C audit completes.
@@ -116,12 +119,40 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Companion Wizard summary orb** — summary screen orb still renders old emoji placeholder instead of the new silhouette SVG. Fix: wire `_getSilhouette()` into the summary orb render path same as portrait orb.
 
+- **Setup: Cancel model download bricks UI** — cancelling mid-download leaves a partial temp file and the model step UI in a broken state. Fix: delete temp file on cancel, then recheck and reset UI state as if download never started.
+
+- **Companion Settings: Mood pill setting doesn't save** — "mood_pill_visibility" stuck on "Always" after reopen. Change isn't persisting to config or the selection widget isn't reading the saved value back correctly. Check both the save path and the initial render path.
+
+- **Chat: Message sometimes arrives in one chunk instead of streaming** — companion reply occasionally delivers as a single block rather than streaming tokens. Likely a buffering or flush issue in the SSE/stream pipeline.
+
+- **TTS: Sometimes skips generation or tries to synthesise huge chunks** — likely the same root cause as the chat streaming issue above. Large unsplit text hits TTS as one request instead of sentence-sized pieces.
+
+- **TTS: Bad chunking at file names / inline code** — two sub-issues:
+  - Period followed by non-space (e.g. `companion_identity.md`) triggers a sentence split mid-filename. Fix: only split on `. ` (period + space), not bare `.`.
+  - Current markdown stripper skips entire inline code blocks. Instead, speak the content (e.g. voice "companion identity dot md" for `` `companion_identity.md` ``). Remove the inline-code skip rule from `strip_markdown()` in `tts_server.py` — or replace it with a light humanisation pass.
+
+- **Chat: Bubbles and pills fill from top** — new message bubbles and mood pills anchor to the top of the container instead of appearing at the bottom near the orb. Should grow upward from the bottom like a chat history.
+
+- **Gemma parsing: broken tool call continuation** — Gemma 4 sometimes ends a turn with "I'll call those tools now" without actually emitting the tool call, or trails off with `channel|>` or similar artefact. Likely tries to continue a reply after the jinja template closes the turn. Needs investigation of the jinja template and any post-processing that strips partial tokens.
+
+- **Chat tabs: order shifts and no rename** — two issues:
+  - Tab order is inconsistent across sessions; no stable index. Fix: store a tab order index in `config.json` or `memory_meta.json` per companion and use it to sort tabs on render.
+  - Replace the delete "X" button with a three-dot (⋯) menu → "Rename" (inline edit) + "Delete" (existing confirmation prompt).
+
 ---
 
 ## Quick Wins
 
 *Ready to build — no design conversation needed.*
 
+- **Senni app icon** — design and add an icon for the binary (`.ico` for Windows PyInstaller spec), wizard header, and elsewhere in the UI. Needs design conversation for the visual; wiring into the spec is straightforward once an `.ico` exists.
+- **Setup: Live pip log during Features install** — stream pip output into the wizard's features step so the user can see what's happening instead of a static screen. Backend: pipe pip stdout/stderr through the SSE stream as `{"type":"log","line":"..."}` events. Frontend: scrolling log area below the progress bar, last N lines visible.
+- **Setup: Animated progress bar during Features install** — pip has no meaningful percentage output. Animate the bar with an indeterminate scroll effect: a semi-transparent shimmer/stripe sweeps across at constant speed while installing, snaps to 100% on done. Replaces the current static bar.
+- **Setup: Boot spinner stays active until TTS ready** — on the boot step ("Bringing your companion online"), the spinner flips to ✓ as soon as llama-server is ready, but TTS service can take several more seconds to load. Keep the spinner running and delay showing the "Say Hello →" button until TTS also reports ready (or a short grace-period timeout if TTS is disabled/unavailable). Prevents the user clicking through before voice is usable.
+- **Setup: Manual path entry for features** — add optional path fields to the Features step for users who already have kokoro/chromadb installed globally or in a custom location. Entering a path should skip the local install and let setup boot TTS/memory cleanly. Also add a "skip, I'll configure later" option so setup can complete without installing.
+- **Settings: Features tab** — new tab in Settings consolidating all optional-feature paths and status. Should include: TTS enable/python path/espeak path/voice path (currently scattered), ChromaDB enable/packages path, per-feature reinstall/detect buttons. Goal: full post-wizard reconfiguration without re-running setup.
+- **TTS: Stop button for current generation** — add a stop/cancel button that appears while TTS is generating for a message. Aborts the in-flight `/api/tts/speak` request and stops any playback.
+- **Chat UI: Offline indicator** — when the model server is not running, the companion "online" pip and status text should turn red and read "offline". Currently stays green/neutral regardless of server state.
 - **Mood → TTS override UI** — speed/blend per mood in Companion Settings Mood tab. Schema already in config, just needs UI. See `design/TTS.md`.
 - **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`.
 - **Mid-session gap detection** — long idle → re-inject updated timestamp into system prompt. Piggyback on consolidation idle timer. Low priority.

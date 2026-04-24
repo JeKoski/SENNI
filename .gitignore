@@ -31,3 +31,9 @@ llama/
 models/
 
 features/
+
+build/
+
+dist/
+
+python-embed/

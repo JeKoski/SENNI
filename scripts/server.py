@@ -85,14 +85,42 @@ app.include_router(boot_router)
 app.include_router(history_router)
 
 # ── Features sys.path patch ────────────────────────────────────────────────────
-# Extras (kokoro, chromadb) installed by wizard land in ./features/packages/.
-# Patch sys.path before tts/memory router imports so chromadb is findable.
-# tts.py subprocess gets PYTHONPATH set in tts_server._start_tts_process instead.
+# All binary extras (kokoro, chromadb) are installed into python-embed site-packages
+# so their native DLLs stay co-located and loadable. The main process needs:
+#   1. python-embed/Lib/site-packages/ on sys.path  → finds the packages
+#   2. os.add_dll_directory(python-embed/)           → Windows finds their DLLs
+#   3. python-embed stdlib zip on sys.path           → fills stdlib gaps (graphlib etc.)
+# tts.py subprocess gets its own PYTHONPATH set in tts_server._start_tts_process.
 import sys as _sys
-if FEATURES_PACKAGES_DIR.is_dir():
-    _fp = str(FEATURES_PACKAGES_DIR)
-    if _fp not in _sys.path:
-        _sys.path.insert(0, _fp)
+import importlib as _importlib
+
+# features/packages/ kept for any future pure-Python extras (safe if dir missing).
+_fp = str(FEATURES_PACKAGES_DIR)
+if _fp not in _sys.path:
+    _sys.path.insert(0, _fp)
+
+if getattr(_sys, "frozen", False):
+    from scripts.paths import PYTHON_EMBED_DIR
+    import os as _os
+
+    # python-embed site-packages → where chromadb, kokoro etc. are installed
+    _sp = str(PYTHON_EMBED_DIR / "Lib" / "site-packages")
+    if _sp not in _sys.path:
+        _sys.path.insert(0, _sp)
+
+    # DLL search path → lets native extensions find their bundled DLLs
+    try:
+        _os.add_dll_directory(str(PYTHON_EMBED_DIR))
+    except Exception:
+        pass
+
+    # stdlib zip → low-priority fallback for stdlib modules PyInstaller didn't collect
+    for _z in PYTHON_EMBED_DIR.glob("python*.zip"):
+        _zs = str(_z)
+        if _zs not in _sys.path:
+            _sys.path.append(_zs)
+
+_importlib.invalidate_caches()
 
 # ── TTS router ─────────────────────────────────────────────────────────────────
 try:
@@ -165,7 +193,7 @@ async def on_startup():
 
     try:
         from scripts.auto_backup import run_backup
-        run_backup(PROJECT_ROOT)
+        run_backup()
     except Exception as e:
         log.warning("Auto-backup failed (non-fatal): %s", e)
 

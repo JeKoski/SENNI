@@ -19,6 +19,8 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
+from scripts.paths import CONFIG_FILE, COMPANIONS_DIR
+
 TOOL_NAME   = "supersede_memory"
 DESCRIPTION = (
     "Replace an existing memory note whose content has become outdated. "
@@ -71,8 +73,7 @@ INPUT_SCHEMA = {
 
 def _get_port() -> int:
     try:
-        root = Path(__file__).resolve().parent.parent
-        cfg  = json.loads((root / "config.json").read_text(encoding="utf-8"))
+        cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         return int(cfg.get("port", 8000))
     except Exception:
         return 8000
@@ -80,11 +81,9 @@ def _get_port() -> int:
 
 def _get_active_mood() -> str | None:
     try:
-        root       = Path(__file__).resolve().parent.parent
-        global_cfg = json.loads((root / "config.json").read_text(encoding="utf-8"))
+        global_cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         folder     = global_cfg.get("companion_folder", "default")
-        comp_path  = root / "companions" / folder / "config.json"
-        comp_cfg   = json.loads(comp_path.read_text(encoding="utf-8"))
+        comp_cfg   = json.loads((COMPANIONS_DIR / folder / "config.json").read_text(encoding="utf-8"))
         return comp_cfg.get("active_mood") or None
     except Exception:
         return None

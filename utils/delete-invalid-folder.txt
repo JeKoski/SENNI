@@ -1,0 +1,7 @@
+## If for example a backup script goes recursive
+## We make an empty directory then copy it over the invalid folder before deleting it
+
+mkdir C:\empty_tmp
+robocopy C:\empty_tmp "C:\AI\SENNI-dev\.claude\worktrees\xenodochial-ritchie-d366fe\dist\senni-backend\backups" /MIR
+rmdir "C:\AI\SENNI-dev\.claude\worktrees\xenodochial-ritchie-d366fe\dist\senni-backend\backups"
+rmdir C:\empty_tmp

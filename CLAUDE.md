@@ -137,6 +137,130 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-24 #2 (ChromaDB bundling + misc fixes)
+
+**ChromaDB now installs into python-embed (embed mode). Diagnostics fixed. mmproj auto-fill fixed.**
+
+### What changed
+
+**`scripts/setup_router.py`:**
+- `_EXTRAS_INSTALL_MODE["memory"]` changed from `"target"` to `"embed"` — chromadb (like kokoro) has native extensions (`chromadb_rust_bindings`) that fail DLL loading when installed via `--target` on Windows. Embed mode keeps DLLs co-located. Rule: any extra with native extensions → embed mode.
+
+**`scripts/server.py` — sys.path/DLL patch expanded:**
+- Always adds `features/packages/` (safe even if dir missing)
+- In frozen mode: adds `python-embed/Lib/site-packages/` (where all embed-mode extras live)
+- In frozen mode: `os.add_dll_directory(PYTHON_EMBED_DIR)` so native extension DLLs are findable
+- In frozen mode: appends `python-embed/python*.zip` as low-priority stdlib fallback (fills gaps like `graphlib` that PyInstaller didn't collect because chromadb is in `excludes`)
+- `importlib.invalidate_caches()` after all path changes (required in frozen mode — path importer cache doesn't rescan new entries without it)
+
+**`senni-backend.spec`:**
+- Added `"graphlib"` and `"sqlite3"` / `"_sqlite3"` to `HIDDEN_IMPORTS` — stdlib C extensions PyInstaller won't collect unless explicitly listed
+
+**`scripts/memory_store.py`:**
+- `_ensure_chroma()`: logs actual import error (was silently returning False), adds `importlib.invalidate_caches()`, inserts python-embed site-packages into sys.path as belt-and-suspenders
+- Error message updated to "Install via Setup Wizard > Features" (was `pip install chromadb --break-system-packages`)
+
+**`scripts/diagnostics.py`:**
+- `_check_import("kokoro"/"chromadb")` replaced with `_check_extra(key, label)` — path-based detection matching setup_router logic. Frozen mode: checks `PYTHON_EMBED_DIR/Lib/site-packages/<pkg>`. Source mode: falls back to `import`. Was always failing in frozen mode because main process can't `import kokoro` (it lives in python-embed, not the frozen bundle's Python).
+
+**`static/js/wizard.js`:**
+- `_applyModelStatus`: when auto-selecting a downloaded model card, now also fills `mmprojPath` and enables multimodal if the model has a mmproj on disk. Previously only did this on user click, leaving mmproj unset when model was already downloaded.
+
+### Bugs fixed
+
+| Bug | Fix |
+|-----|-----|
+| ChromaDB always "not installed" | sys.path patch ran before dir existed + no `invalidate_caches()` |
+| chromadb import: `No module named 'chromadb'` | `invalidate_caches()` missing in frozen mode |
+| chromadb import: `No module named 'graphlib'` | Added stdlib zip fallback + graphlib to hidden imports |
+| chromadb import: `_sqlite3` missing | Added sqlite3/_sqlite3 to hidden imports |
+| chromadb import: DLL load failed (rust bindings) | Switched to embed mode; `os.add_dll_directory` for python-embed |
+| Diagnostics always failing for kokoro/chromadb | Replaced import-based check with path-based `_check_extra()` |
+| mmproj not auto-set on wizard re-run | `_applyModelStatus` now fills mmprojPath when auto-selecting downloaded card |
+
+### Status
+ChromaDB install pending final smoke test (switching to embed mode requires reinstall). TTS confirmed working end-to-end from previous session.
+
+### Next session
+- Verify ChromaDB smoke test (embed mode install + memory system init)
+- Begin working through BACKLOG bugs (streaming, bubbles, tab order, mood pill save)
+- Settings: Features tab design
+- espeak bundling
+
+---
+
+## Session notes — 2026-04-24 (Phase C complete — PyInstaller bundle working, TTS smoke test near-complete)
+
+**PyInstaller spec written, bundle boots, smoke test run. All major bundling bugs fixed.**
+
+### What changed
+
+**`senni-backend.spec` (new):**
+- One-dir mode, `console=True`, `upx=True`
+- DATAS: `static/`, `templates/`, `tools/`, `scripts/tts.py` (real .py, not compiled — subprocess needs it)
+- `python-embed/` added to DATAS if dir exists at build time
+- Excludes `chromadb`, `sentence_transformers`, `kokoro` (user-installed via wizard)
+
+**`scripts/build_prep.py` (new):**
+- Downloads Python embeddable matching current Python version, extracts to `python-embed/`
+- Uncomments `#import site` in `*._pth` file (required for pip)
+- Bootstraps pip via `get-pip.py`
+- Linux: creates `.linux-placeholder` (uses system Python at runtime)
+
+**`build.bat` (new):**
+- Auto-runs `build_prep.py` if `python-embed/` missing, then `pyinstaller senni-backend.spec`
+
+**`scripts/paths.py`:** Added `PYTHON_EMBED_DIR = RESOURCE_ROOT / "python-embed"`
+
+**`.gitignore`:** Added `python-embed/` (build artifact)
+
+**`tools/memory.py`, `tools/write_memory.py`, `tools/retrieve_memory.py`, `tools/supersede_memory.py`, `tools/update_relational_state.py`:**
+- All `__file__`-based path construction removed (breaks in PyInstaller bundle)
+- Now import `CONFIG_FILE`, `COMPANIONS_DIR`, `DATA_ROOT` from `scripts.paths`
+
+**`scripts/diagnostics.py`:** `STATIC_DIR` from `scripts.paths` instead of `project_root / "static"` (static lives in RESOURCE_ROOT in bundle, not DATA_ROOT)
+
+**`scripts/auto_backup.py` (rewrite):**
+- Old: read `.gitignore` to filter backup — no `.gitignore` in bundle → backed up `_internal/` recursively → Windows MAX_PATH disaster
+- New: backs up only `config.json` + `companions/` using constants from `scripts.paths`. Prunes to 10 most recent.
+
+**`scripts/setup_router.py`:**
+- `_get_pip_python()` — uses `PYTHON_EMBED_DIR/python.exe` in frozen mode; falls back to system Python in source mode
+- `_EXTRAS_INSTALL_MODE`: TTS = `"embed"` (python-embed site-packages, DLL-safe), memory = `"target"` (`features/packages/`)
+- `_EXTRAS_POST_CMDS`: TTS runs `python -m spacy download en_core_web_sm` post-install (pre-download prevents runtime pip → stdout corruption of TTS JSON protocol)
+- `_EXTRAS_META["tts"]` packages: `["kokoro", "soundfile"]` (soundfile omitted from kokoro's deps)
+
+**`static/js/wizard.js`:**
+- Fixed extras toggle: `const skip = localFound || !localInstall` (`systemFound` always False in bundle — old logic broke the toggle)
+
+**`scripts/tts_server.py`:**
+- `_resolve_python()` uses `PYTHON_EMBED_DIR` in frozen mode
+- Exception handler always captures stderr (not just on exit code 2)
+
+### Bugs fixed during smoke test
+
+| Bug | Fix |
+|-----|-----|
+| Recursive backup → Windows MAX_PATH | Rewrote `auto_backup.py` to only back up `config.json` + `companions/` |
+| `pip failed for kokoro` — `sys.executable` = .exe in frozen | `_get_pip_python()` finds `python-embed/python.exe` |
+| Extras toggle broken in bundle | Simplified skip logic — removed dead `systemFound` branch |
+| `tts.py not found at _internal/scripts/tts.py` | Added `("scripts/tts.py", "scripts")` to spec DATAS |
+| `ModuleNotFoundError: numpy` | Binary packages via `--target` break Windows DLL loading; TTS now installs into python-embed site-packages |
+| `soundfile not installed` | Added to `_EXTRAS_META["tts"]` package list |
+| TTS header parse failed — pip output on fd 1 | Pre-download spaCy model in `_EXTRAS_POST_CMDS` |
+
+### Status
+33/33 tests green. Bundle boots, wizard runs, extras install, TTS subprocess starts. spaCy pre-download fix applied — final synthesis test pending rebuild.
+
+### Next session
+- Rebuild and verify TTS synthesis end-to-end
+- espeak bundling (portable binary like llama-server)
+- Settings "Install features" button (post-wizard path)
+- Senni app icon (binary + wizard + elsewhere)
+- GitHub Actions CI workflow
+
+---
+
 ## Session notes — 2026-04-23 #3 (Path centralization, boundary hardening, Phase 2 complete)
 
 **`scripts/paths.py` created. Path traversal hardened. Phase 2 PyInstaller prerequisites done.**
