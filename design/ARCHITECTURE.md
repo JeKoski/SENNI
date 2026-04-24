@@ -28,12 +28,18 @@ When creating a new module, it should:
 - `static/js/companion-mood.js` — Mood tab UI ✓
 - `static/js/companion-avatar.js` — canvas crop modal (orb + sidebar portrait modes) ✓
 - `static/js/voice-input.js` — MediaRecorder voice input, WAV transcode, auto-send ✓
+- `static/js/system-prompt.js` — `buildSystemPrompt()` + `_resolveTemplate()` extracted from `chat.js` ✓
+- `static/js/chat-session.js` — boot overlays, `loadStatus()`, `ensureServerRunning()`, `watchBootLog()`, session startup extracted from `chat.js` ✓
+- `static/js/chat-send.js` — `sendMessage()`, `sanitiseHistory()`, `_triggerAssociativeRetrieval()` extracted from `chat.js` ✓
+- `chat.js` reduced to coordinator: shared state, `_detectModelFamily()`, `_applyMoodToOrb()`, DOMContentLoaded, persistence, chat management ✓
+- Tab order bug fixed: `_loadTabsFromDisk()` sorts by `created` ascending ✓
+- Tab ⋯ menu: replaces × close button — Rename (inline edit) + Delete dropdown ✓
 
 ---
 
 ## Planned future modules
 
-- `static/js/system-prompt.js` — extract `buildSystemPrompt()` from chat.js (low priority)
+*(none — Phase B complete)*
 
 ---
 
@@ -49,7 +55,10 @@ message-renderer.js         ← no deps
 chat-ui.js                  ← needs message-renderer.js, orb.js, appendMemoryPill()
 chat-tabs.js                ← needs message-renderer.js, chat-ui.js, chat-controls.js
 chat-controls.js
-chat.js
+system-prompt.js        ← reads config/companionName/_soulFiles/_memoryContext/modelFamily globals
+chat-session.js         ← boot, loadStatus, startSession; needs api.js, chat-ui.js, chat-tabs.js, system-prompt.js
+chat-send.js            ← sendMessage, sanitiseHistory, assoc retrieval; needs api.js, chat-ui.js, chat-tabs.js
+chat.js                 ← coordinator: shared state, _applyMoodToOrb, DOMContentLoaded, persistence
 heartbeat.js
 tts.js                      ← needs api.js (onTtsToken), no DOM deps at load time
 companion-avatar.js         ← canvas crop modal; no deps, loaded before companion.js

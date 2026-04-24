@@ -139,6 +139,20 @@ function cpMoodInit() {
   _cpMoodPillVisibility = c.mood_pill_visibility ?? 'always';
 
   _cpMoodRender();
+
+  // If TTS tab hasn't been opened yet, _cpTtsVoiceList is empty — fetch now
+  // so Mood voice dropdowns show the full list, then patch in-place.
+  if (typeof _cpTtsVoiceList !== 'undefined' && _cpTtsVoiceList.length === 0) {
+    fetch('/api/tts/status').then(r => r.json()).then(data => {
+      _cpTtsVoiceList = data.voices || (typeof ttsGetVoices === 'function' ? ttsGetVoices() : []);
+      if (_cpTtsVoiceList.length > 0) {
+        document.querySelectorAll('.cp-tts-voice-select').forEach(sel => {
+          const cur = sel.value;
+          sel.innerHTML = _cpMoodGetVoiceOptions(cur);
+        });
+      }
+    }).catch(() => {});
+  }
 }
 
 function cpMoodReset() {
@@ -544,14 +558,12 @@ function _cpMoodBuildVoiceSlot(moodName, voice, weight) {
 }
 
 function _cpMoodGetVoiceOptions(selected) {
-  // Read voice list from companion TTS settings if available
-  const ttsVoices = cpSettings?.active_companion?.tts?.voice_blend
-    ? Object.keys(cpSettings.active_companion.tts.voice_blend)
-    : [];
-  // Fallback common voices
-  const fallback = ['af_heart', 'af_sky', 'af_bella', 'af_nicole', 'am_adam', 'am_michael'];
-  const all = [...new Set([...ttsVoices, ...fallback])];
-  return all.map(v => `<option value="${v}"${v === selected ? ' selected' : ''}>${v}</option>`).join('');
+  // Use the full voice list from companion-tts.js (fetched from server).
+  // Falls back to hardcoded list if TTS tab hasn't been opened yet.
+  const voices = (typeof _cpTtsVoiceList !== 'undefined' && _cpTtsVoiceList.length > 0)
+    ? _cpTtsVoiceList
+    : ['af_heart', 'af_sky', 'af_bella', 'af_nicole', 'am_adam', 'am_michael'];
+  return voices.map(v => `<option value="${v}"${v === selected ? ' selected' : ''}>${v}</option>`).join('');
 }
 
 // ── Group accordion toggle ─────────────────────────────────────────────────────

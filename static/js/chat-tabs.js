@@ -228,13 +228,15 @@ async function _loadTabsFromDisk() {
     const res  = await fetch(`/api/history/list?companion_folder=${encodeURIComponent(config.companion_folder || 'default')}`);
     const data = await res.json();
     if (data.ok && data.tabs?.length) {
-      _tabs = data.tabs.map(meta => _hydrateTabShell({
-        id:         meta.tab_id,
-        title:      meta.title,
-        created:    meta.created ? new Date(meta.created).getTime() : Date.now(),
-        tokens:     meta.tokens || 0,
-        visionMode: meta.vision_mode || null,
-      }));
+      _tabs = data.tabs
+        .sort((a, b) => new Date(a.created || 0) - new Date(b.created || 0))
+        .map(meta => _hydrateTabShell({
+          id:         meta.tab_id,
+          title:      meta.title,
+          created:    meta.created ? new Date(meta.created).getTime() : Date.now(),
+          tokens:     meta.tokens || 0,
+          visionMode: meta.vision_mode || null,
+        }));
     }
   } catch (e) {
     console.warn('[tabs] could not load tab list from disk:', e);
@@ -436,16 +438,60 @@ async function _doCloseTab(id) {
   switchTab(nextId);
 }
 
-function renameTab(id, e) {
-  e?.stopPropagation();
+// ── Three-dot tab menu ────────────────────────────────────────────────────────
+
+let _tabMenuDropdown = null;
+
+function _openTabMenu(id, e) {
+  e.stopPropagation();
+  if (_tabMenuDropdown) { _tabMenuDropdown.remove(); _tabMenuDropdown = null; }
+
+  const btn  = e.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  const drop = document.createElement('div');
+  drop.className = 'tab-menu-dropdown';
+  drop.style.cssText = `position:fixed;z-index:9999;top:${rect.bottom + 4}px;left:${rect.left}px`;
+  drop.innerHTML = `
+    <div class="tab-menu-item" onclick="_closeTabMenu();_startInlineRename('${id}')">Rename</div>
+    <div class="tab-menu-item tab-menu-item-delete" onclick="_closeTabMenu();closeTab('${id}')">Delete</div>`;
+  document.body.appendChild(drop);
+  _tabMenuDropdown = drop;
+
+  const onOutside = ev => {
+    if (!drop.contains(ev.target) && ev.target !== btn) _closeTabMenu();
+  };
+  document.addEventListener('mousedown', onOutside, { once: true });
+}
+
+function _closeTabMenu() {
+  if (_tabMenuDropdown) { _tabMenuDropdown.remove(); _tabMenuDropdown = null; }
+}
+
+function _startInlineRename(id) {
+  const itemEl = document.querySelector(`.tab-item[data-id="${id}"] .tab-title`);
+  if (!itemEl) return;
   const tab = _tabs.find(t => t.id === id);
   if (!tab) return;
-  const name = prompt('Rename chat:', tab.title);
-  if (name && name.trim()) {
-    tab.title = name.trim();
+
+  const input = document.createElement('input');
+  input.className = 'tab-rename-input';
+  input.value = tab.title;
+  itemEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const commit = () => {
+    const name = input.value.trim();
+    if (name) tab.title = name;
     saveTabs();
     renderTabList();
-  }
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter')  { ev.preventDefault(); input.blur(); }
+    if (ev.key === 'Escape') { input.value = tab.title; input.blur(); }
+  });
+  input.addEventListener('click', ev => ev.stopPropagation());
 }
 
 // ── Tab state save/restore ────────────────────────────────────────────────────
@@ -587,8 +633,8 @@ function renderTabList() {
     el.className = 'tab-item' + (tab.id === _activeTabId ? ' active' : '');
     el.dataset.id = tab.id;
     el.innerHTML = `
-      <span class="tab-title" ondblclick="renameTab('${tab.id}',event)" title="${_esc(tab.title)}">${_esc(tab.title)}</span>
-      <button class="tab-close" onclick="closeTab('${tab.id}',event)" title="Close">×</button>`;
+      <span class="tab-title" title="${_esc(tab.title)}">${_esc(tab.title)}</span>
+      <button class="tab-menu" onclick="_openTabMenu('${tab.id}',event)" title="Options">⋯</button>`;
     el.onclick = () => switchTab(tab.id);
     list.appendChild(el);
   });

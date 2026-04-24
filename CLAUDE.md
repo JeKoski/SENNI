@@ -231,11 +231,50 @@ ChromaDB install pending final smoke test (switching to embed mode requires rein
 
 ### Deferred
 - **Streaming chunk + TTS skip** — live in send/stream pipeline, fix post-Phase B
-- **Tab order** — defer to Phase B (coupled to chat-tabs.js restructuring)
 - **Gemma tool call continuation** — needs separate investigation
 
 ### Next session
-- **Phase B: frontend chat split** — extract `buildSystemPrompt()` from `chat.js`, split startup/session flow, split send/stream pipeline. Update `design/ARCHITECTURE.md` and `chat.html` load order throughout.
+- Fix streaming chunk + TTS skip bugs in `chat-send.js` (pipeline now isolated, ready to debug)
+- Work through BACKLOG bugs and quick wins
+
+---
+
+## Session notes — 2026-04-24 #4 (Phase B — frontend chat modular split)
+
+**chat.js split into 3 modules. Tab order fixed. ⋯ rename menu added.**
+
+### What changed
+
+**New files:**
+- `static/js/system-prompt.js` — `buildSystemPrompt()` + `_resolveTemplate()` (~240 lines)
+- `static/js/chat-session.js` — boot overlays, `loadStatus()`, `ensureServerRunning()`, `watchBootLog()`, `startSession()`, `reloadSoulFiles()`, `reloadMemoryContext()`, `seedTemplates()`, `triggerFirstRun()`, `_injectFirstMes()` (~300 lines)
+- `static/js/chat-send.js` — `sendMessage()`, `sanitiseHistory()`, `_triggerAssociativeRetrieval()` + assoc counter (~170 lines)
+
+**`static/js/chat.js`:**
+- Down from 1219 → ~230 lines; now coordinator only: shared state, `_detectModelFamily()`, `_applyMoodToOrb()`, DOMContentLoaded, persistence helpers, chat management (`newChat`, `confirmFullReset`, `exportHistory`, `importHistory`)
+
+**`static/chat.html`:**
+- Load order updated: `system-prompt.js` → `chat-session.js` → `chat-send.js` → `chat.js`
+
+**`static/js/chat-tabs.js`:**
+- `_loadTabsFromDisk()`: sorts by `created` ascending before mapping — fixes tab order inconsistency on disk fallback
+- `renderTabList()`: replaced × close button with ⋯ menu button
+- Added `_openTabMenu()`, `_closeTabMenu()`, `_startInlineRename()` — inline rename replaces `prompt()`-based `renameTab()`
+- Removed `renameTab()`
+
+**`static/css/messages.css`:**
+- `.tab-close` → `.tab-menu` styles; added `.tab-menu-dropdown`, `.tab-menu-item`, `.tab-rename-input`
+
+**`design/ARCHITECTURE.md`:**
+- Refactors completed list updated; load order table updated; planned modules cleared
+
+**`static/js/companion-mood.js` (post-session fix):**
+- `_cpMoodGetVoiceOptions()`: was reading `Object.keys(cpSettings.active_companion.tts.voice_blend)` — only voices already in the active blend. Now reads `_cpTtsVoiceList` (full server-fetched list from companion-tts.js)
+- `cpMoodInit()`: if `_cpTtsVoiceList` is empty (Mood tab opened before TTS tab), fetches `/api/tts/status` and patches all `.cp-tts-voice-select` elements in-place on resolve
+
+### Next session
+- Fix streaming chunk + TTS skip bugs in `chat-send.js` (pipeline now isolated)
+- Work through BACKLOG bugs and quick wins
 
 ---
 

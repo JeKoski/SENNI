@@ -24,13 +24,12 @@ Goal: reduce packaging risk before PyInstaller + Tauri by shrinking the biggest 
 - **Centralize runtime path resolution** ✓ — `scripts/paths.py` owns all path constants. `RESOURCE_ROOT` (bundled assets) vs `DATA_ROOT` (writable user data) split handles PyInstaller correctly. All modules import from here.
 - **Harden file/path boundaries** ✓ — `sanitize_folder()`, `sanitize_filename()`, `confine_path()` added to `config.py`. Applied at all route boundaries in `history_router`, `settings_router`, `server.py`. Path traversal via `companion_folder`, `session_id`, `filename`, and `target_folder` inputs closed.
 
-**Phase B - Frontend chat modular split** *(next up)*
-- **Extract `buildSystemPrompt()` from `static/js/chat.js`** - move to a dedicated module as already noted in `design/ARCHITECTURE.md`.
-- **Split chat startup/session flow** - separate startup/bootstrap, session/tab state, and model boot orchestration from the main chat coordinator.
-- **Split send/stream/message pipeline** - isolate send flow, reply handling, and history sanitisation so message behaviour is easier to reason about before desktop wrapping.
-- **Fix streaming chunk + TTS skip bugs** — do these post-split, in the extracted pipeline module.
-- **Fix tab order + rename** — tab order inconsistency and rename UI; tackle inside chat-tabs.js during Phase B.
-- **Keep script load order intentional** - update `design/ARCHITECTURE.md` and `chat.html` load order as modules move.
+**Phase B - Frontend chat modular split** ✓ *(complete 2026-04-24)*
+- `system-prompt.js`, `chat-session.js`, `chat-send.js` extracted from `chat.js` ✓
+- `chat.js` now ~230 lines (down from 1219) ✓
+- Tab order fixed (sort by created) + ⋯ menu with inline rename ✓
+- `design/ARCHITECTURE.md` + `chat.html` load order updated ✓
+- **Fix streaming chunk + TTS skip bugs** — still pending; tackle next session in `chat-send.js`
 
 **Phase C - Packaging prep** *(largely complete 2026-04-24)*
 - **PyInstaller resource audit** ✓ — all `__file__` antipatterns fixed in tool files; `auto_backup.py` rewritten; `diagnostics.py` uses `STATIC_DIR`; `tts_server.py` + `setup_router.py` use `PYTHON_EMBED_DIR`
@@ -127,9 +126,6 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Gemma parsing: broken tool call continuation** — Gemma 4 sometimes ends a turn with "I'll call those tools now" without actually emitting the tool call, or trails off with `channel|>` or similar artefact. Likely tries to continue a reply after the jinja template closes the turn. Needs investigation of the jinja template and any post-processing that strips partial tokens.
 
-- **Chat tabs: order shifts and no rename** — two issues:
-  - Tab order is inconsistent across sessions; no stable index. Fix: store a tab order index in `config.json` or `memory_meta.json` per companion and use it to sort tabs on render.
-  - Replace the delete "X" button with a three-dot (⋯) menu → "Rename" (inline edit) + "Delete" (existing confirmation prompt).
 
 ---
 
