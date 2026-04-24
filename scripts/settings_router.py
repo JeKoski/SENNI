@@ -58,6 +58,7 @@ def create_settings_router(
             "active_presence_preset": active_cfg.get("active_presence_preset", "Default"),
             "moods": active_cfg.get("moods", {}),
             "active_mood": active_cfg.get("active_mood", None),
+            "mood_pill_visibility": active_cfg.get("mood_pill_visibility", "always"),
         }
 
     @router.post("/api/settings/server")
@@ -180,7 +181,7 @@ def create_settings_router(
         for key in (
             "companion_name", "generation", "soul_edit_mode", "heartbeat",
             "force_read_before_write", "presence_presets",
-            "active_presence_preset", "moods", "active_mood", "tts",
+            "active_presence_preset", "moods", "active_mood", "mood_pill_visibility", "tts",
             "cognitive_stack",
         ):
             if key in body:

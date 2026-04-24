@@ -25,6 +25,12 @@ Search for it using project knowledge before doing anything else.
 - **Suggest Extended Thinking** and/or Opus when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
 - **Goal-driven execution** — for any non-trivial task, define success criteria upfront before writing code. e.g. "Fix the scenario field" → "wizard_compile.py outputs correct scenario value; round-trip import restores it." Verifiable goals enable looping to completion without constant check-ins.
 - **End every session by updating CLAUDE.md, BACKLOG.md, and any relevant design docs.** This is non-negotiable — it's what makes the next session productive.
+- **PyInstaller build compatibility** — all Python code must stay bundle-safe:
+  - Never use `__file__` for runtime paths — import constants from `scripts.paths` instead (`RESOURCE_ROOT`, `DATA_ROOT`, named constants)
+  - Any pip extra with native extensions (`.pyd`/`.so`) must install into `python-embed` via `"embed"` mode — `--target` breaks DLL loading on Windows
+  - New subprocess wrappers must use `PYTHON_EMBED_DIR` from `scripts.paths` to find `python.exe` in frozen mode
+  - New static resource directories must be added to `DATAS` in `senni-backend.spec`
+  - After dynamic `sys.path` changes in frozen mode, call `importlib.invalidate_caches()`
 
 ---
 
@@ -189,166 +195,47 @@ ChromaDB install pending final smoke test (switching to embed mode requires rein
 
 ---
 
-## Session notes — 2026-04-24 (Phase C complete — PyInstaller bundle working, TTS smoke test near-complete)
+## Session notes — 2026-04-24 #3 (Bug fixes — mood pill, bubbles, TTS chunking, wizard orb)
 
-**PyInstaller spec written, bundle boots, smoke test run. All major bundling bugs fixed.**
+**5 isolated bugs fixed. ChromaDB smoke test confirmed working (user). Phase B next.**
 
 ### What changed
 
-**`senni-backend.spec` (new):**
-- One-dir mode, `console=True`, `upx=True`
-- DATAS: `static/`, `templates/`, `tools/`, `scripts/tts.py` (real .py, not compiled — subprocess needs it)
-- `python-embed/` added to DATAS if dir exists at build time
-- Excludes `chromadb`, `sentence_transformers`, `kokoro` (user-installed via wizard)
+**`scripts/settings_router.py`:**
+- GET `/api/settings`: added `mood_pill_visibility` to response (was missing — UI always fell back to `'always'`)
+- POST `/api/settings/companion` allowlist: added `mood_pill_visibility` (was never written to config)
 
-**`scripts/build_prep.py` (new):**
-- Downloads Python embeddable matching current Python version, extracts to `python-embed/`
-- Uncomments `#import site` in `*._pth` file (required for pip)
-- Bootstraps pip via `get-pip.py`
-- Linux: creates `.linux-placeholder` (uses system Python at runtime)
+**`static/css/base.css`:**
+- Added `::before { content:''; flex:1; }` on `.messages` — pushes bubbles/pills to bottom when few messages exist; spacer shrinks to 0 on overflow so scrolling still works
 
-**`build.bat` (new):**
-- Auto-runs `build_prep.py` if `python-embed/` missing, then `pyinstaller senni-backend.spec`
-
-**`scripts/paths.py`:** Added `PYTHON_EMBED_DIR = RESOURCE_ROOT / "python-embed"`
-
-**`.gitignore`:** Added `python-embed/` (build artifact)
-
-**`tools/memory.py`, `tools/write_memory.py`, `tools/retrieve_memory.py`, `tools/supersede_memory.py`, `tools/update_relational_state.py`:**
-- All `__file__`-based path construction removed (breaks in PyInstaller bundle)
-- Now import `CONFIG_FILE`, `COMPANIONS_DIR`, `DATA_ROOT` from `scripts.paths`
-
-**`scripts/diagnostics.py`:** `STATIC_DIR` from `scripts.paths` instead of `project_root / "static"` (static lives in RESOURCE_ROOT in bundle, not DATA_ROOT)
-
-**`scripts/auto_backup.py` (rewrite):**
-- Old: read `.gitignore` to filter backup — no `.gitignore` in bundle → backed up `_internal/` recursively → Windows MAX_PATH disaster
-- New: backs up only `config.json` + `companions/` using constants from `scripts.paths`. Prunes to 10 most recent.
-
-**`scripts/setup_router.py`:**
-- `_get_pip_python()` — uses `PYTHON_EMBED_DIR/python.exe` in frozen mode; falls back to system Python in source mode
-- `_EXTRAS_INSTALL_MODE`: TTS = `"embed"` (python-embed site-packages, DLL-safe), memory = `"target"` (`features/packages/`)
-- `_EXTRAS_POST_CMDS`: TTS runs `python -m spacy download en_core_web_sm` post-install (pre-download prevents runtime pip → stdout corruption of TTS JSON protocol)
-- `_EXTRAS_META["tts"]` packages: `["kokoro", "soundfile"]` (soundfile omitted from kokoro's deps)
-
-**`static/js/wizard.js`:**
-- Fixed extras toggle: `const skip = localFound || !localInstall` (`systemFound` always False in bundle — old logic broke the toggle)
+**`static/js/tts.js`:**
+- `_TTS_SENTENCE_RE`: changed `(?:\s|$)` → `\s+` — requires real whitespace after punctuation, not end-of-buffer. Fixes false mid-token splits when streaming delivers `filename.` before the rest of the extension arrives. End-of-stream remainder handled by `_ttsFlushBuffer()`
 
 **`scripts/tts_server.py`:**
-- `_resolve_python()` uses `PYTHON_EMBED_DIR` in frozen mode
-- Exception handler always captures stderr (not just on exit code 2)
+- Added `_humanise_inline_code()` — strips backticks, replaces underscores with spaces, expands file extensions (`.md` → ` dot md`)
+- `strip_markdown()` now calls `_humanise_inline_code()` before the `_MD_RULES` pass instead of silently dropping inline code
 
-### Bugs fixed during smoke test
+**`static/companion-wizard.html`:**
+- `_buildReview()`: review step orb (`#review-avatar-icon`) now uses `_getSilhouette()` with species color instead of emoji
+- `wizFinish()`: compile overlay orb (`#compile-orb-icon`) now uses `_getSilhouette()` with species color instead of emoji
+
+### Bugs fixed
 
 | Bug | Fix |
 |-----|-----|
-| Recursive backup → Windows MAX_PATH | Rewrote `auto_backup.py` to only back up `config.json` + `companions/` |
-| `pip failed for kokoro` — `sys.executable` = .exe in frozen | `_get_pip_python()` finds `python-embed/python.exe` |
-| Extras toggle broken in bundle | Simplified skip logic — removed dead `systemFound` branch |
-| `tts.py not found at _internal/scripts/tts.py` | Added `("scripts/tts.py", "scripts")` to spec DATAS |
-| `ModuleNotFoundError: numpy` | Binary packages via `--target` break Windows DLL loading; TTS now installs into python-embed site-packages |
-| `soundfile not installed` | Added to `_EXTRAS_META["tts"]` package list |
-| TTS header parse failed — pip output on fd 1 | Pre-download spaCy model in `_EXTRAS_POST_CMDS` |
+| Mood pill visibility not saving | Missing field in GET response + POST allowlist |
+| Chat bubbles/pills anchor to top | `::before` flex spacer in `.messages` |
+| TTS splits mid-filename (e.g. `file.md`) | Regex requires whitespace, not end-of-buffer |
+| TTS silently drops inline code | Humanization pass: underscores→spaces, `.ext`→"dot ext" |
+| Wizard review/compile orb shows emoji | Wired `_getSilhouette()` with species color into both |
 
-### Status
-33/33 tests green. Bundle boots, wizard runs, extras install, TTS subprocess starts. spaCy pre-download fix applied — final synthesis test pending rebuild.
+### Deferred
+- **Streaming chunk + TTS skip** — live in send/stream pipeline, fix post-Phase B
+- **Tab order** — defer to Phase B (coupled to chat-tabs.js restructuring)
+- **Gemma tool call continuation** — needs separate investigation
 
 ### Next session
-- Rebuild and verify TTS synthesis end-to-end
-- espeak bundling (portable binary like llama-server)
-- Settings "Install features" button (post-wizard path)
-- Senni app icon (binary + wizard + elsewhere)
-- GitHub Actions CI workflow
-
----
-
-## Session notes — 2026-04-23 #3 (Path centralization, boundary hardening, Phase 2 complete)
-
-**`scripts/paths.py` created. Path traversal hardened. Phase 2 PyInstaller prerequisites done.**
-
-### What changed
-
-**`scripts/paths.py` (new):**
-- Single source of truth for all path constants
-- `RESOURCE_ROOT` (read-only bundled assets) vs `DATA_ROOT` (writable user data) split — diverge in PyInstaller bundle (`sys._MEIPASS` vs `sys.executable.parent`), same in source mode
-- `PROJECT_ROOT` re-exported as `DATA_ROOT` alias for backward compat
-- Named constants: `STATIC_DIR`, `TEMPLATES_DIR`, `TOOLS_DIR`, `SCRIPTS_DIR`, `CONFIG_FILE`, `COMPANIONS_DIR`, `LOGS_DIR`, `BACKUPS_DIR`, `BINARY_DIR`, `MODELS_DIR`, `FEATURES_DIR`, `FEATURES_PACKAGES_DIR`
-- 6 files updated to import from here: `config.py`, `server.py`, `tool_loader.py`, `setup_router.py`, `memory_server.py`, `tts_server.py`
-
-**Path safety helpers in `scripts/config.py` (new):**
-- `sanitize_folder(name)` — strips to `[a-z0-9_-]`, max 64 chars
-- `sanitize_filename(name)` — rejects `..`, strips unsafe chars, max 200
-- `confine_path(path, root)` — raises `ValueError` if resolved path escapes root
-- Applied at all route boundaries: `history_router.py`, `settings_router.py`, `server.py`
-- `session_id` in history media route now sanitized (was missing)
-- Soul file save/delete both hardened; `api_new_companion` uses proper sanitizer
-
-**`main.py` updated:**
-- Switched from string import `"scripts.server:app"` to direct `from scripts.server import app` — PyInstaller static analysis friendlier
-- `wizard_compile.py` `output_dir` concern resolved — uses `COMPANIONS_DIR` from `scripts.paths`, resolves to `DATA_ROOT/companions` in bundled mode automatically
-
-**33/33 tests green throughout.**
-
-### Next session: Phase C (PyInstaller resource audit)
-- Audit all path accesses for bundled correctness
-- Write PyInstaller spec (`senni-backend.spec`)
-- First packaged smoke test
-
-
-## Session notes — 2026-04-23 #2 (Diagnostics, test harness, boot service extraction)
-
-**Self-diagnostic suite added. pytest harness established (33 tests). Boot logic extracted.**
-
-### What changed
-
-**Bug fixes in GPT's extractions (`history_router`, `settings_router`, `server.py`):**
-- `JSONResponse` added to `server.py` imports (was `NameError` on wizard PNG export 404)
-- `delete_avatar_files` dead import removed from `server.py`
-- Redundant `TEMPLATES_DIR = ...` reassignment removed from `server.py`
-- Double file read in `api_get_soul_files` fixed (`settings_router.py:238`)
-
-**`scripts/diagnostics.py` (new):**
-- `setup_file_logging(log_dir, keep=10)` — one timestamped `logs/senni_YYYY-MM-DD_HHMMSS.log` per boot, last 10 kept
-- `run_startup_checks()` — fast: Python version, config, model path, companion folder, static dir, optional extras imports
-- `run_full_checks()` — everything above + binary/mmproj/espeak paths, companions/ write test, each companion config JSON validity
-- `log_results()` — formatted PASS/FAIL block through the logger; `results_to_dict()` for JSON response
-
-**`scripts/server.py` wiring:**
-- `logging.basicConfig` + `setup_file_logging` called at module level (captures all startup output)
-- `run_startup_checks` called in `on_startup`, results logged
-- `GET /api/diagnostics` — on-demand full checks, returns JSON + logs
-
-**`static/chat.html` + `static/js/settings-server.js`:**
-- "⬡ Run diagnostics" button added to Settings → About, left of Restart Server
-- `spRunDiagnostics()` calls `/api/diagnostics`, renders inline PASS/FAIL results below button row
-
-**`scripts/boot_service.py` (new):**
-- All llama-server lifecycle extracted from `server.py`: state globals, `_boot_lock`, `kill_llama_server()`, `get_boot_status()`, `_kill_process_tree()`, `_build_and_launch()`, `_run_subprocess()`, `POST /api/boot`, `GET /api/boot/log`
-- `server.py` lost ~200 lines; imports `kill_llama_server` + `get_boot_status` + `boot_router`
-
-**Test harness (`tests/`):**
-- `pytest.ini` — `asyncio_mode = auto`
-- `requirements-dev.txt` — `pytest`, `pytest-asyncio` (httpx already in requirements.txt)
-- `conftest.py` — `isolated_paths` patches `COMPANIONS_DIR`/`CONFIG_FILE` in config + router modules; `test_config` writes minimal config; per-router async client fixtures
-- `test_history_router.py` — 12 tests
-- `test_settings_router.py` — 12 tests
-- `test_boot_service.py` — 9 tests
-- **33/33 green, 1.73s**
-
-**`BACKLOG.md` updates:**
-- Phase A boot extraction marked complete
-- Smoke testing section updated: harness established, pattern documented
-- Phase 2 PyInstaller: `main.py` entry point and `output_dir` concerns added
-
----
-
-## Session notes — 2026-04-23 (Packaging-oriented modular refactor start — GPT)
-
-**History/settings routes extracted. Launcher dependency check fixed.**
-
-- `scripts/history_router.py` created — owns `/api/history/*`
-- `scripts/settings_router.py` created — owns settings, companion, avatar, and soul-file routes
-- `scripts/server.py` now registers both routers directly
-- `start.bat` launcher: fast import check before pip install; ASCII comments replacing Unicode
+- **Phase B: frontend chat split** — extract `buildSystemPrompt()` from `chat.js`, split startup/session flow, split send/stream pipeline. Update `design/ARCHITECTURE.md` and `chat.html` load order throughout.
 
 ---
 

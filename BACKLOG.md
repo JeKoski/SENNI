@@ -24,17 +24,19 @@ Goal: reduce packaging risk before PyInstaller + Tauri by shrinking the biggest 
 - **Centralize runtime path resolution** ✓ — `scripts/paths.py` owns all path constants. `RESOURCE_ROOT` (bundled assets) vs `DATA_ROOT` (writable user data) split handles PyInstaller correctly. All modules import from here.
 - **Harden file/path boundaries** ✓ — `sanitize_folder()`, `sanitize_filename()`, `confine_path()` added to `config.py`. Applied at all route boundaries in `history_router`, `settings_router`, `server.py`. Path traversal via `companion_folder`, `session_id`, `filename`, and `target_folder` inputs closed.
 
-**Phase B - Frontend chat modular split**
+**Phase B - Frontend chat modular split** *(next up)*
 - **Extract `buildSystemPrompt()` from `static/js/chat.js`** - move to a dedicated module as already noted in `design/ARCHITECTURE.md`.
 - **Split chat startup/session flow** - separate startup/bootstrap, session/tab state, and model boot orchestration from the main chat coordinator.
 - **Split send/stream/message pipeline** - isolate send flow, reply handling, and history sanitisation so message behaviour is easier to reason about before desktop wrapping.
+- **Fix streaming chunk + TTS skip bugs** — do these post-split, in the extracted pipeline module.
+- **Fix tab order + rename** — tab order inconsistency and rename UI; tackle inside chat-tabs.js during Phase B.
 - **Keep script load order intentional** - update `design/ARCHITECTURE.md` and `chat.html` load order as modules move.
 
 **Phase C - Packaging prep** *(largely complete 2026-04-24)*
 - **PyInstaller resource audit** ✓ — all `__file__` antipatterns fixed in tool files; `auto_backup.py` rewritten; `diagnostics.py` uses `STATIC_DIR`; `tts_server.py` + `setup_router.py` use `PYTHON_EMBED_DIR`
 - **`senni-backend.spec`** ✓ — one-dir mode, correct DATAS list, python-embed conditional, optional-extras excludes
 - **`build_prep.py` + `build.bat`** ✓ — python embeddable download + pip bootstrap; auto-runs if `python-embed/` missing
-- **First packaged smoke test** ✓ — bundle boots, wizard runs, TTS fully working end-to-end. ChromaDB smoke test pending (switched to embed mode — reinstall required).
+- **First packaged smoke test** ✓ — bundle boots, wizard runs, TTS fully working end-to-end. ChromaDB confirmed working in embed mode ✓.
 - **Extras install mode rule** ✓ — any extra with native extensions (.pyd/.so) must use `"embed"` mode (python-embed site-packages). `--target` breaks DLL loading on Windows. Both kokoro and chromadb confirmed. Pure-Python-only extras could use `"target"` but none exist currently.
 - **Sidecar runtime contract** — define how Tauri launches, monitors, and shuts down the Python backend sidecar without changing the current HTTP model.
 - **espeak bundling** — bundle a portable espeak-ng binary (like llama-server). Currently still a system dependency. Wizard warns if missing; auto-set `config["tts"]["espeak_path"]` on detection. Target: Phase 3 / Tauri packaging.
@@ -117,21 +119,11 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ## Bugs
 
-- **Companion Wizard summary orb** — summary screen orb still renders old emoji placeholder instead of the new silhouette SVG. Fix: wire `_getSilhouette()` into the summary orb render path same as portrait orb.
-
 - **Setup: Cancel model download bricks UI** — cancelling mid-download leaves a partial temp file and the model step UI in a broken state. Fix: delete temp file on cancel, then recheck and reset UI state as if download never started.
-
-- **Companion Settings: Mood pill setting doesn't save** — "mood_pill_visibility" stuck on "Always" after reopen. Change isn't persisting to config or the selection widget isn't reading the saved value back correctly. Check both the save path and the initial render path.
 
 - **Chat: Message sometimes arrives in one chunk instead of streaming** — companion reply occasionally delivers as a single block rather than streaming tokens. Likely a buffering or flush issue in the SSE/stream pipeline.
 
 - **TTS: Sometimes skips generation or tries to synthesise huge chunks** — likely the same root cause as the chat streaming issue above. Large unsplit text hits TTS as one request instead of sentence-sized pieces.
-
-- **TTS: Bad chunking at file names / inline code** — two sub-issues:
-  - Period followed by non-space (e.g. `companion_identity.md`) triggers a sentence split mid-filename. Fix: only split on `. ` (period + space), not bare `.`.
-  - Current markdown stripper skips entire inline code blocks. Instead, speak the content (e.g. voice "companion identity dot md" for `` `companion_identity.md` ``). Remove the inline-code skip rule from `strip_markdown()` in `tts_server.py` — or replace it with a light humanisation pass.
-
-- **Chat: Bubbles and pills fill from top** — new message bubbles and mood pills anchor to the top of the container instead of appearing at the bottom near the orb. Should grow upward from the bottom like a chat history.
 
 - **Gemma parsing: broken tool call continuation** — Gemma 4 sometimes ends a turn with "I'll call those tools now" without actually emitting the tool call, or trails off with `channel|>` or similar artefact. Likely tries to continue a reply after the jinja template closes the turn. Needs investigation of the jinja template and any post-processing that strips partial tokens.
 
