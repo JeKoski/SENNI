@@ -471,6 +471,12 @@ async function startModelDownload() {
 function cancelModelDownload() {
   if (_modelDownloadAbort) { _modelDownloadAbort.abort(); _modelDownloadAbort = null; }
   _modelDownloading = false;
+  // Restore dl-btn and mm section hidden by startModelDownload (only if not already downloaded)
+  if (selectedModelCard && !_downloadedModels[selectedModelCard]) {
+    const card = document.querySelector(`.model-card[data-model="${selectedModelCard}"]`);
+    card?.querySelector('.model-dl-btn')?.style.removeProperty('display');
+    card?.querySelector('.model-card-mm')?.style.removeProperty('display');
+  }
   document.getElementById('model-dl-progress').style.display = 'none';
   document.getElementById('model-dl-actions').style.display = 'flex';
   document.querySelectorAll('.model-card').forEach(c => c.style.pointerEvents = '');
@@ -570,29 +576,42 @@ async function _installExtras() {
   const fill   = document.getElementById('extras-dl-fill');
   const status = document.getElementById('extras-dl-status');
   const eta    = document.getElementById('extras-dl-eta');
+  const log    = document.getElementById('extras-pip-log');
   prog.style.display = 'block';
+  if (log) { log.innerHTML = ''; log.style.display = 'block'; }
+  // Indeterminate bar — no transition so it doesn't fake-sweep to 100%
+  if (fill) { fill.classList.add('indeterminate'); fill.style.transition = 'none'; fill.style.width = '100%'; }
   document.getElementById('btn-continue').disabled = true;
+
+  const _appendLog = (line) => {
+    if (!log) return;
+    const div = document.createElement('div');
+    div.textContent = line;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  };
 
   await _streamPost(
     '/api/setup/install-extras',
     { tts: needTts, memory: needMemory },
-    (msg) => {
-      if (fill) fill.style.width = msg.pct + '%';
-    },
+    (msg) => { /* progress pct unused — bar is indeterminate */ },
     (msg) => {
       if (status) status.textContent = msg.label || 'Installing\u2026';
       if (eta && msg.step && msg.total) eta.textContent = `${msg.step} of ${msg.total}`;
     },
     () => {
-      if (fill)   fill.style.width   = '100%';
+      if (fill)   { fill.classList.remove('indeterminate'); fill.style.transition = ''; fill.style.width = '100%'; }
       if (status) status.textContent = 'Done \u2713';
       if (eta)    eta.textContent    = '';
       setTimeout(() => goTo('boot'), 600);
     },
     (msg) => {
+      if (fill)   { fill.classList.remove('indeterminate'); fill.style.transition = ''; }
       if (status) status.textContent = '\u2717 ' + (msg.message || 'Install failed');
       document.getElementById('btn-continue').disabled = false;
     },
+    null,
+    (msg) => _appendLog(msg.line),
   );
 }
 
@@ -983,8 +1002,8 @@ function _delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── SSE via POST ───────────────────────────────────────────────────────────
 // Streams a POST endpoint that emits `data: {...}` lines.
-// Calls onProgress / onStatus / onDone / onError as each message type arrives.
-async function _streamPost(url, body, onProgress, onStatus, onDone, onError, signal) {
+// Calls onProgress / onStatus / onDone / onError / onLog as each message type arrives.
+async function _streamPost(url, body, onProgress, onStatus, onDone, onError, signal, onLog) {
   let res;
   try {
     res = await fetch(url, {
@@ -1018,6 +1037,7 @@ async function _streamPost(url, body, onProgress, onStatus, onDone, onError, sig
       else if (msg.type === 'status')   onStatus(msg);
       else if (msg.type === 'done')     { onDone(msg); return; }
       else if (msg.type === 'error')    { onError(msg); return; }
+      else if (msg.type === 'log')      { if (typeof onLog === 'function') onLog(msg); }
     }
   }
 }
