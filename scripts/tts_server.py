@@ -67,11 +67,22 @@ _tts_request_lock = threading.Lock()
 # ── Markdown / formatting stripper ────────────────────────────────────────────
 # Strip markup that should not be spoken aloud.
 
+_INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+_FILE_EXT_RE    = re.compile(r"\.([a-zA-Z0-9]{1,5})\b")
+
+
+def _humanise_inline_code(text: str) -> str:
+    """Replace `inline code` with speakable text: strip backticks, expand underscores and file extensions."""
+    def _sub(m: re.Match) -> str:
+        inner = m.group(1).replace("_", " ")
+        inner = _FILE_EXT_RE.sub(lambda x: f" dot {x.group(1)}", inner)
+        return inner
+    return _INLINE_CODE_RE.sub(_sub, text)
+
+
 _MD_RULES = [
     # Code blocks (``` ... ```) — skip entirely
     (re.compile(r"```[\s\S]*?```"),                   ""),
-    # Inline code — skip entirely
-    (re.compile(r"`[^`]+`"),                          ""),
     # Bold / italic / underline — keep inner text
     (re.compile(r"\*\*([^*]+)\*\*"),                  r"\1"),
     (re.compile(r"\*([^*]+)\*"),                       r"\1"),
@@ -94,6 +105,7 @@ _MD_RULES = [
 
 
 def strip_markdown(text: str) -> str:
+    text = _humanise_inline_code(text)
     for pattern, replacement in _MD_RULES:
         text = pattern.sub(replacement, text)
     return text.strip()

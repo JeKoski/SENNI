@@ -20,17 +20,19 @@ let _ttsAudioCtx   = null;    // Web Audio context (lazy init)
 let _ttsSource     = null;    // currently playing AudioBufferSourceNode
 let _ttsSentenceBuf = '';     // accumulates tokens until a sentence boundary
 
-// Sentence-ending punctuation followed by whitespace or end-of-string.
+// Sentence-ending punctuation followed by whitespace (not end-of-string).
+// Requiring actual whitespace prevents false splits mid-token when streaming
+// delivers "filename." before the rest of the extension arrives.
+// End-of-stream remainder is handled by _ttsFlushBuffer().
 //
 // Negative lookbehind (?<!\d) prevents splitting on decimal points and
 // version numbers: "7.8GB", "v1.4", "3.14" won't trigger a boundary.
-// The pattern still matches "end." followed by a space or end-of-string.
 //
 // _TTS_MIN_CHARS: segments shorter than this are held in the buffer and
 // prepended to the next segment rather than being dropped or dispatched
 // alone. Keeps "I see." and "Sounds good." attached to what follows
 // while still preventing lone punctuation tokens from going to TTS.
-const _TTS_SENTENCE_RE = /(?<!\d)[.!?…]+(?:\s|$)/;
+const _TTS_SENTENCE_RE = /(?<!\d)[.!?…]+\s+/;
 const _TTS_MIN_CHARS   = 10;
 
 // ── Init ───────────────────────────────────────────────────────────────────────

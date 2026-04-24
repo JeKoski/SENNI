@@ -1462,7 +1462,9 @@ function wizFinish() {
     orbImg.src = _data.review.avatarData;
   } else {
     orbIconEl.style.display = '';
-    orbIconEl.textContent = icon;
+    orbIconEl.innerHTML = _getSilhouette();
+    const compileSvg = orbIconEl.querySelector('.wiz-silhouette');
+    if (compileSvg) compileSvg.style.color = SPECIES_COLOURS[_data.appearance?.species] || 'var(--indigo)';
     const existing = document.getElementById('compile-orb-img');
     if (existing) existing.remove();
   }
@@ -1617,7 +1619,10 @@ function _buildReview() {
   // Update header
   document.getElementById('review-companion-name').textContent = name;
   const icon = SPECIES_EMOJI[a.species] || '\u2736';
-  document.getElementById('review-avatar-icon').textContent = icon;
+  const reviewIcon = document.getElementById('review-avatar-icon');
+  reviewIcon.innerHTML = _getSilhouette();
+  const reviewSvg = reviewIcon.querySelector('.wiz-silhouette');
+  if (reviewSvg) reviewSvg.style.color = SPECIES_COLOURS[a.species] || 'var(--indigo)';
   document.getElementById('review-launch-name').textContent = name;
 
   const metaParts = [_data.type, a.species, a.gender].filter(Boolean);

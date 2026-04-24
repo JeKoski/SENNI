@@ -227,6 +227,12 @@ body::before {
   box-sizing: border-box;
 }
 
+/* Push messages to the bottom when there are few — spacer shrinks to 0 when content overflows so scrolling still works */
+.messages::before {
+  content: '';
+  flex: 1;
+}
+
 /* ── Input bar ────────────────────────────────────────────────────────────── */
 .input-bar {
   padding: 16px 40px 24px;
