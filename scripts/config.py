@@ -83,18 +83,18 @@ DEFAULTS = {
     "server_args": {
         # Core — always on
         "ngl":              {"enabled": True,  "value": 99,            "flag": "-ngl"},
-        "ctx":              {"enabled": True,  "value": 16384,         "flag": "-c"},
+        "ctx":              {"enabled": True,  "value": 32768,         "flag": "-c"},
         "np":               {"enabled": True,  "value": 1,             "flag": "-np"},
         "ctk":              {"enabled": True,  "value": "q8_0",        "flag": "-ctk"},
         "ctv":              {"enabled": True,  "value": "q8_0",        "flag": "-ctv"},
         "jinja":            {"enabled": True,  "value": None,          "flag": "--jinja"},
-        "reasoning_format": {"enabled": True,  "value": "deepseek",    "flag": "--reasoning-format"},
+        "reasoning_format": {"enabled": False,  "value": "deepseek",    "flag": "--reasoning-format"},
         # KV cache / performance — on by default
         "cache_reuse":      {"enabled": True,  "value": 256,           "flag": "--cache-reuse"},
         "batch":            {"enabled": True,  "value": 256,           "flag": "-b"},
         "ubatch":           {"enabled": True,  "value": 256,           "flag": "-ub"},
         # Off by default — hardware/situation dependent
-        "flash_attn":       {"enabled": False, "value": None,          "flag": "--flash-attn"},
+        "flash_attn":       {"enabled": False, "value": "auto",          "flag": "--flash-attn"},
         "prompt_cache":     {"enabled": False, "value": "senni.cache", "flag": "--prompt-cache"},
         "mlock":            {"enabled": False, "value": None,          "flag": "--mlock"},
         "no_mmap":          {"enabled": False, "value": None,          "flag": "--no-mmap"},
@@ -143,17 +143,17 @@ DEFAULTS = {
 
     # Generation defaults (per-request, no restart needed)
     "generation": {
-        "temperature":        0.8,
+        "temperature":        1.0,
         "top_p":              0.95,
-        "top_k":              40,
+        "top_k":              64,
         "min_p":              0.0,
-        "repeat_penalty":     1.1,
+        "repeat_penalty":     1.0,
         "presence_penalty":   0.0,
         "frequency_penalty":  0.0,
         "dry_multiplier":     0.0,
         "dry_base":           1.75,
         "dry_allowed_length": 2,
-        "max_tokens":         1024,
+        "max_tokens":         2048,
         "max_tool_rounds":    8,
         "vision_mode":        "always",
         "markdown_enabled":   True,
