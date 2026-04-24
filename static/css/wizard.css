@@ -813,6 +813,7 @@ html, body {
   display: flex; align-items: center; justify-content: center;
 }
 .meet-portrait .senni-placeholder { width: 100%; height: 100%; border-radius: 50%; }
+.meet-portrait img { width: 100%; height: 100%; object-fit: cover; }
 .meet-card-body { flex: 1; }
 .meet-name { font-family: 'Lora', serif; font-size: 22px; font-weight: 500; color: var(--text-bright); margin-bottom: 6px; }
 .meet-tagline { font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px; }

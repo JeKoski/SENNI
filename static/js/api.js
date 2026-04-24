@@ -6,6 +6,7 @@
 //   • XML-style calls: <tool_use><function=name>...                   → Path C
 //   • Tool calls rescued from thinking block (Qwen3)                  → Path D
 //   • Gemma 4 native: <|tool_call>call:name{...}<tool_call|>          → Path E
+//   • Gemma 4 partial/truncated: <|tool_call>call:name{...} (no end) → Path F
 //
 // onToolCall(name, args, status, result) — UI callback, set by chat.js
 //
@@ -241,6 +242,36 @@ async function callModel(system, messages, abortSignal = null) {
       }
       msgs.push({ role: "user", content: responseParts.join("\n") });
       continue;
+    }
+
+    // ── Path F: Gemma 4 partial / truncated tool call rescue ─────────────
+    // Fires when <|tool_call> was emitted but <tool_call|> closing was cut off
+    // (stream ended at <end_of_turn> or max_tokens limit). Tries to parse
+    // whatever argument body arrived before truncation.
+    const family = (typeof modelFamily !== "undefined") ? modelFamily : "generic";
+    if (family === "gemma4" && rawText.includes("<|tool_call>")) {
+      const rescued = rescuePartialGemma4ToolCall(rawText);
+      if (rescued.length > 0) {
+        console.log("[api] gemma4 rescued partial tool call:", rescued[0].name);
+        if (bubbleHandle) { if (typeof ttsStop === "function") ttsStop(); _removeStreamBubble(bubbleHandle); }
+        msgs.push({ role: "assistant", content: rawText });
+        const responseParts = [];
+        for (const { name, args } of rescued) {
+          const res = await _execTool(name, args);
+          responseParts.push(formatGemma4ToolResponse(name, res));
+        }
+        msgs.push({ role: "user", content: responseParts.join("\n") });
+        continue;
+      }
+      // Unparseable fragment — strip before display so artifact doesn't reach TTS
+      rawText = stripGemma4Artifacts(rawText);
+      console.warn("[api] gemma4 tool call fragment dropped (unparseable):", rawText.slice(0, 120));
+    }
+
+    // Gemma 4 debug: log when rawText is non-empty but no tool call matched.
+    // Helps diagnose "I'll call those tools now" + prose-only turns.
+    if (family === "gemma4" && rawText) {
+      console.log("[api] gemma4 plain reply (no tool call detected):", rawText.slice(0, 200));
     }
 
     // ── Plain reply — bubble already streamed live ────────────────────────

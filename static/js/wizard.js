@@ -759,6 +759,20 @@ async function fetchMmprojCandidates(forModelPath) {
   } catch (e) { /* non-critical */ }
 }
 
+// ── Senni avatar ──────────────────────────────────────────────────────────
+function _applySenniAvatar() {
+  const url = '/api/companion/senni/avatar';
+  ['senni-orb-icon', 'meet-portrait'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.querySelector('img')) return;
+    const img = document.createElement('img');
+    img.src = url;
+    img.onerror = () => img.remove();
+    el.innerHTML = '';
+    el.appendChild(img);
+  });
+}
+
 // ── Meet Senni ────────────────────────────────────────────────────────────
 function meetSenni() {
   window.location.href = '/chat';
@@ -949,6 +963,8 @@ async function runSystemCheck() {
   // Apply downloaded model state to cards (marks Available, auto-selects active)
   _applyModelStatus(detected);
 
+  if (detected.senni_companion) _applySenniAvatar();
+
   await _delay(700);
   document.getElementById('senni-orb-wrap').classList.remove('thinking');
 
@@ -1053,6 +1069,8 @@ function _formatSpeed(bps) {
 document.addEventListener('DOMContentLoaded', () => {
   // Apply initial Senni mood
   _updateSenni('intro');
+  // Try avatar immediately — succeeds on rerun when companion folder already exists
+  _applySenniAvatar();
   // Feature cards start enabled
   document.getElementById('feat-tts').classList.add('enabled');
   document.getElementById('feat-memory').classList.add('enabled');
