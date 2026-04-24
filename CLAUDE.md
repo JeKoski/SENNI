@@ -19,7 +19,7 @@ Search for it using project knowledge before doing anything else.
 - **Simplicity and efficiency** — are to be prioritized when it makes sense. Overengineering is to be avoided.
 - **Prefer surgical edits** — use targeted find-and-replace edits for most changes. Full file rewrites are fine for large refactors where most of the file is changing. The old "complete files only" rule was a Web UI workaround — Claude Code applies edits directly, so partial edits are no longer a problem. Every changed line should trace directly to the user's request. Don't "improve" adjacent code, comments, or formatting unless asked. If unrelated dead code is spotted, mention it — don't delete it.
 - **One file at a time** where possible. Flag upfront if a feature will require touching multiple files and get agreement before proceeding.
-- **Surface tradeoffs, don't pick silently** — if multiple valid approaches exist, name them and let Jesse choose. If a simpler path exists than what was asked for, say so. If something is unclear, stop and ask rather than assuming.
+- **Surface tradeoffs, don't pick silently** — if multiple valid approaches exist, name them and let user choose. If a simpler path exists than what was asked for, say so. If something is unclear, stop and ask rather than assuming.
 - **Stop and check in** if things start going wrong rather than pushing through. Escalating complexity when stuck makes things worse.
 - **Never ask the user to remember to do things** at specific times — ADHD means this won't work. Automate it or build it into existing flows instead.
 - **Suggest Extended Thinking** and/or Opus when the architecture is genuinely uncertain or a wrong call would cause cascading problems. For most feature work, standard Sonnet is fine.
