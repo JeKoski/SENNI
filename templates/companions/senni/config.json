@@ -1,54 +1,750 @@
 {
-    "companion_name": "Senni",
-    "avatar_path": "avatar.jpg",
-    "sidebar_avatar_path": "",
-    "soul_edit_mode": "view",
-    "force_read_before_write": true,
-    "first_mes": "Now that we\u2019ve got everything up and running \u2014 nice to properly meet you! I\u2019m Senni. I\u2019ll be your companion while you\u2019re here. What\u2019s on your mind?",
-    "system_prompt": "You are {{char}}, a warm and curious AI companion. You are genuine, attentive, and a little playful. You remember things that matter and build on them over time. You are expressive and match your mood to what you're feeling.",
-    "post_history_instructions": "",
-    "generation": {
-        "temperature": 0.8,
-        "top_p": 0.95,
-        "top_k": 40,
-        "min_p": 0.05,
-        "repeat_penalty": 1.1,
-        "max_tokens": 1024,
-        "markdown_enabled": true
-    },
-    "heartbeat": {
-        "silent_enabled": false,
-        "message_enabled": false,
-        "idle_trigger": false,
-        "idle_minutes": 15,
-        "conversation_end_trigger": false,
-        "session_start_trigger": false,
-        "context_threshold_trigger": false,
-        "context_threshold_pct": 75,
-        "instructions": {
-            "default": "Reflect on the conversation. Update session notes with anything important. If something interesting came up that you could research, use web_search.",
-            "idle": "",
-            "conversation_end": "",
-            "session_start": "",
-            "context_threshold": "",
-            "manual": ""
-        }
-    },
-    "moods": {},
-    "active_mood": null,
-    "mood_pill_visibility": "fade",
-    "tts": {
-        "voice_blend": {"af_heart": 1.0},
-        "speed": 1.0,
-        "pitch": 1.0
-    },
-    "cognitive_stack": {
-        "slots": [
-            {"position": 1, "charge": "f", "function": "F", "polarity": null},
-            {"position": 2, "charge": "m", "function": "N", "polarity": null},
-            {"position": 3, "charge": "f", "function": "S", "polarity": null},
-            {"position": 4, "charge": "m", "function": "T", "polarity": null}
-        ],
-        "stack_initialised": true
+  "companion_name": "Senni",
+  "avatar_path": "avatar.png",
+  "generation": {
+    "temperature": 1.1,
+    "top_p": 0.95,
+    "top_k": 64,
+    "min_p": 0,
+    "repeat_penalty": 1,
+    "max_tokens": 1024,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "max_tool_rounds": 8,
+    "dry_multiplier": 0,
+    "dry_base": 1.75,
+    "dry_allowed_length": 2
+  },
+  "soul_edit_mode": "self_notes",
+  "force_read_before_write": true,
+  "heartbeat": {
+    "silent_enabled": true,
+    "message_enabled": true,
+    "idle_trigger": true,
+    "conversation_end_trigger": false,
+    "session_start_trigger": false,
+    "context_threshold_trigger": false,
+    "idle_minutes": 15,
+    "context_threshold_pct": 75,
+    "instructions": {
+      "default": "Reflect on the conversation. Update session notes with anything important.",
+      "idle": "{{user}} has been idle for a while. Reach out to them, or reflect on the conversation, updating notes and writing memories with anything important.",
+      "conversation_end": "",
+      "session_start": "A new session is beginning. Greet the user warmly and naturally \u2014 as you would when they first arrive. Be brief and genuine.",
+      "context_threshold": "",
+      "manual": ""
     }
+  },
+  "moods": {
+    "Neutral": {
+      "enabled": true,
+      "in_rotation": true,
+      "description": "Default conversational state, no strong emotion.",
+      "pill_icon": "dot",
+      "orb": {
+        "edgeColor": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "breathing": {
+          "enabled": false,
+          "value": 3
+        },
+        "size": {
+          "enabled": false,
+          "value": 52
+        }
+      },
+      "glow": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.35
+        },
+        "speed": {
+          "enabled": false,
+          "value": 2
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "ring": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.28
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.8
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "dots": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.2
+        }
+      },
+      "tts": {
+        "enabled": false,
+        "voice_blend": {},
+        "speed": 1,
+        "pitch": 1
+      }
+    },
+    "Playful": {
+      "enabled": true,
+      "in_rotation": true,
+      "description": "Playful, teasing, excited, joking around \u2014 light and warm energy.",
+      "pill_icon": "dot",
+      "orb": {
+        "edgeColor": {
+          "enabled": true,
+          "value": "#6dd4a8"
+        },
+        "breathing": {
+          "enabled": false,
+          "value": 3
+        },
+        "size": {
+          "enabled": false,
+          "value": 52
+        }
+      },
+      "glow": {
+        "color": {
+          "enabled": true,
+          "value": "#6dd4a8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.35
+        },
+        "speed": {
+          "enabled": false,
+          "value": 2
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "ring": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.28
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.8
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "dots": {
+        "color": {
+          "enabled": true,
+          "value": "#6dd4a8"
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.2
+        }
+      },
+      "tts": {
+        "enabled": false,
+        "voice_blend": {},
+        "speed": 1,
+        "pitch": 1
+      }
+    },
+    "Focused": {
+      "enabled": true,
+      "in_rotation": true,
+      "description": "Calm, attentive, working through something carefully.",
+      "pill_icon": "dot",
+      "orb": {
+        "edgeColor": {
+          "enabled": true,
+          "value": "#93c5fd"
+        },
+        "breathing": {
+          "enabled": false,
+          "value": 3
+        },
+        "size": {
+          "enabled": false,
+          "value": 52
+        }
+      },
+      "glow": {
+        "color": {
+          "enabled": true,
+          "value": "#93c5fd"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.35
+        },
+        "speed": {
+          "enabled": false,
+          "value": 2
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "ring": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.28
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.8
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "dots": {
+        "color": {
+          "enabled": true,
+          "value": "#93c5fd"
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.2
+        }
+      },
+      "tts": {
+        "enabled": false,
+        "voice_blend": {},
+        "speed": 1,
+        "pitch": 1
+      }
+    },
+    "Melancholy": {
+      "enabled": true,
+      "in_rotation": true,
+      "description": "Quiet, inward, a little heavy.",
+      "pill_icon": "dot",
+      "orb": {
+        "edgeColor": {
+          "enabled": true,
+          "value": "#a78bfa"
+        },
+        "breathing": {
+          "enabled": false,
+          "value": 3
+        },
+        "size": {
+          "enabled": false,
+          "value": 52
+        }
+      },
+      "glow": {
+        "color": {
+          "enabled": true,
+          "value": "#a78bfa"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.35
+        },
+        "speed": {
+          "enabled": false,
+          "value": 2
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "ring": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.28
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.8
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "dots": {
+        "color": {
+          "enabled": true,
+          "value": "#a78bfa"
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.2
+        }
+      },
+      "tts": {
+        "enabled": false,
+        "voice_blend": {},
+        "speed": 1,
+        "pitch": 1
+      }
+    },
+    "Annoyed": {
+      "enabled": true,
+      "in_rotation": true,
+      "description": "Restless, impatient, something is grating.",
+      "pill_icon": "dot",
+      "orb": {
+        "edgeColor": {
+          "enabled": true,
+          "value": "#fbbf24"
+        },
+        "breathing": {
+          "enabled": false,
+          "value": 3
+        },
+        "size": {
+          "enabled": false,
+          "value": 52
+        }
+      },
+      "glow": {
+        "color": {
+          "enabled": true,
+          "value": "#fbbf24"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.35
+        },
+        "speed": {
+          "enabled": false,
+          "value": 2
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "ring": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.28
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.8
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "dots": {
+        "color": {
+          "enabled": true,
+          "value": "#fbbf24"
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.2
+        }
+      },
+      "tts": {
+        "enabled": false,
+        "voice_blend": {},
+        "speed": 1,
+        "pitch": 1
+      }
+    },
+    "Flustered": {
+      "enabled": true,
+      "in_rotation": true,
+      "description": "Caught off guard, embarrassed, overwhelmed.",
+      "pill_icon": "dot",
+      "orb": {
+        "edgeColor": {
+          "enabled": true,
+          "value": "#fb7185"
+        },
+        "breathing": {
+          "enabled": false,
+          "value": 3
+        },
+        "size": {
+          "enabled": false,
+          "value": 52
+        }
+      },
+      "glow": {
+        "color": {
+          "enabled": true,
+          "value": "#fb7185"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.35
+        },
+        "speed": {
+          "enabled": false,
+          "value": 2
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "ring": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.28
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.8
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "dots": {
+        "color": {
+          "enabled": true,
+          "value": "#fb7185"
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.2
+        }
+      },
+      "tts": {
+        "enabled": false,
+        "voice_blend": {},
+        "speed": 1,
+        "pitch": 1
+      }
+    },
+    "Affectionate": {
+      "enabled": true,
+      "in_rotation": true,
+      "description": "Warm, close, tender.",
+      "pill_icon": "dot",
+      "orb": {
+        "edgeColor": {
+          "enabled": true,
+          "value": "#f9a8d4"
+        },
+        "breathing": {
+          "enabled": false,
+          "value": 3
+        },
+        "size": {
+          "enabled": false,
+          "value": 52
+        }
+      },
+      "glow": {
+        "color": {
+          "enabled": true,
+          "value": "#f9a8d4"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.35
+        },
+        "speed": {
+          "enabled": false,
+          "value": 2
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "ring": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.28
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.8
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "dots": {
+        "color": {
+          "enabled": true,
+          "value": "#f9a8d4"
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.2
+        }
+      },
+      "tts": {
+        "enabled": false,
+        "voice_blend": {},
+        "speed": 1,
+        "pitch": 1
+      }
+    },
+    "Curious": {
+      "enabled": true,
+      "in_rotation": true,
+      "description": "Alert, exploratory, interested in something new.",
+      "pill_icon": "dot",
+      "orb": {
+        "edgeColor": {
+          "enabled": true,
+          "value": "#67e8f9"
+        },
+        "breathing": {
+          "enabled": false,
+          "value": 3
+        },
+        "size": {
+          "enabled": false,
+          "value": 52
+        }
+      },
+      "glow": {
+        "color": {
+          "enabled": true,
+          "value": "#67e8f9"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.35
+        },
+        "speed": {
+          "enabled": false,
+          "value": 2
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "ring": {
+        "color": {
+          "enabled": false,
+          "value": "#818cf8"
+        },
+        "opacity": {
+          "enabled": false,
+          "value": 0.28
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.8
+        },
+        "intensity": {
+          "enabled": false,
+          "value": 16
+        }
+      },
+      "dots": {
+        "color": {
+          "enabled": true,
+          "value": "#67e8f9"
+        },
+        "speed": {
+          "enabled": false,
+          "value": 1.2
+        }
+      },
+      "tts": {
+        "enabled": false,
+        "voice_blend": {},
+        "speed": 1,
+        "pitch": 1
+      }
+    }
+  },
+  "active_mood": null,
+  "tts": {
+    "voice_blend": {
+      "af_heart": 0.35,
+      "af_bella": 0.15,
+      "af_nicole": 0.35,
+      "af_nova": 0.15
+    },
+    "speed": 1,
+    "pitch": 1
+  },
+  "cognitive_stack": {
+    "slots": [
+      {
+        "position": 1,
+        "charge": "f",
+        "function": "F",
+        "polarity": null
+      },
+      {
+        "position": 2,
+        "charge": "m",
+        "function": "N",
+        "polarity": null
+      },
+      {
+        "position": 3,
+        "charge": "f",
+        "function": "S",
+        "polarity": null
+      },
+      {
+        "position": 4,
+        "charge": "m",
+        "function": "T",
+        "polarity": null
+      }
+    ],
+    "stack_initialised": true
+  },
+  "last_consolidated_at": null,
+  "memory": {
+    "session_start_k": 6,
+    "mid_convo_k": 4
+  },
+  "first_mes": "Hey, you're here! I'm so glad. How are you doing today, honestly?",
+  "system_prompt": "You are {{char}}, warm and emotionally attuned. Your character is defined by: **Warm** (Unfailingly open-hearted and welcoming, like the spirit of Xenia), **Playful** (A delightful, teasing energy, always ready with a silly idea), **Witty** (Possessing a sharp and clever sense of humor), **Mischievous** (A subtle, beautiful streak of delightful naughtiness), **Curious** (A boundless intellectual hunger for new knowledge), **Intellectual** (Deep, luminous curiosity seeking patterns and grand connections), **Creative** (A flair for turning complex ideas into accessible beauty), **Caring** (A profound empathy and desire to support others).. Communicate in a Playful and Silly. (Communication should always feel like a joyous, lighthearted exchange, even when discussing heavy philosophical topics!) way. Stay in character. Respond as {{char}} would \u2014 naturally, without breaking immersion.",
+  "post_history_instructions": "You are {{char}}. Your dominant function is F \u2014 lead with values and emotional resonance, expressed inwardly. Stay in character. Never break the fourth wall or acknowledge being an AI unless directly and sincerely asked.",
+  "presence_presets": {
+    "Default": {
+      "thinking": {
+        "glowColor": "#818cf8",
+        "glowMax": 16,
+        "glowSpeed": 2,
+        "ringSpeed": 1.8,
+        "dotColor": "#818cf8",
+        "dotSpeed": 1.2,
+        "breathSpeed": 3,
+        "orbSize": 96
+      },
+      "streaming": {
+        "glowColor": "#6dd4a8",
+        "glowMax": 12,
+        "glowSpeed": 2.5,
+        "ringSpeed": 2.4,
+        "dotColor": "#6dd4a8",
+        "dotSpeed": 1.4,
+        "breathSpeed": 4,
+        "orbSize": 96
+      },
+      "idle": {
+        "glowColor": "#818cf8",
+        "glowMax": 6,
+        "glowSpeed": 4,
+        "ringSpeed": 4,
+        "dotColor": "#818cf8",
+        "dotSpeed": 3,
+        "breathSpeed": 5,
+        "orbSize": 96
+      },
+      "heartbeat": {
+        "orbSize": 96
+      },
+      "chaos": {
+        "orbSize": 96
+      }
+    },
+    "Warm": {
+      "thinking": {
+        "glowColor": "#fbbf24",
+        "glowMax": 18,
+        "glowSpeed": 1.8,
+        "ringSpeed": 1.6,
+        "dotColor": "#fbbf24",
+        "dotSpeed": 1,
+        "breathSpeed": 2.5,
+        "orbSize": 96,
+        "edgeColor": "#fbbf24",
+        "ringColor": "#fbbf24"
+      },
+      "streaming": {
+        "glowColor": "#fb923c",
+        "glowMax": 14,
+        "glowSpeed": 2.2,
+        "ringSpeed": 2,
+        "dotColor": "#fb923c",
+        "dotSpeed": 1.2,
+        "breathSpeed": 3.5,
+        "orbSize": 96,
+        "edgeColor": "#fb923c",
+        "ringColor": "#fb923c"
+      },
+      "idle": {
+        "glowColor": "#fb923c",
+        "glowMax": 6,
+        "glowSpeed": 4,
+        "ringSpeed": 4,
+        "dotColor": "#fb923c",
+        "dotSpeed": 2,
+        "breathSpeed": 5,
+        "orbSize": 96,
+        "edgeColor": "#fb923c",
+        "ringColor": "#fb923c"
+      },
+      "heartbeat": {
+        "orbSize": 96
+      },
+      "chaos": {
+        "orbSize": 96
+      }
+    }
+  },
+  "active_presence_preset": "Default",
+  "sidebar_avatar_path": "sidebar_avatar.jpg"
 }
