@@ -69,6 +69,10 @@ function _injectToolResults(msgs, cleanedText, results, rawText) {
 }
 
 // ── callModel ─────────────────────────────────────────────────────────────────
+// Streams each round. After the stream ends, accumulated text is checked for
+// tool calls. If found: provisional bubble removed, tools processed, loop
+// continues. If not found: bubble finalized, TTS flushed, text returned.
+// No double-fetch — one streaming request per round.
 async function callModel(system, messages, abortSignal = null) {
   const port      = config.port_model || 8081;
   const url       = `http://localhost:${port}/v1/chat/completions`;
@@ -132,46 +136,12 @@ async function callModel(system, messages, abortSignal = null) {
   });
 
   for (let round = 0; round < maxRounds; round++) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: abortSignal,
-      body: JSON.stringify({
-        model:             "local",
-        messages:          [{ role: "system", content: system }, ...msgs],
-        tools:             TOOL_DEFINITIONS,
-        tool_choice:       "auto",
-        max_tokens:        gen.max_tokens       || 1024,
-        temperature:       gen.temperature      ?? 0.8,
-        top_p:             gen.top_p            ?? 0.95,
-        top_k:             gen.top_k            ?? 40,
-        min_p:             gen.min_p            ?? 0.0,
-        repeat_penalty:    gen.repeat_penalty   ?? 1.1,
-        presence_penalty:  gen.presence_penalty  ?? 0.0,
-        frequency_penalty: gen.frequency_penalty ?? 0.0,
-        ...(gen.dry_multiplier ? { dry_multiplier: gen.dry_multiplier, dry_base: gen.dry_base ?? 1.75, dry_allowed_length: gen.dry_allowed_length ?? 2 } : {}),
-        stream:            false,
-      }),
-    });
+    // Stream this round. Returns accumulated text + metadata; does NOT finalize
+    // the bubble — caller decides to finalize (plain reply) or remove (tool calls).
+    const result = await _streamRound(url, system, msgs, gen, abortSignal);
+    let { text: rawText, thinkContent, structuredCalls, finishReason, bubbleHandle, usageData } = result;
 
-    if (!res.ok) {
-      const err = await res.text().catch(() => String(res.status));
-      throw new Error(`Model server ${res.status}: ${err.slice(0, 200)}`);
-    }
-
-    const data   = await res.json();
-    const choice = data.choices?.[0];
-    if (!choice) throw new Error("No choices in model response");
-
-    if (data.usage && typeof onUsageUpdate === "function") {
-      onUsageUpdate(data.usage.prompt_tokens || 0, data.usage.total_tokens || 0);
-    }
-
-    const msg = choice.message;
-
-    let thinkContent = msg.reasoning_content || null;
-    let rawText      = (msg.content || "").trim();
-
+    // Extract inline <think> block if model didn't use reasoning_content field.
     if (!thinkContent) {
       const thinkMatch = rawText.match(/^<think>([\s\S]*?)<\/think>\s*/);
       if (thinkMatch) {
@@ -184,21 +154,25 @@ async function callModel(system, messages, abortSignal = null) {
       onThinking(thinkContent);
     }
 
+    if (usageData && typeof onUsageUpdate === "function") {
+      onUsageUpdate(usageData.prompt_tokens || 0, usageData.total_tokens || 0);
+    }
+
     // ── Path A: structured tool_calls (OpenAI format) ─────────────────────
     // llama-server may parse some model formats natively into tool_calls.
-    // Gemma 4 via llama-server currently lands here only if the peg-gemma4
-    // grammar successfully parses the call — otherwise it falls through to Path E.
-    if (choice.finish_reason === "tool_calls" && msg.tool_calls?.length) {
-      msgs.push({ role: "assistant", content: msg.content || null, tool_calls: msg.tool_calls });
-      for (const tc of msg.tool_calls) {
+    // delta.tool_calls are accumulated during streaming in _streamRound.
+    if (finishReason === "tool_calls" && structuredCalls?.length) {
+      if (bubbleHandle) { if (typeof ttsStop === "function") ttsStop(); _removeStreamBubble(bubbleHandle); }
+      msgs.push({ role: "assistant", content: rawText || null, tool_calls: structuredCalls });
+      for (const tc of structuredCalls) {
         let args = {};
         try {
           args = typeof tc.function.arguments === "string"
             ? JSON.parse(tc.function.arguments || "{}")
             : (tc.function.arguments || {});
         } catch {}
-        const result = await _execTool(tc.function.name, args);
-        msgs.push({ role: "tool", tool_call_id: tc.id, content: String(result) });
+        const res = await _execTool(tc.function.name, args);
+        msgs.push({ role: "tool", tool_call_id: tc.id, content: String(res) });
       }
       continue;
     }
@@ -207,13 +181,13 @@ async function callModel(system, messages, abortSignal = null) {
     // Gemma 3 / older models that write: toolName({"key": "value"})
     const inlineCalls = parseInlineToolCalls(rawText);
     if (inlineCalls.length > 0) {
+      if (bubbleHandle) { if (typeof ttsStop === "function") ttsStop(); _removeStreamBubble(bubbleHandle); }
       const results = [];
       for (const { name, args } of inlineCalls) {
-        const result = await _execTool(name, args);
-        results.push({ name, result });
+        const res = await _execTool(name, args);
+        results.push({ name, result: res });
       }
       const cleaned = stripToolCalls(rawText, inlineCalls);
-      // rawText passed as fourth arg so Gemma 4 can preserve the call in its assistant turn.
       _injectToolResults(msgs, cleaned, results, rawText);
       continue;
     }
@@ -221,21 +195,15 @@ async function callModel(system, messages, abortSignal = null) {
     // ── Path C: XML-style tool calls ──────────────────────────────────────
     // <tool_call><function=name><parameter=key>value</parameter></tool_call>
     // Also accepts <tool_use> as the opening tag (older/variant format).
-    //
-    // Both Qwen3 and Gemma 4 (when not using its native token format) land here.
-    // _injectToolResults handles feeding results back in the right format:
-    //   Gemma 4  → assistant turn gets rawText (call block intact) so the template
-    //              can match call to response; <|tool_response> tokens as user turn.
-    //   Generic  → assistant turn gets cleaned text; [Tool results] as user turn.
     const xmlCalls = parseXmlToolCalls(rawText);
     if (xmlCalls.length > 0) {
+      if (bubbleHandle) { if (typeof ttsStop === "function") ttsStop(); _removeStreamBubble(bubbleHandle); }
       const results = [];
       for (const { name, args } of xmlCalls) {
-        const result = await _execTool(name, args);
-        results.push({ name, result });
+        const res = await _execTool(name, args);
+        results.push({ name, result: res });
       }
       const cleaned = rawText.replace(/<(?:tool_call|tool_use)>[\s\S]*?<\/tool_call>/g, "").trim();
-      // rawText passed as fourth arg so Gemma 4 can preserve the call block in its assistant turn.
       _injectToolResults(msgs, cleaned, results, rawText);
       continue;
     }
@@ -248,13 +216,12 @@ async function callModel(system, messages, abortSignal = null) {
       const rescuedCalls = parseXmlToolCalls(thinkContent);
       if (rescuedCalls.length > 0) {
         console.log("[api] rescued", rescuedCalls.length, "tool call(s) from thinking block");
+        if (bubbleHandle) { if (typeof ttsStop === "function") ttsStop(); _removeStreamBubble(bubbleHandle); }
         const results = [];
         for (const { name, args } of rescuedCalls) {
-          const result = await _execTool(name, args);
-          results.push({ name, result });
+          const res = await _execTool(name, args);
+          results.push({ name, result: res });
         }
-        // rawText is the prose output that accompanied the thinking block.
-        // For Gemma 4 this goes in the assistant turn; for generic it's the fallback placeholder.
         _injectToolResults(msgs, rawText, results, rawText);
         continue;
       }
@@ -262,42 +229,30 @@ async function callModel(system, messages, abortSignal = null) {
 
     // ── Path E: Gemma 4 native tool calls ────────────────────────────────
     // Format: <|tool_call>call:name{param:<|"|>value<|"|>}<tool_call|>
-    //
-    // llama-server passes these through as raw content when the peg-gemma4
-    // grammar doesn't convert them to structured tool_calls (Path A). We
-    // parse the raw tokens ourselves and feed results back using Gemma 4's
-    // own <|tool_response>...</tool_response|> token syntax, which its chat
-    // template understands natively.
-    //
-    // Note: this path does NOT go through _injectToolResults because Gemma 4
-    // native calls have their own assistant-turn push semantics (raw token
-    // content preserved) that differ from the XML path.
     const gemma4Calls = parseGemma4ToolCalls(rawText);
     if (gemma4Calls.length > 0) {
       console.log("[api] gemma4 tool call(s):", gemma4Calls.map(c => c.name));
-      // Push the raw assistant turn so the model retains context of its own call
+      if (bubbleHandle) { if (typeof ttsStop === "function") ttsStop(); _removeStreamBubble(bubbleHandle); }
       msgs.push({ role: "assistant", content: rawText });
       const responseParts = [];
       for (const { name, args } of gemma4Calls) {
-        const result = await _execTool(name, args);
-        responseParts.push(formatGemma4ToolResponse(name, result));
+        const res = await _execTool(name, args);
+        responseParts.push(formatGemma4ToolResponse(name, res));
       }
-      // Inject all tool responses as a single user turn using Gemma 4's token syntax.
-      // The model reads these response tokens before generating its final reply.
-      msgs.push({
-        role: "user",
-        content: responseParts.join("\n")
-      });
+      msgs.push({ role: "user", content: responseParts.join("\n") });
       continue;
     }
 
-    // ── Plain reply — stream it live ──────────────────────────────────────
-    const streamedText = await _streamFinalReply(url, system, msgs, gen, abortSignal);
-    return streamedText ?? rawText;
+    // ── Plain reply — bubble already streamed live ────────────────────────
+    if (typeof sealThinkingBlock === "function") sealThinkingBlock();
+    if (typeof setPresenceState === "function") setPresenceState("idle");
+    if (bubbleHandle) _finaliseStreamBubble(bubbleHandle, rawText);
+    if (typeof ttsEndGeneration === "function") ttsEndGeneration();
+    return rawText || null;
   }
 
-  // Fallback after max rounds
-  const fb = await fetch(url, {
+  // Fallback after max rounds — plain non-streaming fetch, no bubble
+  const fb = await fetch(`http://localhost:${config.port_model || 8081}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -311,12 +266,24 @@ async function callModel(system, messages, abortSignal = null) {
   return (fd.choices?.[0]?.message?.content || "").trim();
 }
 
-// ── Streaming final reply ─────────────────────────────────────────────────────
-async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
-  let bubbleHandle = null;
-  let accumulated  = "";
-  let thinkAccum   = "";
-  let thinkShown   = false;
+// ── Stream one round ──────────────────────────────────────────────────────────
+// Streams tokens live into a provisional bubble + TTS. Does NOT finalize the
+// bubble — caller decides based on post-stream tool-call detection:
+//   • Tool calls found  → caller calls ttsStop() + _removeStreamBubble()
+//   • Plain reply       → caller calls _finaliseStreamBubble() + ttsEndGeneration()
+//
+// Returns { text, thinkContent, structuredCalls, finishReason, bubbleHandle, usageData }
+// On non-abort error: rethrows after cleanup (bubble removed, TTS stopped).
+// On abort: finalises partial bubble with what was received, rethrows.
+async function _streamRound(url, system, msgs, gen, abortSignal) {
+  let bubbleHandle   = null;
+  let accumulated    = "";
+  let thinkAccum     = "";
+  let thinkShown     = false;
+  let finishReason   = null;
+  let usageData      = null;
+  // Path A: delta.tool_calls arrive as index-keyed patches; accumulate into a map.
+  const structuredCallsMap = new Map();
 
   if (typeof ttsStartGeneration === "function") ttsStartGeneration();
 
@@ -373,9 +340,32 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
         let parsed;
         try { parsed = JSON.parse(raw); } catch { continue; }
 
-        const delta = parsed.choices?.[0]?.delta;
+        const choice = parsed.choices?.[0];
+        if (!choice) continue;
+
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+        if (parsed.usage) usageData = parsed.usage;
+
+        const delta = choice.delta;
         if (!delta) continue;
 
+        // Path A: accumulate structured tool_calls patches by index
+        if (delta.tool_calls) {
+          for (const tcDelta of delta.tool_calls) {
+            const idx = tcDelta.index ?? 0;
+            if (!structuredCallsMap.has(idx)) {
+              structuredCallsMap.set(idx, { id: "", type: "function", function: { name: "", arguments: "" } });
+            }
+            const tc = structuredCallsMap.get(idx);
+            if (tcDelta.id)                    tc.id                    = tcDelta.id;
+            if (tcDelta.type)                  tc.type                  = tcDelta.type;
+            if (tcDelta.function?.name)        tc.function.name        += tcDelta.function.name;
+            if (tcDelta.function?.arguments)   tc.function.arguments   += tcDelta.function.arguments;
+          }
+          continue;
+        }
+
+        // Thinking / reasoning content
         if (delta.reasoning_content) {
           thinkAccum += delta.reasoning_content;
           if (!thinkShown && typeof onThinking === "function") {
@@ -388,6 +378,7 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
           continue;
         }
 
+        // Regular content
         const token = delta.content || "";
         if (!token) continue;
 
@@ -398,33 +389,34 @@ async function _streamFinalReply(url, system, msgs, gen, abortSignal) {
           if (typeof setPresenceState === "function") setPresenceState("streaming");
           _updateStreamBubble(bh, accumulated);
         }
-
-        if (parsed.usage && typeof onUsageUpdate === "function") {
-          onUsageUpdate(parsed.usage.prompt_tokens || 0);
-        }
       }
     }
-  } catch(e) {
+  } catch (e) {
     if (typeof sealThinkingBlock === "function") sealThinkingBlock();
     if (e.name === "AbortError") {
+      // Abort: finalise whatever arrived so the partial reply stays visible
       if (typeof ttsStop === "function") ttsStop();
       if (bubbleHandle) _finaliseStreamBubble(bubbleHandle, accumulated);
       throw e;
     }
+    // Other error: clean up and rethrow so sendMessage shows error message
+    if (typeof ttsStop === "function") ttsStop();
     if (bubbleHandle) _removeStreamBubble(bubbleHandle);
-    return null;
+    throw e;
   }
 
-  // Seal any streaming thinking block — handles the case where the model goes
-  // straight from thinking into a tool call with no text preamble (in which case
-  // _createStreamBubble is never called and the dots would otherwise stay).
-  if (typeof sealThinkingBlock === "function") sealThinkingBlock();
-  if (typeof setPresenceState === "function") setPresenceState("idle");
-  if (bubbleHandle) {
-    _finaliseStreamBubble(bubbleHandle, accumulated);
-  }
-  if (typeof ttsEndGeneration === "function") ttsEndGeneration();
-  return accumulated.trim() || null;
+  const structuredCalls = structuredCallsMap.size > 0
+    ? [...structuredCallsMap.values()]
+    : null;
+
+  return {
+    text:           accumulated.trim(),
+    thinkContent:   thinkAccum.trim(),
+    structuredCalls,
+    finishReason,
+    bubbleHandle,
+    usageData,
+  };
 }
 
 // ── Stream bubble helpers ─────────────────────────────────────────────────────

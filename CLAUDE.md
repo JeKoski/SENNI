@@ -143,6 +143,56 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-24 #5 (Streaming fix, bugs, quick wins)
+
+**Streaming-first architecture. 7 bugs/quick-wins closed.**
+
+### What changed
+
+**`static/js/api.js` — streaming-first architecture:**
+- `callModel` now streams every round (`stream: true`). No probe fetch, no double-fetch.
+- `_streamFinalReply` → `_streamRound`: streams live into provisional bubble + TTS, returns `{text, thinkContent, structuredCalls, finishReason, bubbleHandle}` without finalizing.
+- Tool call detection happens post-stream. Tool call rounds: `ttsStop()` + remove provisional bubble. Plain reply: `_finaliseStreamBubble()` + `ttsEndGeneration()`.
+- Path A structured tool_calls now accumulated from `delta.tool_calls` during streaming (was only available from non-streaming `choice.message.tool_calls`).
+- Root cause of both streaming bugs: double-fetch caused second request to fail intermittently → one-chunk fallback + TTS left in dirty state. Now eliminated.
+
+**`static/js/chat-controls.js` — pre-existing duplicate bubble bug:**
+- Regenerate and edit-resend now check `streamWasRendered()` before calling `appendMessage` — was adding a second bubble when streaming worked.
+
+**`scripts/setup_router.py` + `static/js/wizard.js` — cancel model download:**
+- `_download_to_queue`: writes to `.tmp` file, renames on success, deletes on cancel/error. Partial files no longer left at real dest path.
+- `cancel_event` (threading.Event) passed to download thread; generator polls `request.is_disconnected()` every 1s and signals cancellation.
+- `cancelModelDownload()`: restores card's hidden dl-btn + mm section so card UI fully resets.
+
+**`static/css/base.css` + `static/js/chat-session.js` — offline indicator:**
+- `.is-offline` CSS class: red static dot (ripple circle hidden), muted red text color.
+- `_setOnlineIndicator(bool)`: called from `loadStatus()` after `config.model_running` is set, and from `watchBootLog` on ready event.
+
+**`static/css/base.css` — default sidebar avatar:**
+- `.avatar` background changed from solid `linear-gradient(135deg, #6366f1, #7c3aed)` to `rgba(129,140,248,0.12)` — matches orb body. Image avatars unaffected (`object-fit:cover`).
+
+**`static/wizard.html` + `static/css/wizard.css` + `static/js/wizard.js` + `scripts/setup_router.py` — Features install UX:**
+- Indeterminate progress bar: `fill.classList.add('indeterminate')` sets width 100% with `transition: none`. Existing `::after` shimmer sweep runs. Removed on done/error.
+- Live pip log: `#extras-pip-log` div appended to extras step. `_run_pip` reads `proc.stdout` line-by-line, pushes `{"type":"log","line":"..."}` events. Backend queue loop changed from single `queue.get()` to a proper while-loop. `_streamPost` gains optional `onLog` 8th param.
+
+### Bugs fixed / closed
+
+| Item | Fix |
+|------|-----|
+| Chat: message arrives as one chunk | Streaming-first — no second request to fail |
+| TTS skips / huge chunks | `ttsEndGeneration` now always called on plain reply |
+| Regenerate/edit: duplicate bubble | `streamWasRendered()` check added to chat-controls.js |
+| Cancel download bricks UI | Temp files + cancel event + card UI reset |
+| Offline indicator always green | `_setOnlineIndicator()` wired to `loadStatus` + boot-ready |
+| Sidebar avatar solid purple placeholder | Transparent background matching orb |
+| Features install: static bar | Indeterminate shimmer + live pip log |
+
+### Next session
+- Work through remaining BACKLOG quick wins
+- Gemma tool call continuation bug (needs investigation)
+
+---
+
 ## Session notes — 2026-04-24 #2 (ChromaDB bundling + misc fixes)
 
 **ChromaDB now installs into python-embed (embed mode). Diagnostics fixed. mmproj auto-fill fixed.**

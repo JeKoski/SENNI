@@ -13,6 +13,7 @@ import functools
 import json
 import platform
 import tarfile
+import threading
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -149,9 +150,11 @@ def _download_to_queue(
     dest: Path,
     queue: asyncio.Queue,
     loop: asyncio.AbstractEventLoop,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     """
-    Downloads `url` to `dest` in a thread pool.
+    Downloads `url` to a .tmp file beside `dest`, then renames on success.
+    Checks cancel_event each chunk — deletes the .tmp and exits cleanly if set.
     Pushes progress dicts onto `queue` via the event loop at ~4 Hz.
     Pushes {"type":"download_done"} or {"type":"error",...} when finished.
     """
@@ -160,6 +163,7 @@ def _download_to_queue(
     def push(obj: dict) -> None:
         loop.call_soon_threadsafe(queue.put_nowait, obj)
 
+    tmp = dest.with_name(dest.name + ".tmp")
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "SENNI-setup/1.0"})
         with urllib.request.urlopen(req, timeout=60) as resp:
@@ -169,8 +173,11 @@ def _download_to_queue(
             t0         = time.time()
             last_push  = 0.0
 
-            with open(dest, "wb") as fh:
+            with open(tmp, "wb") as fh:
                 while True:
+                    if cancel_event and cancel_event.is_set():
+                        tmp.unlink(missing_ok=True)
+                        return
                     buf = resp.read(65536)
                     if not buf:
                         break
@@ -185,9 +192,11 @@ def _download_to_queue(
                               "total": total, "speed_bps": int(speed), "pct": pct})
                         last_push = now
 
+        tmp.rename(dest)
         push({"type": "download_done"})
 
     except Exception as e:
+        tmp.unlink(missing_ok=True)
         push({"type": "error", "message": str(e)})
 
 
@@ -383,12 +392,19 @@ async def setup_download_model(request: Request):
         size_bytes = int(model["size_gb"] * 1024 ** 3)
         yield _sse({"type": "status", "label": f"Downloading {model['name']}…", "total": size_bytes, "phase": "model"})
 
+        cancel  = threading.Event()
         queue   = asyncio.Queue()
-        dl      = functools.partial(_download_to_queue, model["url"], dest, queue, loop)
+        dl      = functools.partial(_download_to_queue, model["url"], dest, queue, loop, cancel)
         dl_task = loop.run_in_executor(None, dl)
 
         while True:
-            msg = await queue.get()
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                if await request.is_disconnected():
+                    cancel.set()
+                    return
+                continue
             if msg["type"] == "progress":
                 yield _sse({**msg, "phase": "model"})
             elif msg["type"] == "download_done":
@@ -410,12 +426,19 @@ async def setup_download_model(request: Request):
         mmproj_size = int(model.get("mmproj_size_gb", 1.0) * 1024 ** 3)
         yield _sse({"type": "status", "label": "Downloading vision projector (mmproj)…", "total": mmproj_size, "phase": "mmproj"})
 
+        cancel  = threading.Event()
         queue   = asyncio.Queue()
-        dl      = functools.partial(_download_to_queue, model["mmproj_url"], mmproj_dest, queue, loop)
+        dl      = functools.partial(_download_to_queue, model["mmproj_url"], mmproj_dest, queue, loop, cancel)
         dl_task = loop.run_in_executor(None, dl)
 
         while True:
-            msg = await queue.get()
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                if await request.is_disconnected():
+                    cancel.set()
+                    return
+                continue
             if msg["type"] == "progress":
                 yield _sse({**msg, "phase": "mmproj"})
             elif msg["type"] == "download_done":
@@ -568,6 +591,15 @@ async def setup_install_extras(request: Request):
 
             def _run_pip(pkgs: list = pkgs, mode: str = mode, key: str = key) -> None:
                 import subprocess
+
+                def push(obj: dict) -> None:
+                    loop.call_soon_threadsafe(queue.put_nowait, obj)
+
+                def push_log(line: str) -> None:
+                    line = line.rstrip()
+                    if line:
+                        push({"type": "log", "line": line})
+
                 py  = _get_pip_python()
                 cmd = [py, "-m", "pip", "install", "--upgrade", "--no-cache-dir"]
                 if mode == "target":
@@ -579,38 +611,47 @@ async def setup_install_extras(request: Request):
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, bufsize=1,
                     )
-                    proc.communicate()
+                    for line in proc.stdout:
+                        push_log(line)
+                    proc.wait()
                     if proc.returncode != 0:
-                        loop.call_soon_threadsafe(
-                            queue.put_nowait,
-                            {"type": "error", "message": f"pip failed for {pkgs} (exit {proc.returncode})"},
-                        )
+                        push({"type": "error", "message": f"pip failed for {pkgs} (exit {proc.returncode})"})
                         return
                     # Run any post-install commands (e.g. spacy model download)
                     for post_args in _EXTRAS_POST_CMDS.get(key, []):
+                        push_log(f"$ {' '.join(post_args)}")
                         r = subprocess.run(
                             [py, *post_args],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True,
                         )
+                        for line in (r.stdout or "").splitlines():
+                            push_log(line)
                         if r.returncode != 0:
-                            loop.call_soon_threadsafe(
-                                queue.put_nowait,
-                                {"type": "error", "message": f"post-install failed: {post_args} (exit {r.returncode})"},
-                            )
+                            push({"type": "error", "message": f"post-install failed: {post_args} (exit {r.returncode})"})
                             return
-                    loop.call_soon_threadsafe(queue.put_nowait, {"type": "pkg_done"})
+                    push({"type": "pkg_done"})
                 except Exception as exc:
-                    loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "message": str(exc)})
+                    push({"type": "error", "message": str(exc)})
 
             pip_task = loop.run_in_executor(None, _run_pip)
 
-            msg = await queue.get()
-            await pip_task
-            if msg["type"] == "error":
-                yield _sse(msg)
-                return
+            while True:
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        return
+                    continue
+                if msg["type"] == "log":
+                    yield _sse(msg)
+                elif msg["type"] == "pkg_done":
+                    break
+                elif msg["type"] == "error":
+                    yield _sse(msg)
+                    return
 
+            await pip_task
             yield _sse({"type": "progress", "pct": int(step / total * 100)})
 
         yield _sse({"type": "done"})

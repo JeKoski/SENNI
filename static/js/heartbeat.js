@@ -185,7 +185,7 @@ async function heartbeatFire(trigger) {
       }
 
       if (c.message_enabled && !skip) {
-        // callModel → _streamFinalReply already rendered the bubble and pushed
+        // callModel → _streamRound already rendered the bubble and pushed
         // to conversationHistory if streaming ran. Check the flag before adding
         // a second bubble or a second history entry.
         if (typeof streamWasRendered === 'function' && streamWasRendered()) {

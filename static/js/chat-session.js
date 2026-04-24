@@ -58,6 +58,7 @@ async function loadStatus() {
     config               = data.config || {};
     tools                = data.tools  || [];
     config.model_running = data.model_running || false;
+    _setOnlineIndicator(config.model_running);
     if (data.effective_generation) {
       config.generation = data.effective_generation;
     }
@@ -275,6 +276,7 @@ function watchBootLog(onReady) {
     if (msg.line) { console.log('[llama-server]', msg.line); updateBootStatus(msg.line); }
     if (msg.ready && !readyFired) {
       readyFired = true;
+      _setOnlineIndicator(true);
       if (btn) { btn.textContent = '\u21ba Restart'; btn.disabled = false; }
       if (typeof onReady === 'function') onReady();
       es.close();
@@ -284,6 +286,15 @@ function watchBootLog(onReady) {
   es.onerror = () => {
     if (btn) { btn.textContent = '\u21ba Restart'; btn.disabled = false; }
   };
+}
+
+// ── Online / offline indicator ────────────────────────────────────────────────
+function _setOnlineIndicator(isOnline) {
+  const statusEl = document.querySelector('.companion-status');
+  const textEl   = document.getElementById('status-text');
+  if (!statusEl || !textEl) return;
+  statusEl.classList.toggle('is-offline', !isOnline);
+  textEl.textContent = isOnline ? 'online' : 'offline';
 }
 
 // ── Soul file helpers ─────────────────────────────────────────────────────────

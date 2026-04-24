@@ -93,7 +93,7 @@ body::before {
   max-width: 320px;
   aspect-ratio: 3 / 4;
   border-radius: 12px;
-  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  background: rgba(129,140,248,0.12);
   display: flex; align-items: center; justify-content: center;
   font-size: clamp(28px, calc(var(--sidebar-w) * 0.18), 64px);
   flex-shrink: 0;
@@ -120,6 +120,15 @@ body::before {
 .status-dot-svg {
   flex-shrink: 0;
   overflow: visible;
+}
+.companion-status.is-offline {
+  color: rgba(220, 80, 70, 0.75);
+}
+.companion-status.is-offline .status-dot-svg circle:first-child {
+  fill: #dc5046;
+}
+.companion-status.is-offline .status-dot-svg circle:last-child {
+  display: none;
 }
 
 /* ── Sidebar sections ─────────────────────────────────────────────────────── */

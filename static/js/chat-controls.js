@@ -91,8 +91,10 @@ async function regenerateFromRow(targetRow) {
     const reply = await callModel(buildSystemPrompt('chat'), sanitiseHistory(conversationHistory), _abortCtrl.signal);
     removeTyping(typingId);
     if (reply) {
-      const row = appendMessage('companion', reply);
-      _attachMessageControls(row, 'companion');
+      if (!streamWasRendered()) {
+        const row = appendMessage('companion', reply);
+        _attachMessageControls(row, 'companion');
+      }
       conversationHistory.push({ role: 'assistant', content: reply });
       _saveCurrentTabState(); saveTabs();
       updateMemoryCounts();
@@ -189,8 +191,10 @@ function editMessage(row, role) {
         const reply = await callModel(buildSystemPrompt('chat'), sanitiseHistory(conversationHistory), _abortCtrl.signal);
         removeTyping(typingId);
         if (reply) {
-          const newRow = appendMessage('companion', reply);
-          _attachMessageControls(newRow, 'companion');
+          if (!streamWasRendered()) {
+            const newRow = appendMessage('companion', reply);
+            _attachMessageControls(newRow, 'companion');
+          }
           conversationHistory.push({ role: 'assistant', content: reply });
           updateMemoryCounts();
         }

@@ -29,7 +29,7 @@ Goal: reduce packaging risk before PyInstaller + Tauri by shrinking the biggest 
 - `chat.js` now ~230 lines (down from 1219) ✓
 - Tab order fixed (sort by created) + ⋯ menu with inline rename ✓
 - `design/ARCHITECTURE.md` + `chat.html` load order updated ✓
-- **Fix streaming chunk + TTS skip bugs** — still pending; tackle next session in `chat-send.js`
+- **Streaming chunk + TTS skip bugs fixed** ✓ — stream-first architecture, single `_streamRound` call, post-stream tool detection
 
 **Phase C - Packaging prep** *(largely complete 2026-04-24)*
 - **PyInstaller resource audit** ✓ — all `__file__` antipatterns fixed in tool files; `auto_backup.py` rewritten; `diagnostics.py` uses `STATIC_DIR`; `tts_server.py` + `setup_router.py` use `PYTHON_EMBED_DIR`
@@ -118,12 +118,6 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ## Bugs
 
-- **Setup: Cancel model download bricks UI** — cancelling mid-download leaves a partial temp file and the model step UI in a broken state. Fix: delete temp file on cancel, then recheck and reset UI state as if download never started.
-
-- **Chat: Message sometimes arrives in one chunk instead of streaming** — companion reply occasionally delivers as a single block rather than streaming tokens. Likely a buffering or flush issue in the SSE/stream pipeline.
-
-- **TTS: Sometimes skips generation or tries to synthesise huge chunks** — likely the same root cause as the chat streaming issue above. Large unsplit text hits TTS as one request instead of sentence-sized pieces.
-
 - **Gemma parsing: broken tool call continuation** — Gemma 4 sometimes ends a turn with "I'll call those tools now" without actually emitting the tool call, or trails off with `channel|>` or similar artefact. Likely tries to continue a reply after the jinja template closes the turn. Needs investigation of the jinja template and any post-processing that strips partial tokens.
 
 
@@ -134,13 +128,10 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 *Ready to build — no design conversation needed.*
 
 - **Senni app icon** — design and add an icon for the binary (`.ico` for Windows PyInstaller spec), wizard header, and elsewhere in the UI. Needs design conversation for the visual; wiring into the spec is straightforward once an `.ico` exists.
-- **Setup: Live pip log during Features install** — stream pip output into the wizard's features step so the user can see what's happening instead of a static screen. Backend: pipe pip stdout/stderr through the SSE stream as `{"type":"log","line":"..."}` events. Frontend: scrolling log area below the progress bar, last N lines visible.
-- **Setup: Animated progress bar during Features install** — pip has no meaningful percentage output. Animate the bar with an indeterminate scroll effect: a semi-transparent shimmer/stripe sweeps across at constant speed while installing, snaps to 100% on done. Replaces the current static bar.
 - **Setup: Boot spinner stays active until TTS ready** — on the boot step ("Bringing your companion online"), the spinner flips to ✓ as soon as llama-server is ready, but TTS service can take several more seconds to load. Keep the spinner running and delay showing the "Say Hello →" button until TTS also reports ready (or a short grace-period timeout if TTS is disabled/unavailable). Prevents the user clicking through before voice is usable.
 - **Setup: Manual path entry for features** — add optional path fields to the Features step for users who already have kokoro/chromadb installed globally or in a custom location. Entering a path should skip the local install and let setup boot TTS/memory cleanly. Also add a "skip, I'll configure later" option so setup can complete without installing.
 - **Settings: Features tab** — new tab in Settings consolidating all optional-feature paths and status. Should include: TTS enable/python path/espeak path/voice path (currently scattered), ChromaDB enable/packages path, per-feature reinstall/detect buttons. Goal: full post-wizard reconfiguration without re-running setup.
 - **TTS: Stop button for current generation** — add a stop/cancel button that appears while TTS is generating for a message. Aborts the in-flight `/api/tts/speak` request and stops any playback.
-- **Chat UI: Offline indicator** — when the model server is not running, the companion "online" pip and status text should turn red and read "offline". Currently stays green/neutral regardless of server state.
 - **Mood → TTS override UI** — speed/blend per mood in Companion Settings Mood tab. Schema already in config, just needs UI. See `design/TTS.md`.
 - **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`.
 - **Mid-session gap detection** — long idle → re-inject updated timestamp into system prompt. Piggyback on consolidation idle timer. Low priority.
@@ -149,7 +140,6 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 - **Import QA round-trip** — ongoing edge case testing as real use surfaces issues.
 - **Companion Wizard appearance step titles** — swap subtitle/heading order. Currently: small="Step 02 - face", large="How do they look?". Should be: small="Step 02 - How do they look?", large="Face". Apply to all appearance sub-steps.
 - **Companion Wizard avatar PNG normalization** — on compile, convert avatar to PNG regardless of upload format (JPG, WEBP, etc.) so embedded card image is always PNG. If no avatar uploaded, render the current silhouette SVG to a PNG canvas and use that. Prevents blank avatar slot.
-- **Default sidebar avatar** — when no `sidebar_avatar_path` is set, use the same transparent orb-style default as the orb's default avatar rather than a solid placeholder. Consistent visual language between orb and sidebar.
 - **Setup Wizard — model step downloaded state on load** — `_applyModelStatus` runs during system check, but if user navigates directly to model step without running check (e.g. back-nav from engine step), downloaded state won't be applied. Consider calling `_applyModelStatus` also on `goTo('model')` with a lightweight fetch, or caching last status.
 - **Setup Wizard — system check extras reporting** — extend the system check step to detect extras (same logic as `GET /api/setup/extras-status`). Show result inline only if found ("✓ Kokoro found at …"). Loading label "Checking for extras…" disappears silently if nothing found.
 - **Settings — show resolved paths for extras** — after wizard or detection, Settings should display `./features/packages/` path and espeak binary path so user can verify what's actually being used. Paths already stored in config; just needs Settings UI wiring.
