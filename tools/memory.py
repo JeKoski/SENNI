@@ -14,6 +14,8 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
+from scripts.paths import CONFIG_FILE, COMPANIONS_DIR
+
 TOOL_NAME   = "memory"
 DESCRIPTION = (
     "Read, write, archive or move the companion's memory files. "
@@ -54,17 +56,16 @@ INPUT_SCHEMA = {
 def _companion_base() -> tuple:
     """Resolve the active companion's folder. Returns (base_path, folder_name)."""
     try:
-        root   = Path(__file__).resolve().parent.parent
-        config = json.loads((root / "config.json").read_text(encoding="utf-8"))
+        config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         folder = config.get("companion_folder", "default")
     except Exception:
         folder = "default"
-    return Path(__file__).resolve().parent.parent / "companions" / folder, folder
+    return COMPANIONS_DIR / folder, folder
 
 
 def _load_companion_cfg(companion_folder: str) -> dict:
     try:
-        path = Path(__file__).resolve().parent.parent / "companions" / companion_folder / "config.json"
+        path = COMPANIONS_DIR / companion_folder / "config.json"
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
@@ -74,7 +75,7 @@ def _backup_soul_file(companion_folder: str, filename: str, source: Path) -> Non
     """Back up any soul/ file to _backups/ with a timestamp. The AI cannot see this folder."""
     if not source.exists():
         return
-    backups_dir = Path(__file__).resolve().parent.parent / "companions" / companion_folder / "_backups"
+    backups_dir = COMPANIONS_DIR / companion_folder / "_backups"
     backups_dir.mkdir(parents=True, exist_ok=True)
     stamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
     stem   = filename.rsplit(".", 1)[0]

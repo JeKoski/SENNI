@@ -138,11 +138,22 @@ def _resolve_python(tts_cfg: dict) -> str:
     """
     Resolve the Python executable that has kokoro installed.
     Priority:
-      1. config["tts"]["python_path"] — explicit path set by user/Aurini
-      2. Same Python that's running this process (sys.executable)
+      1. config["tts"]["python_path"] — explicit path set by user
+      2. Bundled Python embeddable (frozen mode — sys.executable is the bundle binary)
+      3. sys.executable (source mode — already a real Python)
     """
     explicit = tts_cfg.get("python_path", "").strip()
-    return explicit if explicit else sys.executable
+    if explicit:
+        return explicit
+    if getattr(sys, "frozen", False):
+        import shutil
+        from scripts.paths import PYTHON_EMBED_DIR
+        for name in ("python.exe", "python3", "python"):
+            candidate = PYTHON_EMBED_DIR / name
+            if candidate.exists():
+                return str(candidate)
+        return shutil.which("python3") or shutil.which("python") or sys.executable
+    return sys.executable
 
 
 def _start_tts_process() -> bool:
@@ -211,19 +222,19 @@ def _start_tts_process() -> bool:
             return False
 
     except Exception as e:
-        # Check exit code — 2 means dependency missing
+        # Always capture stderr — it carries the actual crash traceback
+        try:
+            stderr_out = proc.stderr.read().decode("utf-8", errors="replace").strip()
+        except Exception:
+            stderr_out = ""
         rc = proc.poll()
         if rc == 2:
-            try:
-                stderr_out = proc.stderr.read().decode("utf-8", errors="replace")
-                _tts_error_msg = stderr_out.strip() or "kokoro or espeak-ng not installed"
-            except Exception:
-                _tts_error_msg = "kokoro or espeak-ng not installed"
+            _tts_error_msg = stderr_out or "kokoro or espeak-ng not installed"
             _tts_unavailable = True
             log.warning("TTS unavailable (exit 2): %s", _tts_error_msg)
         else:
             _tts_error_msg = f"TTS startup error: {e}"
-            log.warning(_tts_error_msg)
+            log.warning("%s | stderr: %s", _tts_error_msg, stderr_out or "(empty)")
         _tts_process = None
         return False
 

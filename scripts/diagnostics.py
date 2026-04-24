@@ -15,6 +15,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from scripts.paths import STATIC_DIR
+
 log = logging.getLogger(__name__)
 
 _DIV = "=" * 64
@@ -57,12 +59,35 @@ def _fail(name: str, detail: str = "") -> dict:
     return {"name": name, "ok": False, "detail": detail}
 
 
-def _check_import(package: str) -> dict:
-    try:
-        __import__(package)
-        return _pass(f"{package} importable")
-    except ImportError:
-        return _fail(f"{package} importable", f"{package} not installed")
+def _check_extra(key: str, label: str) -> dict:
+    """
+    Check whether an optional extra is installed in the correct location.
+    Uses path-based detection (mirrors setup_router._detect_extra) so it works
+    correctly in frozen mode where the main process can't import embed-mode packages.
+    """
+    import sys
+    from scripts.paths import FEATURES_PACKAGES_DIR, PYTHON_EMBED_DIR
+
+    _INSTALL_MODES = {"tts": "embed", "memory": "target"}
+    _PRIMARY_PKG   = {"tts": "kokoro", "memory": "chromadb"}
+
+    mode    = _INSTALL_MODES.get(key, "target")
+    primary = _PRIMARY_PKG.get(key, key)
+
+    if getattr(sys, "frozen", False) and mode == "embed":
+        found = (PYTHON_EMBED_DIR / "Lib" / "site-packages" / primary).is_dir()
+    elif mode == "target":
+        found = (FEATURES_PACKAGES_DIR / primary).is_dir()
+    else:
+        try:
+            __import__(primary)
+            found = True
+        except ImportError:
+            found = False
+
+    if found:
+        return _pass(f"{label} installed")
+    return _fail(f"{label} installed", "install via Setup Wizard > Features")
 
 
 # ── Startup checks (fast, every boot) ─────────────────────────────────────────
@@ -102,18 +127,17 @@ def run_startup_checks(config: dict, project_root: Path, companions_dir: Path) -
         results.append(_fail("Companion folder configured", "not set"))
 
     # Static dir
-    static_dir = project_root / "static"
     results.append(
-        _pass("Static dir exists", str(static_dir)) if static_dir.exists()
-        else _fail("Static dir exists", str(static_dir))
+        _pass("Static dir exists", str(STATIC_DIR)) if STATIC_DIR.exists()
+        else _fail("Static dir exists", str(STATIC_DIR))
     )
 
     # Optional extras — only checked if enabled
     if config.get("tts", {}).get("enabled"):
-        results.append(_check_import("kokoro"))
+        results.append(_check_extra("tts", "Kokoro TTS"))
 
     if config.get("memory", {}).get("enabled"):
-        results.append(_check_import("chromadb"))
+        results.append(_check_extra("memory", "ChromaDB memory"))
 
     return results
 

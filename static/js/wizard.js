@@ -358,12 +358,17 @@ function _applyModelStatus(detected) {
     // Downloaded cards never show the mm section on selection
   }
 
-  // Auto-select card if current model_path matches a Senni-downloaded model
+  // Auto-select card if current model_path matches a Senni-downloaded model.
+  // Also pre-fill mmprojPath from the model's mmproj_path (mirrors selectModelCard click).
   if (detected.model_path) {
     for (const [id, info] of Object.entries(_downloadedModels)) {
       if (info.path === detected.model_path) {
         const card = document.querySelector(`.model-card[data-model="${id}"]`);
         if (card) { card.classList.add('selected'); selectedModelCard = id; }
+        if (info.mmproj_path && !mmprojPath) {
+          mmprojPath = info.mmproj_path;
+          if (!multimodal) { multimodal = true; _syncMmToggles(); }
+        }
         break;
       }
     }
@@ -503,8 +508,8 @@ function _applyExtrasStatus(status) {
 
     const localFound  = info.installed && info.source === 'local';
     const systemFound = info.installed && info.source === 'system';
-    // Skip install if: already local, OR (system found AND user chose not to install locally)
-    const skip = localFound || (systemFound && !localInstall);
+    // Skip install if: already local, OR user explicitly chose not to install locally
+    const skip = localFound || !localInstall;
     if (key === 'tts')    featTtsInstalled    = skip;
     if (key === 'memory') featMemoryInstalled = skip;
 
@@ -516,8 +521,10 @@ function _applyExtrasStatus(status) {
         statusEl.textContent   = `\u2713 Installed locally \u2014 ${info.path}`;
         statusEl.style.display = 'block';
         statusEl.style.color   = '';
-      } else if (systemFound && !localInstall) {
-        statusEl.textContent   = `\u2713 Using system install \u2014 ${info.path}`;
+      } else if (!localInstall) {
+        statusEl.textContent   = systemFound
+          ? `\u2713 Using system install \u2014 ${info.path}`
+          : `\u2014 Skipping \u2014 set up manually or enable local install`;
         statusEl.style.display = 'block';
         statusEl.style.color   = '#6dd4a8';
       } else if (systemFound) {

@@ -39,6 +39,13 @@ def _ensure_chroma():
     global _chroma_available, _chroma_client_class, _chroma_ef_class
     if _chroma_available:
         return True
+    import sys
+    import importlib
+    from scripts.paths import PYTHON_EMBED_DIR
+    sp = str(PYTHON_EMBED_DIR / "Lib" / "site-packages")
+    if sp not in sys.path:
+        sys.path.insert(0, sp)
+    importlib.invalidate_caches()
     try:
         import chromadb
         from chromadb.utils import embedding_functions
@@ -46,7 +53,8 @@ def _ensure_chroma():
         _chroma_ef_class = embedding_functions.DefaultEmbeddingFunction
         _chroma_available = True
         return True
-    except ImportError:
+    except Exception as e:
+        log.warning("chromadb import failed: %s", e)
         return False
 
 
@@ -122,7 +130,7 @@ class MemoryStore:
         if not _ensure_chroma():
             log.warning(
                 "chromadb not installed — memory system disabled. "
-                "Run: pip install chromadb --break-system-packages"
+                "Install via Setup Wizard > Features."
             )
             return
 

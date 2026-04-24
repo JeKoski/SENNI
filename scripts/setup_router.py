@@ -431,26 +431,78 @@ async def setup_download_model(request: Request):
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
-# ── Extras: package labels and pip names ───────────────────────────────────────
+# ── Extras: pip Python resolver ───────────────────────────────────────────────
+
+def _get_pip_python() -> str:
+    """
+    Return the Python executable to use for pip installs.
+
+    Priority:
+      1. Bundled Python embeddable (python-embed/python.exe) — zero system deps
+      2. System Python via PATH — Linux fallback / source-mode installs
+      3. sys.executable — source-mode dev (always has Python)
+    """
+    import shutil
+    import sys
+    from scripts.paths import PYTHON_EMBED_DIR
+
+    if getattr(sys, "frozen", False):
+        for name in ("python.exe", "python3", "python"):
+            candidate = PYTHON_EMBED_DIR / name
+            if candidate.exists():
+                return str(candidate)
+        return shutil.which("python3") or shutil.which("python") or sys.executable
+
+    return sys.executable
+
+
+# ── Extras: package labels, pip names, install modes ──────────────────────────
 _EXTRAS_ORDER = ("tts", "memory")
 _EXTRAS_META  = {
-    "tts":    ("kokoro",   "Voice (Kokoro TTS)"),
-    "memory": ("chromadb", "Memory (ChromaDB)"),
+    "tts":    (["kokoro", "soundfile"], "Voice (Kokoro TTS)"),
+    "memory": (["chromadb"],            "Memory (ChromaDB)"),
+}
+
+# "embed"  → install into embedded Python's own site-packages (no --target).
+#            Required for ALL binary packages — native extensions (.pyd/.so) fail
+#            to load their DLL dependencies when installed via --target on Windows.
+#            Both kokoro (numpy/soundfile) and chromadb (chromadb_rust_bindings)
+#            hit this. "embed" keeps DLLs co-located where Windows can find them.
+# "target" → reserved for pure-Python packages only (none currently).
+_EXTRAS_INSTALL_MODE = {
+    "tts":    "embed",
+    "memory": "embed",
+}
+
+# Extra commands to run via the pip Python after the main install.
+# Each entry is a list of args passed to [python, *args].
+_EXTRAS_POST_CMDS = {
+    "tts":    [["-m", "spacy", "download", "en_core_web_sm"]],
+    "memory": [],
 }
 
 
 def _detect_extra(key: str) -> dict:
     """
-    Check if an extra is installed. Prefers ./features/packages/ local install;
-    falls back to checking the current Python env via importlib.
+    Check if an extra is installed, looking in the right location per install mode.
+    Uses the first package in the list as the primary indicator.
     """
-    import importlib.util
-    pkg = _EXTRAS_META[key][0]
+    import sys
+    primary = _EXTRAS_META[key][0][0]  # first package in the list
+    mode    = _EXTRAS_INSTALL_MODE[key]
 
-    if (FEATURES_PACKAGES_DIR / pkg).is_dir():
+    if getattr(sys, "frozen", False) and mode == "embed":
+        from scripts.paths import PYTHON_EMBED_DIR
+        embed_sp = PYTHON_EMBED_DIR / "Lib" / "site-packages" / primary
+        if embed_sp.is_dir():
+            return {"installed": True, "path": str(embed_sp.parent), "source": "local"}
+        return {"installed": False, "path": "", "source": ""}
+
+    if (FEATURES_PACKAGES_DIR / primary).is_dir():
         return {"installed": True, "path": str(FEATURES_PACKAGES_DIR), "source": "local"}
 
-    spec = importlib.util.find_spec(pkg)
+    import importlib.util
+    spec = importlib.util.find_spec(primary)
     if spec and spec.origin:
         return {"installed": True, "path": str(Path(spec.origin).parent.parent), "source": "system"}
 
@@ -503,8 +555,8 @@ async def setup_install_extras(request: Request):
 
         FEATURES_PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
         for step, key in enumerate(to_install, start=1):
-            pkg, label = _EXTRAS_META[key]
-            target_dir = FEATURES_PACKAGES_DIR
+            pkgs, label = _EXTRAS_META[key]
+            mode        = _EXTRAS_INSTALL_MODE[key]
             yield _sse({
                 "type": "status",
                 "label": f"Installing {label}\u2026",
@@ -514,23 +566,40 @@ async def setup_install_extras(request: Request):
 
             queue: asyncio.Queue = asyncio.Queue()
 
-            def _run_pip(pkg: str = pkg, target: Path = target_dir) -> None:
+            def _run_pip(pkgs: list = pkgs, mode: str = mode, key: str = key) -> None:
                 import subprocess
-                import sys
+                py  = _get_pip_python()
+                cmd = [py, "-m", "pip", "install", "--upgrade", "--no-cache-dir"]
+                if mode == "target":
+                    cmd += ["--target", str(FEATURES_PACKAGES_DIR)]
+                cmd.extend(pkgs)
                 try:
                     proc = subprocess.Popen(
-                        [sys.executable, "-m", "pip", "install", "--target", str(target), "--upgrade", pkg],
+                        cmd,
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, bufsize=1,
                     )
-                    proc.communicate()  # wait; output not forwarded (too noisy for wizard UI)
+                    proc.communicate()
                     if proc.returncode != 0:
                         loop.call_soon_threadsafe(
                             queue.put_nowait,
-                            {"type": "error", "message": f"pip failed for {pkg} (exit {proc.returncode})"},
+                            {"type": "error", "message": f"pip failed for {pkgs} (exit {proc.returncode})"},
                         )
-                    else:
-                        loop.call_soon_threadsafe(queue.put_nowait, {"type": "pkg_done"})
+                        return
+                    # Run any post-install commands (e.g. spacy model download)
+                    for post_args in _EXTRAS_POST_CMDS.get(key, []):
+                        r = subprocess.run(
+                            [py, *post_args],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True,
+                        )
+                        if r.returncode != 0:
+                            loop.call_soon_threadsafe(
+                                queue.put_nowait,
+                                {"type": "error", "message": f"post-install failed: {post_args} (exit {r.returncode})"},
+                            )
+                            return
+                    loop.call_soon_threadsafe(queue.put_nowait, {"type": "pkg_done"})
                 except Exception as exc:
                     loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "message": str(exc)})
 
