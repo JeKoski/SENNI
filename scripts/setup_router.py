@@ -22,8 +22,8 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from scripts.config import detect_gpu, load_config, save_config
-from scripts.paths import BINARY_DIR, FEATURES_DIR, FEATURES_PACKAGES_DIR, MODELS_DIR
+from scripts.config import detect_gpu, instantiate_companion_template, load_config, save_config
+from scripts.paths import BINARY_DIR, COMPANIONS_DIR, FEATURES_DIR, FEATURES_PACKAGES_DIR, MODELS_DIR
 
 router = APIRouter()
 
@@ -260,6 +260,8 @@ def _scan_default_model() -> str:
 
 @router.get("/api/setup/status")
 async def setup_status():
+    instantiate_companion_template("senni", "senni")   # no-op if already exists
+
     config = load_config()
     binary = config.get("server_binary", "")
     model  = config.get("model_path", "")
@@ -299,6 +301,7 @@ async def setup_status():
         "build_type":        _gpu_to_build(gpu, oneapi),
         "oneapi_present":    oneapi,
         "platform":          SYSTEM,
+        "senni_companion":   (COMPANIONS_DIR / "senni").exists(),
     }
 
 

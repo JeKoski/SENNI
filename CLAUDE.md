@@ -188,12 +188,49 @@ Copying a companion folder between installs:
 | Features install: static bar | Indeterminate shimmer + live pip log |
 
 ### Next session
-- Work through remaining BACKLOG quick wins
-- Gemma tool call continuation bug (needs investigation)
+- Quick wins batch: boot spinner until TTS ready, TTS stop button, wizard appearance step titles, wizard avatar PNG normalization
+- Settings Features tab (post-wizard reconfiguration)
+- Gemma tool call continuation: review console logs from Path F to determine if format mismatch is the root cause
 
 ---
 
-## Session notes — 2026-04-24 #2 (ChromaDB bundling + misc fixes)
+## Session notes — 2026-04-24 #6 (Senni template wiring + Gemma4 rescue)
+
+**Senni avatar wired. Gemma4 partial tool call rescue added.**
+
+### What changed
+
+**`scripts/setup_router.py` — auto-install Senni template:**
+- `instantiate_companion_template("senni", "senni")` called in `GET /api/setup/status` — no-op if folder already exists
+- `"senni_companion": bool` added to status response
+
+**`static/js/wizard.js` + `static/css/wizard.css` — Senni avatar display:**
+- `_applySenniAvatar()`: replaces `.senni-placeholder` div with `<img src="/api/companion/senni/avatar">` in `#senni-orb-icon` and `#meet-portrait`. `onerror` fallback removes img (placeholder stays on 404).
+- Called at DOMContentLoaded (rerun path) and after status fetch when `detected.senni_companion` is true (first-run path).
+- `.meet-portrait img { object-fit: cover }` added to wizard.css (`.senni-orb-icon img` rule already existed).
+
+**`static/js/tool-parser.js` — Gemma4 rescue + artifact strip:**
+- `rescuePartialGemma4ToolCall(text)`: finds `<|tool_call>call:name{` without closing `<tool_call|>`, locates last `}`, tries JSON parse with same unescape+relax logic as Path E. Returns `[{name, args}]` on success, `[]` otherwise.
+- `stripGemma4Artifacts(text)`: removes unclosed `<|tool_call>` fragments, trailing `word|>` patterns, trailing `<|` sequences.
+
+**`static/js/api.js` — Path F + debug logging:**
+- Path F: if Gemma4 and rawText contains `<|tool_call>` but Path E missed → try `rescuePartialGemma4ToolCall()` → if rescued, execute and continue. If rescue fails → `stripGemma4Artifacts()` before bubble/TTS + console.warn.
+- Debug log: all Gemma4 plain replies (no tool call matched) logged to console — enables observing actual rawText for format investigation.
+- Header comment updated to include Path F.
+
+### Bugs fixed / closed
+
+| Item | Fix |
+|------|-----|
+| Senni wizard portrait: placeholder forever | `instantiate_companion_template` in status + `_applySenniAvatar()` wired to status fetch |
+| Gemma4 partial `<|tool_call>` artifacts in bubble | Path F strips unclosed fragments before display |
+
+### Remaining Gemma4 investigation
+Path F and debug logging are in place. Next step: observe console logs during a real Gemma4 tool call session to determine if the root cause is format mismatch vs prose-before-call vs truncation.
+
+---
+
+## Session notes — 2026-04-24 #5 (Streaming fix, bugs, quick wins)
 
 **ChromaDB now installs into python-embed (embed mode). Diagnostics fixed. mmproj auto-fill fixed.**
 
@@ -278,53 +315,6 @@ ChromaDB install pending final smoke test (switching to embed mode requires rein
 | TTS splits mid-filename (e.g. `file.md`) | Regex requires whitespace, not end-of-buffer |
 | TTS silently drops inline code | Humanization pass: underscores→spaces, `.ext`→"dot ext" |
 | Wizard review/compile orb shows emoji | Wired `_getSilhouette()` with species color into both |
-
-### Deferred
-- **Streaming chunk + TTS skip** — live in send/stream pipeline, fix post-Phase B
-- **Gemma tool call continuation** — needs separate investigation
-
-### Next session
-- Fix streaming chunk + TTS skip bugs in `chat-send.js` (pipeline now isolated, ready to debug)
-- Work through BACKLOG bugs and quick wins
-
----
-
-## Session notes — 2026-04-24 #4 (Phase B — frontend chat modular split)
-
-**chat.js split into 3 modules. Tab order fixed. ⋯ rename menu added.**
-
-### What changed
-
-**New files:**
-- `static/js/system-prompt.js` — `buildSystemPrompt()` + `_resolveTemplate()` (~240 lines)
-- `static/js/chat-session.js` — boot overlays, `loadStatus()`, `ensureServerRunning()`, `watchBootLog()`, `startSession()`, `reloadSoulFiles()`, `reloadMemoryContext()`, `seedTemplates()`, `triggerFirstRun()`, `_injectFirstMes()` (~300 lines)
-- `static/js/chat-send.js` — `sendMessage()`, `sanitiseHistory()`, `_triggerAssociativeRetrieval()` + assoc counter (~170 lines)
-
-**`static/js/chat.js`:**
-- Down from 1219 → ~230 lines; now coordinator only: shared state, `_detectModelFamily()`, `_applyMoodToOrb()`, DOMContentLoaded, persistence helpers, chat management (`newChat`, `confirmFullReset`, `exportHistory`, `importHistory`)
-
-**`static/chat.html`:**
-- Load order updated: `system-prompt.js` → `chat-session.js` → `chat-send.js` → `chat.js`
-
-**`static/js/chat-tabs.js`:**
-- `_loadTabsFromDisk()`: sorts by `created` ascending before mapping — fixes tab order inconsistency on disk fallback
-- `renderTabList()`: replaced × close button with ⋯ menu button
-- Added `_openTabMenu()`, `_closeTabMenu()`, `_startInlineRename()` — inline rename replaces `prompt()`-based `renameTab()`
-- Removed `renameTab()`
-
-**`static/css/messages.css`:**
-- `.tab-close` → `.tab-menu` styles; added `.tab-menu-dropdown`, `.tab-menu-item`, `.tab-rename-input`
-
-**`design/ARCHITECTURE.md`:**
-- Refactors completed list updated; load order table updated; planned modules cleared
-
-**`static/js/companion-mood.js` (post-session fix):**
-- `_cpMoodGetVoiceOptions()`: was reading `Object.keys(cpSettings.active_companion.tts.voice_blend)` — only voices already in the active blend. Now reads `_cpTtsVoiceList` (full server-fetched list from companion-tts.js)
-- `cpMoodInit()`: if `_cpTtsVoiceList` is empty (Mood tab opened before TTS tab), fetches `/api/tts/status` and patches all `.cp-tts-voice-select` elements in-place on resolve
-
-### Next session
-- Fix streaming chunk + TTS skip bugs in `chat-send.js` (pipeline now isolated)
-- Work through BACKLOG bugs and quick wins
 
 ---
 

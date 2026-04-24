@@ -5,9 +5,11 @@
 //   TOOL_NAMES               — derived name list
 //   parseInlineToolCalls(text)   → [{ name, args, raw }, ...]   Gemma 3 / inline style
 //   parseXmlToolCalls(text)      → [{ name, args }, ...]         Qwen3 XML style
-//   parseGemma4ToolCalls(text)   → [{ name, args }, ...]         Gemma 4 native token style
+//   parseGemma4ToolCalls(text)        → [{ name, args }, ...]    Gemma 4 native token style
+//   rescuePartialGemma4ToolCall(text) → [{ name, args }]         Gemma 4 partial/truncated call
 //   formatGemma4ToolResponse(name, result) → string              Gemma 4 response token
-//   stripToolCalls(text, calls)  → cleaned string
+//   stripGemma4Artifacts(text)        → string                   Remove unclosed tokens/artifacts
+//   stripToolCalls(text, calls)       → cleaned string
 //
 // No DOM dependency. No side effects. Load before api.js.
 
@@ -403,6 +405,58 @@ function formatGemma4ToolResponse(name, result) {
   // stays well-formed, then wrap with Gemma 4's <|"|> quoting convention.
   const escaped = String(result).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `<|tool_response>response:${name}{result:<|"|>${escaped}<|"|>}<tool_response|>`;
+}
+
+// ── Gemma 4 partial tool call rescue ─────────────────────────────────────────
+// When the stream ends before the closing <tool_call|> token (e.g. cut off by
+// <end_of_turn> or max_tokens), try to extract and parse whatever we got.
+// Returns [{ name, args }] on success, [] otherwise.
+function rescuePartialGemma4ToolCall(text) {
+  // Need at least the opener + call:name{ pattern
+  const opener = text.indexOf('<|tool_call>');
+  if (opener === -1) return [];
+
+  const afterOpener = text.slice(opener + '<|tool_call>'.length);
+  const nameMatch = afterOpener.match(/^call:([a-zA-Z_][a-zA-Z0-9_]*)/);
+  if (!nameMatch) return [];
+
+  const name = nameMatch[1];
+  if (!TOOL_NAMES.includes(name)) return [];
+
+  const bodyStart = afterOpener.indexOf('{', nameMatch[0].length);
+  if (bodyStart === -1) return [];
+
+  // Find the last } — handles truncation mid-value
+  const rawBody = afterOpener.slice(bodyStart);
+  const lastBrace = rawBody.lastIndexOf('}');
+  if (lastBrace === -1) return [];
+
+  const jsonStr = rawBody.slice(0, lastBrace + 1).replace(/<\|"\|>/g, '"');
+  let args = {};
+  try {
+    args = JSON.parse(jsonStr);
+  } catch {
+    try {
+      const relaxed = jsonStr.replace(/([{,]\s*)([a-zA-Z_]\w*)(\s*:)/g, '$1"$2"$3');
+      args = JSON.parse(relaxed);
+    } catch {
+      return [];
+    }
+  }
+  return [{ name, args }];
+}
+
+// ── Strip Gemma 4 token artifacts from display text ───────────────────────────
+// Removes unclosed <|tool_call> blocks and trailing *|> fragments that appear
+// when the stream ends mid-token or the model generates continuation artifacts.
+function stripGemma4Artifacts(text) {
+  // Remove any <|tool_call>... fragment (with or without closing token)
+  let out = text.replace(/<\|tool_call>[\s\S]*?(?:<tool_call\|>|$)/g, '');
+  // Remove trailing word|> artifacts (e.g. "channel|>")
+  out = out.replace(/\s*\w+\|>\s*$/, '');
+  // Remove any trailing <| fragment
+  out = out.replace(/\s*<\|[^>]*$/, '');
+  return out.trim();
 }
 
 // ── Strip inline tool calls from visible reply ────────────────────────────────

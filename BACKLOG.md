@@ -118,7 +118,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ## Bugs
 
-- **Gemma parsing: broken tool call continuation** — Gemma 4 sometimes ends a turn with "I'll call those tools now" without actually emitting the tool call, or trails off with `channel|>` or similar artefact. Likely tries to continue a reply after the jinja template closes the turn. Needs investigation of the jinja template and any post-processing that strips partial tokens.
+- **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks (no closing `<tool_call|>`); `stripGemma4Artifacts()` cleans trailing artifacts before display. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging now in place — check browser console on next occurrence to determine actual rawText format and whether it's a prose-before-call issue or format mismatch.
 
 
 ---
