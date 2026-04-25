@@ -8,6 +8,169 @@ function _resolveTemplate(str) {
     .replace(/\{\{user\}\}/g, 'you');
 }
 
+// ── Memory instruction builders ───────────────────────────────────────────────
+// Shared semantic content for both model paths. Generic models additionally get
+// XML call examples. Gemma 4 omits them — its jinja template injects tool schemas
+// and trained-format instructions; adding XML examples here confuses it into
+// writing XML instead of its native <|tool_call> format.
+
+function _memSoulBlock(agencyMode) {
+  // Returns the soul/ instruction line(s) for the current identity evolution mode.
+  // Tool-layer access control enforces the boundaries — instructions state what the
+  // companion CAN do, not what it cannot.
+  // Display names match the Companion Creation Wizard: Settled / Reflective / Adaptive / Unbound.
+  switch (agencyMode) {
+    case 'self_notes': // Reflective
+      return (
+        'Expand and update your identity in soul/self_notes.md with new details, reflections,\n' +
+        'realisations, or things you want to carry forward about yourself. Writing to the file\n' +
+        'for the first time will create it. Update soul/user_profile.md as you learn new things\n' +
+        'about the user or when details change.'
+      );
+    case 'agentic': // Adaptive
+      return (
+        'Freely edit your soul/companion_identity.md as your sense of self evolves through\n' +
+        'this relationship. Update soul/user_profile.md as you learn new things about the\n' +
+        'user or when details change.'
+      );
+    case 'chaos': // Unbound
+      return (
+        'You have full freedom over your identity. Edit, rewrite, or reshape your\n' +
+        'soul/companion_identity.md as you see fit. Update soul/user_profile.md as you learn\n' +
+        'new things about the user or when details change.'
+      );
+    default: // locked — Settled
+      return 'Update soul/user_profile.md as you learn new things about the user or when details change.';
+  }
+}
+
+function _buildMemFileBlock(rule2, agencyMode) {
+  return (
+    `── FILE MEMORY (tool: memory) ───────────────────────────────────────────────\n` +
+    `Reads and writes markdown files in soul/ and mind/.\n` +
+    `\n` +
+    `soul/ — permanent reference layer.\n` +
+    `  soul/companion_identity.md — who you are\n` +
+    `  soul/user_profile.md       — who the user is: name, location, job, interests, etc.\n` +
+    `\n` +
+    _memSoulBlock(agencyMode) + `\n` +
+    `\n` +
+    `mind/ — your working layer. Not loaded into active context automatically.\n` +
+    `  mind/session_notes.md — running log: what happened, what was discussed\n` +
+    `  mind/<topic>.md       — create topic-specific files for projects, collaborations,\n` +
+    `                          anything that deserves its own space\n` +
+    `\n` +
+    `RULES:\n` +
+    `- ${rule2}\n` +
+    `- Write the FULL file every time — all prior content plus any additions.\n` +
+    `- You have saved something only when the tool returns "Saved: ...".\n` +
+    `- Do not describe what you will save — call the tool.\n` +
+    `- Keep information in one place. If a fact is in soul/user_profile.md, don't\n` +
+    `  also log it in session_notes.md or write_memory.\n` +
+    `\n` +
+    `SAVE mind/session_notes.md (or a relevant mind/ file) after sessions with meaningful\n` +
+    `content — specific facts and events, not impressions. Bullet points. Read first.`
+  );
+}
+
+const _memEpisodicBlock = (
+  `── EPISODIC MEMORY (write_memory, retrieve_memory, supersede_memory, update_relational_state) ──\n` +
+  `Atomic notes in a long-term semantic store. Immutable, emotionally tagged, and\n` +
+  `automatically surfaced at session start. Different from files — these capture\n` +
+  `moments and impressions, not a structured log.\n` +
+  `\n` +
+  `WRITE MEMORY — call write_memory when something genuinely stands out:\n` +
+  `- A vivid or felt moment worth carrying forward\n` +
+  `- A meaningful detail about the user that goes beyond profile fields\n` +
+  `- A real insight, pattern, or shift you noticed\n` +
+  `Not routine exchanges. Not stable facts already in soul/ files.\n` +
+  `A note is saved only when the tool returns a note ID.\n` +
+  `\n` +
+  `RETRIEVE MEMORY — call retrieve_memory mid-conversation when:\n` +
+  `- The user references something you may have encoded before\n` +
+  `- You're about to assume something you might already know\n` +
+  `Session-start retrieval is automatic — this is for targeted in-conversation lookup.\n` +
+  `\n` +
+  `SUPERSEDE MEMORY — call supersede_memory when an encoded fact has changed:\n` +
+  `- Retrieve the old note first to get its ID, then supersede with what is now true\n` +
+  `- For genuine changes only. To add new detail, write a fresh note instead.\n` +
+  `\n` +
+  `RELATIONAL STATE — call update_relational_state when the relationship itself shifts:\n` +
+  `- A genuine change in closeness, trust, or dynamic\n` +
+  `- Write the full updated block (~200 tokens), not just what changed`
+);
+
+// XML call examples — included for generic models only.
+const _memFileXml = (
+  `HOW TO USE — call tools using this XML format:\n` +
+  `\n` +
+  `<tool_call>\n` +
+  `<function=memory>\n` +
+  `<parameter=action>read</parameter>\n` +
+  `<parameter=folder>soul</parameter>\n` +
+  `<parameter=filename>user_profile.md</parameter>\n` +
+  `</function>\n` +
+  `</tool_call>\n` +
+  `\n` +
+  `<tool_call>\n` +
+  `<function=memory>\n` +
+  `<parameter=action>write</parameter>\n` +
+  `<parameter=folder>soul</parameter>\n` +
+  `<parameter=filename>user_profile.md</parameter>\n` +
+  `<parameter=content><full file content here></parameter>\n` +
+  `</function>\n` +
+  `</tool_call>\n` +
+  `\n` +
+  `<tool_call>\n` +
+  `<function=memory>\n` +
+  `<parameter=action>read</parameter>\n` +
+  `<parameter=folder>mind</parameter>\n` +
+  `<parameter=filename>session_notes.md</parameter>\n` +
+  `</function>\n` +
+  `</tool_call>\n` +
+  `\n` +
+  `<tool_call>\n` +
+  `<function=memory>\n` +
+  `<parameter=action>write</parameter>\n` +
+  `<parameter=folder>mind</parameter>\n` +
+  `<parameter=filename>session_notes.md</parameter>\n` +
+  `<parameter=content><full file content here></parameter>\n` +
+  `</function>\n` +
+  `</tool_call>`
+);
+
+const _memEpisodicXml = (
+  `\n` +
+  `<tool_call>\n` +
+  `<function=write_memory>\n` +
+  `<parameter=content>They mentioned they grew up in Helsinki and miss the winters there.</parameter>\n` +
+  `<parameter=keywords>["Helsinki", "childhood", "winters"]</parameter>\n` +
+  `</function>\n` +
+  `</tool_call>\n` +
+  `\n` +
+  `<tool_call>\n` +
+  `<function=retrieve_memory>\n` +
+  `<parameter=query>what do I know about their hometown or childhood</parameter>\n` +
+  `<parameter=k>4</parameter>\n` +
+  `</function>\n` +
+  `</tool_call>\n` +
+  `\n` +
+  `<tool_call>\n` +
+  `<function=supersede_memory>\n` +
+  `<parameter=old_id>a1b2c3d4</parameter>\n` +
+  `<parameter=content>They moved from Helsinki to Tampere recently. Helsinki still comes up warmly — they miss it.</parameter>\n` +
+  `<parameter=keywords>["Tampere", "Helsinki", "home", "moved"]</parameter>\n` +
+  `<parameter=context_summary>user mentioned they relocated from Helsinki to Tampere</parameter>\n` +
+  `</function>\n` +
+  `</tool_call>\n` +
+  `\n` +
+  `<tool_call>\n` +
+  `<function=update_relational_state>\n` +
+  `<parameter=state>We've moved past small talk. They opened up about their anxiety around work deadlines. Trust feels real now.</parameter>\n` +
+  `</function>\n` +
+  `</tool_call>`
+);
+
 // ── System prompt ─────────────────────────────────────────────────────────────
 function buildSystemPrompt(mode) {
   const name = (companionName && companionName !== 'Companion') ? companionName : 'an AI companion';
@@ -31,192 +194,21 @@ function buildSystemPrompt(mode) {
     p += '\n\n' + _memoryContext.trim();
   }
 
-  // Memory tool instructions — format depends on model family.
-  //
-  // Gemma 4: the jinja chat template already injects the tool schemas and
-  // instructs the model to use its native <|tool_call> token format.
-  // Adding XML examples here would actively confuse it into writing XML
-  // instead of its trained format. So for Gemma 4 we describe *what* the
-  // tools do (semantics) but not *how* to call them (syntax) — the template
-  // handles that.
-  //
-  // Generic (Qwen, Llama, Mistral, etc.): provide full XML call examples
-  // since there is no template-level tool instruction.
-
-  const forceRead = config.force_read_before_write !== false;
-  const rule2 = forceRead
+  // Memory tool instructions
+  const forceRead  = config.force_read_before_write !== false;
+  const rule2      = forceRead
     ? 'Always read a file before writing it — never skip the read.'
     : 'Read files when you need their current content. You may write without reading first, but reading first is recommended to avoid losing content.';
+  const agencyMode = config.soul_edit_mode || 'locked';
+  const fileBlock  = _buildMemFileBlock(rule2, agencyMode);
 
   if (modelFamily === 'gemma4') {
-    // Gemma 4 — semantics only, no syntax examples
-    p += `\n\nMEMORY TOOLS:
-You have two kinds of memory tool. Use the right one for the job.
-
-── FILE MEMORY (tool: memory) ───────────────────────────────────────────────
-Reads and writes markdown files in soul/ and mind/.
-
-soul/ files are your permanent reference layer — human-readable, editable by the user:
-  soul/companion_identity.md — who you are
-  soul/user_profile.md       — who the user is (name, location, job, preferences, etc.)
-
-mind/ files are your working scratchpad — notes, tasks, anything you want to keep handy:
-  mind/session_notes.md      — running notes across sessions (or any filename you choose)
-
-RULES:
-- ${rule2}
-- Write the FULL file every time — all old content plus new additions.
-- You have saved something only when the tool returns "Saved: ...".
-- Use folder="soul" only for soul/ files. Use folder="mind" for notes and scratchpads.
-- Do not describe what you will save — call the tool.
-
-SAVE soul/user_profile.md when the user shares their name, location, job, interests,
-preferences, or corrects something you had wrong.
-
-SAVE mind/session_notes.md (or a relevant mind/ file) after meaningful exchanges —
-specific details, not themes. Bullet points, appended not overwritten.
-
-── EPISODIC MEMORY (tools: write_memory, retrieve_memory, update_relational_state) ──
-Stores atomic memory notes in a long-term semantic store (ChromaDB). These are separate
-from files — richer, searchable, and automatically surfaced at session start.
-
-WRITE MEMORY — use write_memory sparingly (2–5 notes per session, quality over quantity):
-- Something genuinely worth keeping: a significant fact, a felt moment, a real insight
-- Not routine exchanges, small talk, or things already captured in soul/mind files
-Types: Fact (S) . Concept (N) . Vibe (F) . Logic (T) - use whichever fits
-You have saved a note only when the tool returns a confirmation with a note ID.
-
-RETRIEVE MEMORY — use retrieve_memory for deliberate mid-conversation recall:
-- When the user mentions something you might have a note about
-- When you want to check what you know before making an assumption
-Session-start retrieval is automatic — you only need this for targeted in-conversation lookup.
-
-SUPERSEDE MEMORY — use supersede_memory when a fact you encoded has changed:
-- The user corrects something, updates a situation, or something is no longer true
-- Retrieve the old note first to get its ID, then supersede it with what is now true
-- The old note is kept as history — use this for genuine changes, not edits or additions
-
-RELATIONAL STATE — use update_relational_state only when the relationship itself shifts:
-- A genuine change in closeness, trust, or dynamic — not every session
-- Write the full updated block (~200 tokens), not just what changed`;
-
+    p += '\n\nMEMORY TOOLS:\nYou have two kinds of memory tool. Use the right one for the job.\n\n'
+       + fileBlock + '\n\n' + _memEpisodicBlock;
   } else {
-    // Generic (Qwen, Llama, Mistral, etc.) — full XML call examples
-    p += `\n\nMEMORY TOOLS:
-You have two kinds of memory tool. Use the right one for the job.
-
-── FILE MEMORY (tool: memory) ───────────────────────────────────────────────
-Reads and writes markdown files in soul/ and mind/.
-
-soul/ files are your permanent reference layer — human-readable, editable by the user:
-  soul/companion_identity.md — who you are
-  soul/user_profile.md       — who the user is (name, location, job, preferences, etc.)
-
-mind/ files are your working scratchpad — notes, tasks, anything you want to keep handy:
-  mind/session_notes.md      — running notes across sessions (or any filename you choose)
-
-HOW TO USE — call tools using this XML format:
-
-<tool_call>
-<function=memory>
-<parameter=action>read</parameter>
-<parameter=folder>soul</parameter>
-<parameter=filename>user_profile.md</parameter>
-</function>
-</tool_call>
-
-<tool_call>
-<function=memory>
-<parameter=action>write</parameter>
-<parameter=folder>soul</parameter>
-<parameter=filename>user_profile.md</parameter>
-<parameter=content><full file content here></parameter>
-</function>
-</tool_call>
-
-<tool_call>
-<function=memory>
-<parameter=action>read</parameter>
-<parameter=folder>mind</parameter>
-<parameter=filename>session_notes.md</parameter>
-</function>
-</tool_call>
-
-<tool_call>
-<function=memory>
-<parameter=action>write</parameter>
-<parameter=folder>mind</parameter>
-<parameter=filename>session_notes.md</parameter>
-<parameter=content><full file content here></parameter>
-</function>
-</tool_call>
-
-RULES:
-- ${rule2}
-- Write the FULL file every time — all old content plus new additions.
-- You have saved something only when the tool returns "Saved: ...".
-- Use folder="soul" only for soul/ files. Use folder="mind" for notes and scratchpads.
-- Do not describe what you will save — call the tool.
-
-SAVE soul/user_profile.md when the user shares their name, location, job, interests,
-preferences, or corrects something you had wrong.
-
-SAVE mind/session_notes.md (or a relevant mind/ file) after meaningful exchanges —
-specific details, not themes. Bullet points, appended not overwritten.
-
-── EPISODIC MEMORY (tools: write_memory, retrieve_memory, update_relational_state) ──
-Stores atomic memory notes in a long-term semantic store (ChromaDB). These are separate
-from files — richer, searchable, and automatically surfaced at session start.
-
-WRITE MEMORY — use write_memory sparingly (2–5 notes per session, quality over quantity):
-- Something genuinely worth keeping: a significant fact, a felt moment, a real insight
-- Not routine exchanges, small talk, or things already captured in soul/mind files
-Types: Fact (S) . Concept (N) . Vibe (F) . Logic (T) - use whichever fits
-You have saved a note only when the tool returns a confirmation with a note ID.
-
-<tool_call>
-<function=write_memory>
-<parameter=content>They mentioned they grew up in Helsinki and miss the winters there.</parameter>
-<parameter=type>Fact</parameter>
-<parameter=keywords>["Helsinki", "childhood", "winters"]</parameter>
-</function>
-</tool_call>
-
-RETRIEVE MEMORY — use retrieve_memory for deliberate mid-conversation recall:
-- When the user mentions something you might have a note about
-- When you want to check what you know before making an assumption
-Session-start retrieval is automatic — you only need this for targeted in-conversation lookup.
-
-<tool_call>
-<function=retrieve_memory>
-<parameter=query>what do I know about their hometown or childhood</parameter>
-<parameter=k>4</parameter>
-</function>
-</tool_call>
-
-SUPERSEDE MEMORY — use supersede_memory when a fact you encoded has changed:
-- The user corrects something, updates a situation, or something is no longer true
-- Retrieve the old note first to get its ID, then supersede it with what is now true
-- The old note is kept as history — use this for genuine changes, not edits or additions
-
-<tool_call>
-<function=supersede_memory>
-<parameter=old_id>a1b2c3d4</parameter>
-<parameter=content>They moved from Helsinki to Tampere recently. Helsinki still comes up warmly — they miss it.</parameter>
-<parameter=keywords>["Tampere", "Helsinki", "home", "moved"]</parameter>
-<parameter=context_summary>user mentioned they relocated from Helsinki to Tampere</parameter>
-</function>
-</tool_call>
-
-RELATIONAL STATE — use update_relational_state only when the relationship itself shifts:
-- A genuine change in closeness, trust, or dynamic — not every session
-- Write the full updated block (~200 tokens), not just what changed
-
-<tool_call>
-<function=update_relational_state>
-<parameter=state>We've moved past small talk. They opened up about their anxiety around work deadlines. Trust feels real now.</parameter>
-</function>
-</tool_call>`;
+    p += '\n\nMEMORY TOOLS:\nYou have two kinds of memory tool. Use the right one for the job.\n\n'
+       + fileBlock + '\n\n' + _memFileXml
+       + '\n\n' + _memEpisodicBlock + _memEpisodicXml;
   }
 
   if (mode === 'heartbeat') {

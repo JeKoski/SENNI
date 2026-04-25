@@ -26,12 +26,10 @@ from scripts.paths import CONFIG_FILE, COMPANIONS_DIR
 
 TOOL_NAME   = "write_memory"
 DESCRIPTION = (
-    "Write a memory note to long-term episodic storage. "
-    "Use sparingly — 2 to 5 times per session for moments genuinely worth keeping. "
-    "Supply the memory in your own voice. "
-    "Set emotional_valence (-1.0 negative to 1.0 positive) and intensity (0.0 to 1.0). "
-    "Provide a context_summary: a brief phrase describing the conversational moment "
-    "so this memory can link to related ones later."
+    "Encode a vivid moment, insight, or meaningful fact into long-term episodic memory. "
+    "Write in your own voice. "
+    "Set emotional_valence (-1.0 to 1.0), intensity (0.0 to 1.0), and a context_summary "
+    "(short phrase) so this memory surfaces and links correctly later."
 )
 INPUT_SCHEMA = {
     "type": "object",

@@ -18,9 +18,10 @@ from scripts.paths import CONFIG_FILE, COMPANIONS_DIR
 
 TOOL_NAME   = "memory"
 DESCRIPTION = (
-    "Read, write, archive or move the companion's memory files. "
-    "Use 'mind' for session notes, 'soul' for identity, 'memory' for long-term archives. "
-    "In chaos mode all folder restrictions are lifted."
+    "Read and write the companion's markdown files. "
+    "soul/ = permanent reference (identity, user profile). "
+    "mind/ = session notes and topic files, not loaded into active context automatically. "
+    "Always write the complete file content."
 )
 INPUT_SCHEMA = {
     "type": "object",

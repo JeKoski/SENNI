@@ -143,9 +143,52 @@ Copying a companion folder between installs:
 
 ---
 
-## Session notes — 2026-04-24 #5 (Streaming fix, bugs, quick wins)
+## Session notes — 2026-04-26 (Quick wins + memory instruction rewrite)
 
-**Streaming-first architecture. 7 bugs/quick-wins closed.**
+**4 quick wins shipped. Memory system instructions fully rewritten.**
+
+### What changed
+
+**`static/js/wizard.js` — boot spinner delayed until TTS ready:**
+- Removed premature `ring.classList.add('done')` at llama-server ready signal. Ring now keeps spinning until `_markBootDone` fires (after TTS resolves, or immediately if TTS disabled). "Say Hello" button was already correctly delayed — only the ring flip was wrong.
+
+**`static/chat.html` + `static/css/messages.css` + `static/js/tts.js` + `static/js/chat-controls.js` — TTS stop button:**
+- Added `#tts-stop-btn` (amber ♪, distinct from red generation stop). Appears when TTS is fetching or playing, disappears when queue empties.
+- `_ttsUpdateStopBtn()` called at 4 state transitions: `_ttsEnqueue`, `_ttsDrainFetchQueue` end, `_ttsPlayNext` when queue empties, `ttsStop`.
+- `stopGeneration()` now also calls `ttsStop()` — pressing ■ kills both stream and audio.
+
+**`static/companion-wizard.html` — appearance step titles swapped:**
+- Eyebrow now static: "Step 02 — How do they look?". H1 gets the sub-step label ("Foundation", "Body", "Face", etc.) via `id="step2-heading"`. Removed `id="step2-eyebrow"` (no longer dynamic).
+
+**`static/companion-wizard.html` + `scripts/config.py` — avatar PNG normalization:**
+- `write_avatar_file` (config.py) now converts to PNG via Pillow (RGBA, `img.save(png)`). Falls back to original format if Pillow unavailable. All companion avatars now saved as `.png`.
+- `wizFinish` is now `async`. If no avatar uploaded, `_avatarFallbackPng()` renders the species silhouette SVG to a 512×512 canvas with species color + dark background, outputs PNG. Runs during compile animation — no visible delay.
+
+**`static/js/system-prompt.js` — full refactor + memory instruction rewrite:**
+- Shared semantic text extracted into `_buildMemFileBlock(rule2, agencyMode)` and `_memEpisodicBlock` constant. Gemma4 and generic paths no longer duplicate content — generic path appends `_memFileXml` + `_memEpisodicXml` on top of the same semantics.
+- `soul_edit_mode` config now wired into system prompt via `_memSoulBlock(agencyMode)`. Four modes (display names match Wizard): Settled (user_profile.md only), Reflective (+ self_notes.md), Adaptive (+ companion_identity.md), Unbound (full freedom).
+- Removed stale `Types: Fact (S) . Concept (N) . Vibe (F) . Logic (T)` — no `type` field in write_memory schema.
+- Removed numerical estimates from write_memory ("sparingly 2-5") — replaced with qualitative triggers.
+- `supersede_memory` added to episodic section header.
+- De-duplication rule added: one fact, one place.
+- `mind/` now described with topic file support (`mind/<topic>.md` for projects, collaborations).
+- Generic XML write_memory example no longer includes `<parameter=type>Fact</parameter>`.
+
+**`static/js/tool-parser.js` + `tools/memory.py` + `tools/write_memory.py` + `tools/retrieve_memory.py` — tool description updates:**
+- `memory`: positive framing, `mind/` "not loaded into active context automatically", `memory/` archive reference removed.
+- `write_memory`: dropped "sparingly 2-5", now "encode a vivid moment, insight, or meaningful fact".
+- `retrieve_memory`: tighter phrasing, same meaning.
+
+### Next session
+- Settings: Features tab (post-wizard reconfiguration)
+- Gemma4: observe console logs during real tool call session — debug logging is in place (Path F + plain reply log)
+- soul_edit_mode: verify branching works correctly for each mode in a real session
+
+---
+
+## Session notes — 2026-04-24 #6 (Senni template wiring + Gemma4 rescue)
+
+**Senni avatar wired. Gemma4 partial tool call rescue added.**
 
 ### What changed
 
@@ -230,31 +273,7 @@ Path F and debug logging are in place. Next step: observe console logs during a 
 
 ---
 
-## Session notes — 2026-04-24 #5 (Streaming fix, bugs, quick wins)
-
-**ChromaDB now installs into python-embed (embed mode). Diagnostics fixed. mmproj auto-fill fixed.**
-
-### What changed
-
-**`scripts/setup_router.py`:**
-- `_EXTRAS_INSTALL_MODE["memory"]` changed from `"target"` to `"embed"` — chromadb (like kokoro) has native extensions (`chromadb_rust_bindings`) that fail DLL loading when installed via `--target` on Windows. Embed mode keeps DLLs co-located. Rule: any extra with native extensions → embed mode.
-
-**`scripts/server.py` — sys.path/DLL patch expanded:**
-- Always adds `features/packages/` (safe even if dir missing)
-- In frozen mode: adds `python-embed/Lib/site-packages/` (where all embed-mode extras live)
-- In frozen mode: `os.add_dll_directory(PYTHON_EMBED_DIR)` so native extension DLLs are findable
-- In frozen mode: appends `python-embed/python*.zip` as low-priority stdlib fallback (fills gaps like `graphlib` that PyInstaller didn't collect because chromadb is in `excludes`)
-- `importlib.invalidate_caches()` after all path changes (required in frozen mode — path importer cache doesn't rescan new entries without it)
-
-**`senni-backend.spec`:**
-- Added `"graphlib"` and `"sqlite3"` / `"_sqlite3"` to `HIDDEN_IMPORTS` — stdlib C extensions PyInstaller won't collect unless explicitly listed
-
-**`scripts/memory_store.py`:**
-- `_ensure_chroma()`: logs actual import error (was silently returning False), adds `importlib.invalidate_caches()`, inserts python-embed site-packages into sys.path as belt-and-suspenders
-- Error message updated to "Install via Setup Wizard > Features" (was `pip install chromadb --break-system-packages`)
-
-**`scripts/diagnostics.py`:**
-- `_check_import("kokoro"/"chromadb")` replaced with `_check_extra(key, label)` — path-based detection matching setup_router logic. Frozen mode: checks `PYTHON_EMBED_DIR/Lib/site-packages/<pkg>`. Source mode: falls back to `import`. Was always failing in frozen mode because main process can't `import kokoro` (it lives in python-embed, not the frozen bundle's Python).
+## Session notes — 2026-04-24 #6 (removed — see git)
 
 **`static/js/wizard.js`:**
 - `_applyModelStatus`: when auto-selecting a downloaded model card, now also fills `mmprojPath` and enables multimodal if the model has a mmproj on disk. Previously only did this on user click, leaving mmproj unset when model was already downloaded.
