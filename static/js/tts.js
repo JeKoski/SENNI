@@ -110,6 +110,7 @@ let _ttsFetching    = false;
 
 function _ttsEnqueue(sentence) {
   _ttsFetchQueue.push(sentence);
+  _ttsUpdateStopBtn();
   if (!_ttsFetching) _ttsDrainFetchQueue();
 }
 
@@ -123,6 +124,7 @@ async function _ttsDrainFetchQueue() {
   }
 
   _ttsFetching = false;
+  _ttsUpdateStopBtn();
 }
 
 async function _ttsFetchAndQueue(sentence) {
@@ -181,6 +183,7 @@ function _ttsPlayNext() {
   if (_ttsQueue.length === 0) {
     _ttsPlaying = false;
     _ttsSource  = null;
+    _ttsUpdateStopBtn();
     return;
   }
 
@@ -217,6 +220,14 @@ function ttsStop() {
   _ttsFetching   = false;
   _ttsPlaying    = false;
   _ttsSentenceBuf = '';
+  _ttsUpdateStopBtn();
+}
+
+function _ttsUpdateStopBtn() {
+  const busy = _ttsFetching || _ttsPlaying || _ttsFetchQueue.length > 0;
+  if (typeof showTtsStopBtn === 'function') {
+    if (busy) showTtsStopBtn(); else hideTtsStopBtn();
+  }
 }
 
 // Called at the start of each new generation to reset buffers

@@ -851,7 +851,6 @@ function streamBootLog() {
     }
     if (data.ready) {
       es.close();
-      ring.classList.add('done'); ring.textContent = '\u2713'; ring.style.display = 'flex';
       const ok = document.createElement('div'); ok.className='log-ok'; ok.textContent='\u2713 Server is ready';
       logEl.appendChild(ok); logEl.scrollTop = logEl.scrollHeight;
       fetch('/api/setup/complete', { method: 'POST' }).catch(() => {});

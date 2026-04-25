@@ -437,6 +437,17 @@
   border-color: rgba(248,113,113,0.5);
   color: #f87171;
 }
+.tts-stop-btn {
+  background: rgba(251,191,36,0.1);
+  border-color: rgba(251,191,36,0.22);
+  color: rgba(251,191,36,0.7);
+  font-size: 15px;
+}
+.tts-stop-btn:hover {
+  background: rgba(251,191,36,0.2);
+  border-color: rgba(251,191,36,0.4);
+  color: #fbbf24;
+}
 
 /* ── Message controls (hover-reveal) ─────────────────────────────────────── */
 .msg-controls {

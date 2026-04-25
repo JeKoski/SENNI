@@ -12,6 +12,7 @@ function stopGeneration() {
     _hbAbortCtrl.abort();
     _hbAbortCtrl = null;
   }
+  if (typeof ttsStop === 'function') ttsStop();
 }
 
 function showStopButton() {
@@ -26,6 +27,16 @@ function hideStopButton() {
   const stop = document.getElementById('stop-btn');
   if (send) send.style.display = 'flex';
   if (stop) stop.style.display = 'none';
+}
+
+function showTtsStopBtn() {
+  const btn = document.getElementById('tts-stop-btn');
+  if (btn) btn.style.display = 'flex';
+}
+
+function hideTtsStopBtn() {
+  const btn = document.getElementById('tts-stop-btn');
+  if (btn) btn.style.display = 'none';
 }
 
 // ── Message controls ──────────────────────────────────────────────────────────
