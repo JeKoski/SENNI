@@ -11,6 +11,7 @@ let companionName       = 'Companion';
 let _soulFiles          = {};
 let _memoryContext      = '';
 let _activeToolIndicators = {};
+let _memorySurfacedCount  = 0;
 
 // Tab state (used by chat-tabs.js)
 let _tabs        = [];
@@ -30,6 +31,12 @@ let _contextTokens = 0;
 // "generic" — Everything else (Qwen, Llama, Mistral, etc.): XML tool
 //             instructions in system prompt; [Tool results] user turn.
 let modelFamily = "generic";
+
+// ── Orb mode ──────────────────────────────────────────────────────────────────
+function setOrbMode(mode) {
+  document.body.classList.remove('orb-mode-chat', 'orb-mode-header');
+  document.body.classList.add(mode === 'header' ? 'orb-mode-header' : 'orb-mode-chat');
+}
 
 function _detectModelFamily(modelPath) {
   if (!modelPath) return "generic";
@@ -72,6 +79,10 @@ function _applyMoodToOrb(moodName) {
       orb.applyPreset(preset, null);
     }
     if (typeof moodPill !== 'undefined') moodPill.update(null);
+    document.documentElement.style.removeProperty('--active-mood-color');
+    document.documentElement.style.removeProperty('--active-mood-color-hi');
+    if (typeof updateSidebarMoodStrip === 'function') updateSidebarMoodStrip(null, null);
+    if (typeof updateChatHeader === 'function') updateChatHeader(companionName, null, _memorySurfacedCount);
     return;
   }
 
@@ -118,6 +129,11 @@ function _applyMoodToOrb(moodName) {
     const edgeColor = flat.edgeColor || dotColor;
     moodPill.update(moodName, dotColor, edgeColor);
   }
+
+  const moodColor = flat.edgeColor || flat.glowColor || flat.dotColor || '#818cf8';
+  document.documentElement.style.setProperty('--active-mood-color', moodColor);
+  if (typeof updateSidebarMoodStrip === 'function') updateSidebarMoodStrip(moodName, moodColor);
+  if (typeof updateChatHeader === 'function') updateChatHeader(companionName, moodName, _memorySurfacedCount);
 }
 
 // ── Image lightbox ────────────────────────────────────────────────────────────

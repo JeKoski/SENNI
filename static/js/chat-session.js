@@ -23,12 +23,13 @@ function setupToolCallHandler() {
     if (status === 'loading') {
       const id = 'tool-' + Date.now();
       const el = appendToolIndicator(name, args, id);
-      _activeToolIndicators[id] = el;
-      el._toolId = id;
+      _activeToolIndicators[id] = el; // may be null for hidden tools
+      if (el) el._toolId = id;
     } else if (status === 'done') {
       const entries = Object.entries(_activeToolIndicators);
       for (let i = entries.length - 1; i >= 0; i--) {
         const [id, el] = entries[i];
+        if (!el) { delete _activeToolIndicators[id]; continue; }
         if (el.dataset.toolName === name) {
           markToolIndicatorDone(el, result);
           delete _activeToolIndicators[id];
@@ -106,6 +107,7 @@ async function loadStatus() {
     if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(_markdownEnabled);
 
     modelFamily = _detectModelFamily(config.model_path || '');
+    setOrbMode(config.orb_mode || 'chat');
     console.log(`[chat] model family: ${modelFamily} (${config.model_path?.split(/[/\\]/).pop() || 'unknown'})`);
 
     renderToolPills(tools);
@@ -334,6 +336,8 @@ async function reloadMemoryContext() {
     const data = await res.json();
     if (data.ok && data.session_context) {
       _memoryContext = data.session_context;
+      _memorySurfacedCount = data.note_count || 0;
+      if (typeof updateChatHeader === 'function') updateChatHeader(companionName, config.active_mood || null, _memorySurfacedCount);
       console.log('[memory] session context loaded,', data.note_count, 'notes in store');
       setTimeout(() => {
         if (typeof onMemorySurface === 'function') onMemorySurface('');

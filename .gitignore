@@ -37,3 +37,5 @@ build/
 dist/
 
 python-embed/
+
+static/style-rulebook/

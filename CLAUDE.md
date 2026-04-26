@@ -143,6 +143,77 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-26 #2 (Main Chat UI Redesign — all 10 steps + polish)
+
+**UI redesign complete. All steps 1–10 shipped + visual polish pass.**
+
+### What changed
+
+**`static/css/base.css` — Steps 1–5, 10 + polish:**
+- Full token system (surface tiers, border tiers, elevation presets, glow vars, spacing, radii, motion vars)
+- 3-gradient body ambient, sidebar sunken bg
+- Sidebar: portrait card (name moved BELOW frame with overlap + shadow), mood strip, chats ⚙ menu, 2-pill footer
+- Sidebar gradient: two-layer (horizontal dark-left/light-right + vertical top/bottom)
+- Chat header strip: companion name + meta, mood sphere, ⋯ btn, header ⋯ menu
+- Orb mode system: `body.orb-mode-chat` / `body.orb-mode-header`; Mode B CSS stub
+- `--active-mood-color` CSS var on `:root` — set by `_applyMoodToOrb()`
+- `chat-header-sphere` uses `color-mix()` for dynamic mood color
+- `.chat-area::before` subtle 60px grid overlay (`rgba(140,145,220,0.028)`)
+- Global `:focus-visible` ring; `#msg-input:focus-visible` excluded (input-wrap handles it)
+- Composer padding bumped to 72px horizontal
+
+**`static/css/messages.css` — Steps 6–7, 9–10 + polish:**
+- Companion bubble: `rgba(255,255,255,0.025)` bg, `--border-subtle`, left-edge 2px/70% halo
+- User bubble: indigo/purple gradient, inner highlight, drop shadow
+- `.msg-row` animation: `var(--dur-slow) var(--ease-out-soft)` + `body.perf-mode` kill
+- `.bubble { position: relative }` for `::before` halo
+- Companion `em`: Lora serif, `rgba(221,225,240,0.6)` (muted, not link-blue)
+- Tab active: left-edge indigo stripe via `::before`; `.tab-content` + `.tab-preview` for two-line tabs
+- `.msg-orb`: 32px sphere, `margin-top: 18px` (visually centred in bubble body)
+- `.day-marker` pill; `.retrieve` CSS variant for retrieve_memory tool indicator
+- `.msg-ctrl-btn`: `--elev-1` + `--r-xs`
+
+**`static/chat.html`:**
+- Companion name moved outside `.avatar` div — now a sibling `<div class="companion-name">` below the frame
+- Chats ⋯ replaced with ⚙; Export ↑ / Import ↓ icons corrected
+
+**`static/js/chat.js`:**
+- `_memorySurfacedCount` state var; `setOrbMode(mode)`
+- `_applyMoodToOrb`: sets `--active-mood-color` on `:root`, calls `updateSidebarMoodStrip` + `updateChatHeader`
+
+**`static/js/chat-session.js`:**
+- `loadStatus`: `setOrbMode(config.orb_mode || 'chat')`
+- `reloadMemoryContext`: sets `_memorySurfacedCount`, calls `updateChatHeader`
+
+**`static/js/chat-ui.js`:**
+- `updateContextBar`: className reset preserves `ctx-token-fill` (was stripping it)
+
+**`static/js/chat-controls.js`:**
+- `toggleHeaderMenu` / `closeHeaderMenu`, `toggleChatsMenu` / `closeChatsMenu`
+- `openMemoryManager()` stub; `updateChatHeader()`, `updateSidebarMoodStrip()`
+
+**`static/js/message-renderer.js`:**
+- `.msg-orb` injected in `appendMessage`, `_createStreamBubble`, `_appendHeartbeatMessage`
+- `_HIDDEN_TOOLS`: `set_mood`, `memory`, `update_relational_state` → null (hidden)
+- `_toolDisplayName()`, updated `_toolLabel()`, null guard in `markToolIndicatorDone`
+
+**`static/js/chat-tabs.js`:**
+- `_saveCurrentTabState`: captures `tab.preview` from last message
+- `renderTabList`: two-line tab items with `.tab-preview` span
+
+**`static/js/api.js`:**
+- Thinking block duplication fixed: `onThinking` moved inside inline `<think>` extraction block only — streaming `delta.reasoning_content` path already called it live, second call was the dupe
+
+### Next session
+- Settings: Features tab (post-wizard reconfiguration)
+- Attachments bug: images not appearing in bubbles, AI not seeing them (pre-existing)
+- Context bar: verify fill/label visible in live session
+- Orb Mode B: test with `config.orb_mode = 'header'`
+- Performance mode toggle in Settings (CSS hooks in place)
+- soul_edit_mode: verify branching works for each mode
+
+---
+
 ## Session notes — 2026-04-26 (Quick wins + memory instruction rewrite)
 
 **4 quick wins shipped. Memory system instructions fully rewritten.**
@@ -192,57 +263,6 @@ Copying a companion folder between installs:
 
 ### What changed
 
-**`static/js/api.js` — streaming-first architecture:**
-- `callModel` now streams every round (`stream: true`). No probe fetch, no double-fetch.
-- `_streamFinalReply` → `_streamRound`: streams live into provisional bubble + TTS, returns `{text, thinkContent, structuredCalls, finishReason, bubbleHandle}` without finalizing.
-- Tool call detection happens post-stream. Tool call rounds: `ttsStop()` + remove provisional bubble. Plain reply: `_finaliseStreamBubble()` + `ttsEndGeneration()`.
-- Path A structured tool_calls now accumulated from `delta.tool_calls` during streaming (was only available from non-streaming `choice.message.tool_calls`).
-- Root cause of both streaming bugs: double-fetch caused second request to fail intermittently → one-chunk fallback + TTS left in dirty state. Now eliminated.
-
-**`static/js/chat-controls.js` — pre-existing duplicate bubble bug:**
-- Regenerate and edit-resend now check `streamWasRendered()` before calling `appendMessage` — was adding a second bubble when streaming worked.
-
-**`scripts/setup_router.py` + `static/js/wizard.js` — cancel model download:**
-- `_download_to_queue`: writes to `.tmp` file, renames on success, deletes on cancel/error. Partial files no longer left at real dest path.
-- `cancel_event` (threading.Event) passed to download thread; generator polls `request.is_disconnected()` every 1s and signals cancellation.
-- `cancelModelDownload()`: restores card's hidden dl-btn + mm section so card UI fully resets.
-
-**`static/css/base.css` + `static/js/chat-session.js` — offline indicator:**
-- `.is-offline` CSS class: red static dot (ripple circle hidden), muted red text color.
-- `_setOnlineIndicator(bool)`: called from `loadStatus()` after `config.model_running` is set, and from `watchBootLog` on ready event.
-
-**`static/css/base.css` — default sidebar avatar:**
-- `.avatar` background changed from solid `linear-gradient(135deg, #6366f1, #7c3aed)` to `rgba(129,140,248,0.12)` — matches orb body. Image avatars unaffected (`object-fit:cover`).
-
-**`static/wizard.html` + `static/css/wizard.css` + `static/js/wizard.js` + `scripts/setup_router.py` — Features install UX:**
-- Indeterminate progress bar: `fill.classList.add('indeterminate')` sets width 100% with `transition: none`. Existing `::after` shimmer sweep runs. Removed on done/error.
-- Live pip log: `#extras-pip-log` div appended to extras step. `_run_pip` reads `proc.stdout` line-by-line, pushes `{"type":"log","line":"..."}` events. Backend queue loop changed from single `queue.get()` to a proper while-loop. `_streamPost` gains optional `onLog` 8th param.
-
-### Bugs fixed / closed
-
-| Item | Fix |
-|------|-----|
-| Chat: message arrives as one chunk | Streaming-first — no second request to fail |
-| TTS skips / huge chunks | `ttsEndGeneration` now always called on plain reply |
-| Regenerate/edit: duplicate bubble | `streamWasRendered()` check added to chat-controls.js |
-| Cancel download bricks UI | Temp files + cancel event + card UI reset |
-| Offline indicator always green | `_setOnlineIndicator()` wired to `loadStatus` + boot-ready |
-| Sidebar avatar solid purple placeholder | Transparent background matching orb |
-| Features install: static bar | Indeterminate shimmer + live pip log |
-
-### Next session
-- Quick wins batch: boot spinner until TTS ready, TTS stop button, wizard appearance step titles, wizard avatar PNG normalization
-- Settings Features tab (post-wizard reconfiguration)
-- Gemma tool call continuation: review console logs from Path F to determine if format mismatch is the root cause
-
----
-
-## Session notes — 2026-04-24 #6 (Senni template wiring + Gemma4 rescue)
-
-**Senni avatar wired. Gemma4 partial tool call rescue added.**
-
-### What changed
-
 **`scripts/setup_router.py` — auto-install Senni template:**
 - `instantiate_companion_template("senni", "senni")` called in `GET /api/setup/status` — no-op if folder already exists
 - `"senni_companion": bool` added to status response
@@ -273,70 +293,6 @@ Path F and debug logging are in place. Next step: observe console logs during a 
 
 ---
 
-## Session notes — 2026-04-24 #6 (removed — see git)
-
-**`static/js/wizard.js`:**
-- `_applyModelStatus`: when auto-selecting a downloaded model card, now also fills `mmprojPath` and enables multimodal if the model has a mmproj on disk. Previously only did this on user click, leaving mmproj unset when model was already downloaded.
-
-### Bugs fixed
-
-| Bug | Fix |
-|-----|-----|
-| ChromaDB always "not installed" | sys.path patch ran before dir existed + no `invalidate_caches()` |
-| chromadb import: `No module named 'chromadb'` | `invalidate_caches()` missing in frozen mode |
-| chromadb import: `No module named 'graphlib'` | Added stdlib zip fallback + graphlib to hidden imports |
-| chromadb import: `_sqlite3` missing | Added sqlite3/_sqlite3 to hidden imports |
-| chromadb import: DLL load failed (rust bindings) | Switched to embed mode; `os.add_dll_directory` for python-embed |
-| Diagnostics always failing for kokoro/chromadb | Replaced import-based check with path-based `_check_extra()` |
-| mmproj not auto-set on wizard re-run | `_applyModelStatus` now fills mmprojPath when auto-selecting downloaded card |
-
-### Status
-ChromaDB install pending final smoke test (switching to embed mode requires reinstall). TTS confirmed working end-to-end from previous session.
-
-### Next session
-- Verify ChromaDB smoke test (embed mode install + memory system init)
-- Begin working through BACKLOG bugs (streaming, bubbles, tab order, mood pill save)
-- Settings: Features tab design
-- espeak bundling
-
----
-
-## Session notes — 2026-04-24 #3 (Bug fixes — mood pill, bubbles, TTS chunking, wizard orb)
-
-**5 isolated bugs fixed. ChromaDB smoke test confirmed working (user). Phase B next.**
-
-### What changed
-
-**`scripts/settings_router.py`:**
-- GET `/api/settings`: added `mood_pill_visibility` to response (was missing — UI always fell back to `'always'`)
-- POST `/api/settings/companion` allowlist: added `mood_pill_visibility` (was never written to config)
-
-**`static/css/base.css`:**
-- Added `::before { content:''; flex:1; }` on `.messages` — pushes bubbles/pills to bottom when few messages exist; spacer shrinks to 0 on overflow so scrolling still works
-
-**`static/js/tts.js`:**
-- `_TTS_SENTENCE_RE`: changed `(?:\s|$)` → `\s+` — requires real whitespace after punctuation, not end-of-buffer. Fixes false mid-token splits when streaming delivers `filename.` before the rest of the extension arrives. End-of-stream remainder handled by `_ttsFlushBuffer()`
-
-**`scripts/tts_server.py`:**
-- Added `_humanise_inline_code()` — strips backticks, replaces underscores with spaces, expands file extensions (`.md` → ` dot md`)
-- `strip_markdown()` now calls `_humanise_inline_code()` before the `_MD_RULES` pass instead of silently dropping inline code
-
-**`static/companion-wizard.html`:**
-- `_buildReview()`: review step orb (`#review-avatar-icon`) now uses `_getSilhouette()` with species color instead of emoji
-- `wizFinish()`: compile overlay orb (`#compile-orb-icon`) now uses `_getSilhouette()` with species color instead of emoji
-
-### Bugs fixed
-
-| Bug | Fix |
-|-----|-----|
-| Mood pill visibility not saving | Missing field in GET response + POST allowlist |
-| Chat bubbles/pills anchor to top | `::before` flex spacer in `.messages` |
-| TTS splits mid-filename (e.g. `file.md`) | Regex requires whitespace, not end-of-buffer |
-| TTS silently drops inline code | Humanization pass: underscores→spaces, `.ext`→"dot ext" |
-| Wizard review/compile orb shows emoji | Wired `_getSilhouette()` with species color into both |
-
----
-
 ## Design folder
 
 Large design decisions live in `design/` as standalone docs. These are NOT loaded into context automatically — search project knowledge when you need them.
@@ -353,6 +309,7 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 | `design/COMPANION_STACK.md` | Cognitive function stack format, O+J axis pairing, charge as directionality, stack position as probability.                         |
 | `design/ORB_DESIGN.md`      | Orb positioning, layout modes, CSS variable documentation                                                                           |
 | `design/MOOD.md`            | Mood system — full design + implementation notes. Config schema, default moods, orb schema translation.                             |
+| `design/UI-REDESIGN.md`     | Main chat UI redesign — full spec: token system, sidebar, header, orb modes, bubbles, composer, tool call polish, impl order.       |
 | `design/SETUP_WIZARD.md`    | Setup wizard — step flow, GPU→binary mapping, animation principles, backend endpoints needed.                                       |
 | `design/WIZARD.md`          | Companion Creation Wizard — V2 character card format, Birth Certificate architecture, step flow, appearance sub-steps.              |
 | `design/CHARA_CARD.md`      | Chara card V2 field reference, SENNI alignment, soul file best practices, first_mes, system_prompt, character_book/lorebook design. |
