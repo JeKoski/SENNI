@@ -27,11 +27,9 @@ from scripts.paths import CONFIG_FILE
 
 TOOL_NAME   = "retrieve_memory"
 DESCRIPTION = (
-    "Deliberately recall memories related to a topic or query. "
-    "Use when you want to surface something you may have encoded previously — "
-    "a fact about the user, a pattern you noticed, a moment that felt significant. "
-    "Returns the most relevant notes from long-term storage. "
-    "You do not need to call this for things already in the current conversation."
+    "Recall memories related to a topic or query — use when you might have encoded "
+    "something relevant that isn't in the current conversation. "
+    "Returns the most semantically similar notes from long-term storage."
 )
 INPUT_SCHEMA = {
     "type": "object",

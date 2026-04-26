@@ -480,8 +480,8 @@
 
   <!-- ════ STEP 2 — Appearance ════ -->
   <div class="wiz-step" id="step-2">
-    <div class="step-eyebrow" id="step2-eyebrow">Step 02 &mdash; Foundation</div>
-    <h1 class="step-heading">How do they look?</h1>
+    <div class="step-eyebrow">Step 02 &mdash; How do they look?</div>
+    <h1 class="step-heading" id="step2-heading">Foundation</h1>
     <p class="step-sub" id="step2-sub">Start with the basics.</p>
 
     <div class="appearance-layout">
@@ -1397,7 +1397,7 @@ function _updateNav() {
   if (_step === 9) _buildReview();
   if (_step === 2) {
     const meta = SUB_META[_subStep - 1];
-    document.getElementById('step2-eyebrow').textContent = 'Step 02 \u2014 ' + meta.label;
+    document.getElementById('step2-heading').textContent = meta.label;
     document.getElementById('step2-sub').textContent = meta.sub;
   }
   _checkReady();
@@ -1434,7 +1434,38 @@ function wizBack() {
   }
 }
 
-function wizFinish() {
+async function _avatarFallbackPng() {
+  try {
+    const species    = _data.appearance?.species;
+    const cssColor   = SPECIES_COLOURS[species] || 'var(--indigo)';
+    const color      = cssColor.startsWith('var(')
+      ? (getComputedStyle(document.documentElement).getPropertyValue(cssColor.slice(4, -1).trim()).trim() || '#6366f1')
+      : cssColor;
+    const svgStr = _getSilhouette()
+      .replace(/currentColor/g, color)
+      .replace(/class="wiz-silhouette"\s*/g, '')
+      .replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" ');
+    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    return await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgb(15,15,28)';
+        ctx.fillRect(0, 0, 512, 512);
+        ctx.drawImage(img, 0, 0, 512, 512);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  } catch { return null; }
+}
+
+async function wizFinish() {
   const name = _data.personality.name || 'them';
   const icon = SPECIES_EMOJI[_data.appearance?.species] || '\u2736';
   const LINES = [
@@ -1532,6 +1563,11 @@ function wizFinish() {
       document.getElementById('compile-final').classList.add('visible');
     }, 380);
   }, shakeAt + 1500);
+
+  // Generate silhouette PNG fallback if no avatar was uploaded
+  if (!_data.review.avatarData) {
+    _data.review.avatarData = await _avatarFallbackPng();
+  }
 
   // POST to /api/wizard/compile during the animation
   fetch('/api/wizard/compile', {

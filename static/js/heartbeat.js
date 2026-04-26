@@ -314,6 +314,9 @@ function _appendHeartbeatMessage(text, trigger) {
   const list = document.getElementById('messages');
   const row  = document.createElement('div');
   row.className = 'msg-row companion heartbeat-msg';
+  const msgOrb = document.createElement('div');
+  msgOrb.className = 'msg-orb';
+  row.appendChild(msgOrb);
   const wrap   = document.createElement('div');
   const bubble = document.createElement('div');
   bubble.className       = 'bubble heartbeat-bubble';

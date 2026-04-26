@@ -12,6 +12,7 @@ function stopGeneration() {
     _hbAbortCtrl.abort();
     _hbAbortCtrl = null;
   }
+  if (typeof ttsStop === 'function') ttsStop();
 }
 
 function showStopButton() {
@@ -26,6 +27,16 @@ function hideStopButton() {
   const stop = document.getElementById('stop-btn');
   if (send) send.style.display = 'flex';
   if (stop) stop.style.display = 'none';
+}
+
+function showTtsStopBtn() {
+  const btn = document.getElementById('tts-stop-btn');
+  if (btn) btn.style.display = 'flex';
+}
+
+function hideTtsStopBtn() {
+  const btn = document.getElementById('tts-stop-btn');
+  if (btn) btn.style.display = 'none';
 }
 
 // ── Message controls ──────────────────────────────────────────────────────────
@@ -213,6 +224,80 @@ function editMessage(row, role) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirm(); }
     if (e.key === 'Escape') cancel();
   });
+}
+
+// ── Header + chats menu toggles ───────────────────────────────────────────────
+function toggleHeaderMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('chat-header-menu');
+  if (!menu) return;
+  menu.classList.toggle('open');
+  if (menu.classList.contains('open')) {
+    document.addEventListener('click', closeHeaderMenu, { once: true });
+  }
+}
+function closeHeaderMenu() {
+  document.getElementById('chat-header-menu')?.classList.remove('open');
+}
+
+function toggleChatsMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('chats-menu');
+  if (!menu) return;
+  menu.classList.toggle('open');
+  if (menu.classList.contains('open')) {
+    document.addEventListener('click', closeChatsMenu, { once: true });
+  }
+}
+function closeChatsMenu() {
+  document.getElementById('chats-menu')?.classList.remove('open');
+}
+
+function openMemoryManager() {
+  const existing = document.getElementById('memory-manager-modal');
+  if (existing) { existing.remove(); return; }
+  const modal = document.createElement('div');
+  modal.id = 'memory-manager-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border-default);border-radius:var(--r-lg);padding:var(--sp-7);max-width:460px;width:90%;box-shadow:var(--elev-4);text-align:center">
+      <div style="font:400 22px/1.2 'Lora',serif;color:var(--text-bright);margin-bottom:var(--sp-3)">Memory Manager</div>
+      <p style="font-size:13.5px;color:var(--text-muted);line-height:1.6;margin-bottom:var(--sp-6)">Browse, edit, and manage soul files, mind notes, and episodic memory.</p>
+      <div style="display:inline-flex;align-items:center;gap:var(--sp-2);padding:8px 18px;background:var(--surface-sunken);border:1px solid var(--border-subtle);border-radius:var(--r-pill);font:400 11px/1 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)">Coming soon</div>
+      <div style="margin-top:var(--sp-6)"><button onclick="document.getElementById('memory-manager-modal').remove()" style="background:none;border:1px solid var(--border-default);border-radius:var(--r-md);color:var(--text-muted);font:400 13px/1 'DM Sans',sans-serif;padding:9px 22px;cursor:pointer">Close</button></div>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+// ── Chat header population ────────────────────────────────────────────────────
+function updateChatHeader(name, moodName, memoryCount) {
+  const nameEl = document.getElementById('chat-header-name');
+  const metaEl = document.getElementById('chat-header-meta');
+  if (nameEl && name) nameEl.textContent = name;
+  if (metaEl) {
+    const parts = [];
+    if (moodName) parts.push(`<em>${moodName}</em>`);
+    if (memoryCount != null && memoryCount > 0) parts.push(`${memoryCount} memories surfaced`);
+    metaEl.innerHTML = parts.join(' · ') || '&nbsp;';
+  }
+}
+
+function updateSidebarMoodStrip(moodName, moodColor) {
+  const strip  = document.getElementById('sidebar-mood-strip');
+  const dot    = document.getElementById('sidebar-mood-dot');
+  const label  = document.getElementById('sidebar-mood-name');
+  if (!strip) return;
+  if (moodName) {
+    strip.style.display = 'flex';
+    if (label) label.textContent = moodName;
+    if (dot && moodColor) {
+      dot.style.background = moodColor;
+      dot.style.boxShadow  = `0 0 8px ${moodColor}`;
+    }
+  } else {
+    strip.style.display = 'none';
+  }
 }
 
 // ── Vision mode ask prompt ────────────────────────────────────────────────────

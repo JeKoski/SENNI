@@ -77,6 +77,11 @@ function appendMessage(role, text) {
   const list = document.getElementById('messages');
   const row  = document.createElement('div');
   row.className = `msg-row ${role}`;
+  if (role === 'companion') {
+    const msgOrb = document.createElement('div');
+    msgOrb.className = 'msg-orb';
+    row.appendChild(msgOrb);
+  }
   const bubble = document.createElement('div');
   bubble.className       = 'bubble';
   bubble.dataset.rawText = text;
@@ -152,16 +157,21 @@ function sealThinkingBlock() {
 }
 
 // ── Tool indicators ───────────────────────────────────────────────────────────
+// Tools hidden from the chat UI by default
+const _HIDDEN_TOOLS = new Set(['set_mood', 'memory', 'update_relational_state']);
+
 function appendToolIndicator(name, args, id) {
+  if (_HIDDEN_TOOLS.has(name)) return null;
   const list = document.getElementById('messages');
   const el   = document.createElement('div');
-  el.className        = 'tool-indicator loading';
+  const isRetrieve = (name === 'retrieve_memory');
+  el.className        = 'tool-indicator loading' + (isRetrieve ? ' retrieve' : '');
   el.dataset.toolName = name;
   el.id = id;
   el.innerHTML = `
     <div class="tool-spinner"></div>
     ${TOOL_ICON}
-    <span class="tool-name">${name}</span>
+    <span class="tool-name">${_toolDisplayName(name)}</span>
     <span class="tool-desc">${_toolLabel(name, args)}</span>
     <span class="tool-status">running…</span>`;
   list.appendChild(el);
@@ -170,12 +180,21 @@ function appendToolIndicator(name, args, id) {
 }
 
 function markToolIndicatorDone(el, result) {
+  if (!el) return;
   el.classList.remove('loading');
   el.classList.add('done');
   const spinner = el.querySelector('.tool-spinner');
   if (spinner) spinner.outerHTML = '<span class="tool-done-dot"></span>';
   const status = el.querySelector('.tool-status');
   if (status) status.textContent = 'done';
+
+  // For retrieve_memory, update desc with result summary
+  if (el.dataset.toolName === 'retrieve_memory' && result) {
+    const desc = el.querySelector('.tool-desc');
+    const firstLine = result.split('\n').find(l => l.trim()) || result;
+    if (desc) desc.textContent = firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '');
+  }
+
   el.style.cursor = 'pointer';
   el.title = result ? result.slice(0, 200) : '';
   el.onclick = () => el.classList.toggle('expanded');
@@ -187,13 +206,28 @@ function markToolIndicatorDone(el, result) {
   }
 }
 
+function _toolDisplayName(name) {
+  const map = {
+    write_memory:           'Memory',
+    retrieve_memory:        'Memory',
+    supersede_memory:       'Memory',
+    update_relational_state:'Memory',
+    web_search:             'Web Search',
+    web_scrape:             'Web',
+    get_time:               'Time',
+    set_mood:               'Mood',
+    memory:                 'File',
+  };
+  return map[name] || name;
+}
+
 function _toolLabel(name, args) {
-  if (name === 'memory') {
-    if (args.action === 'write')   return `writing ${args.folder}/${args.filename || '?'}`;
-    if (args.action === 'read')    return `reading ${args.folder}/${args.filename || '?'}`;
-    if (args.action === 'list')    return `listing ${args.folder}/`;
-    if (args.action === 'archive') return `archiving ${args.filename || '?'}`;
+  if (name === 'write_memory') {
+    const summary = args.context_summary || (args.content || '').slice(0, 40);
+    return `+ Saved to ${summary || '…'}`;
   }
+  if (name === 'retrieve_memory') return `◦ Recalling "${(args.query || '').slice(0, 40)}"`;
+  if (name === 'supersede_memory') return '↺ Updated memory';
   if (name === 'web_search') return `"${(args.query || '').slice(0, 40)}"`;
   if (name === 'web_scrape') return (args.url || '').slice(0, 50);
   if (name === 'get_time')   return 'current time';

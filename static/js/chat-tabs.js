@@ -502,6 +502,9 @@ function _saveCurrentTabState() {
   if (!tab) return;
   tab.history  = conversationHistory;
   tab.messages = _serializeMessages();
+  // Capture plain-text preview from last non-empty message
+  const last = [...conversationHistory].reverse().find(m => typeof m.content === 'string' && m.content.trim());
+  tab.preview = last ? last.content.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
 }
 
 function _serializeMessages() {
@@ -633,7 +636,10 @@ function renderTabList() {
     el.className = 'tab-item' + (tab.id === _activeTabId ? ' active' : '');
     el.dataset.id = tab.id;
     el.innerHTML = `
-      <span class="tab-title" title="${_esc(tab.title)}">${_esc(tab.title)}</span>
+      <div class="tab-content">
+        <span class="tab-title" title="${_esc(tab.title)}">${_esc(tab.title)}</span>
+        ${tab.preview ? `<span class="tab-preview">${_esc(tab.preview)}</span>` : ''}
+      </div>
       <button class="tab-menu" onclick="_openTabMenu('${tab.id}',event)" title="Options">⋯</button>`;
     el.onclick = () => switchTab(tab.id);
     list.appendChild(el);

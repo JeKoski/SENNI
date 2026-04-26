@@ -7,6 +7,19 @@ Update at end of each session. Completed items get deleted, not struck through.
 
 ## High Priority
 
+### Main Chat UI Redesign — ✓ COMPLETE (2026-04-26)
+
+All 10 implementation steps done. See `design/UI-REDESIGN.md`. Branch: `claude/dreamy-saha-5855c2`.
+
+**Remaining polish / follow-ups:**
+- Orb Mode B (full orb in header): CSS stub in place, needs real testing with a live companion — low priority
+- Settings windows redesign: adopt new tokens/elevation (after Settings Features tab is added)
+- Memory Manager panel: stub "coming soon" modal in place; full implementation is a future design session
+- Performance mode toggle in Settings: CSS hooks (`body.perf-mode`) in place, just need the Settings toggle UI
+- Tool call "Show technical details" Settings toggle: hide logic in place, toggle UI not yet built
+
+---
+
 ### Packaging-oriented modular refactor
 
 Goal: reduce packaging risk before PyInstaller + Tauri by shrinking the biggest hotspots, making runtime/resource boundaries explicit, and keeping behaviour stable while structure improves.
@@ -118,6 +131,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ## Bugs
 
+- **Thinking pills duplicated after final response** — thinking pill appears once during streaming, then duplicates when the final response is rendered. Likely the provisional bubble's think content isn't cleaned up before the final bubble is inserted.
 - **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks (no closing `<tool_call|>`); `stripGemma4Artifacts()` cleans trailing artifacts before display. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging now in place — check browser console on next occurrence to determine actual rawText format and whether it's a prose-before-call issue or format mismatch.
 
 
@@ -128,18 +142,16 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 *Ready to build — no design conversation needed.*
 
 - **Senni app icon** — design and add an icon for the binary (`.ico` for Windows PyInstaller spec), wizard header, and elsewhere in the UI. Needs design conversation for the visual; wiring into the spec is straightforward once an `.ico` exists.
-- **Setup: Boot spinner stays active until TTS ready** — on the boot step ("Bringing your companion online"), the spinner flips to ✓ as soon as llama-server is ready, but TTS service can take several more seconds to load. Keep the spinner running and delay showing the "Say Hello →" button until TTS also reports ready (or a short grace-period timeout if TTS is disabled/unavailable). Prevents the user clicking through before voice is usable.
 - **Setup: Manual path entry for features** — add optional path fields to the Features step for users who already have kokoro/chromadb installed globally or in a custom location. Entering a path should skip the local install and let setup boot TTS/memory cleanly. Also add a "skip, I'll configure later" option so setup can complete without installing.
 - **Settings: Features tab** — new tab in Settings consolidating all optional-feature paths and status. Should include: TTS enable/python path/espeak path/voice path (currently scattered), ChromaDB enable/packages path, per-feature reinstall/detect buttons. Goal: full post-wizard reconfiguration without re-running setup.
-- **TTS: Stop button for current generation** — add a stop/cancel button that appears while TTS is generating for a message. Aborts the in-flight `/api/tts/speak` request and stops any playback.
 - **Mood → TTS override UI** — speed/blend per mood in Companion Settings Mood tab. Schema already in config, just needs UI. See `design/TTS.md`.
 - **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`.
 - **Mid-session gap detection** — long idle → re-inject updated timestamp into system prompt. Piggyback on consolidation idle timer. Low priority.
 - **Tool settings UI** — global enable/disable per tool + per-companion overrides. Settings > Tools tab. See `design/FEATURES.md`.
+- **Performance mode toggle** — setting that reduces CPU/GPU load for lower-end hardware. Disables orb animations (glow/particle effects become static), disables CSS transitions where possible, potentially reduces polling frequency. Toggle location TBD (Settings > Display, or quick-access in UI). Context: i5-7600K hits 20-30% CPU just from orb animation + TTS. Should be usable on modest hardware without a gaming rig.
+- **Tool call visual polish** — replace raw syntax in chat with end-user-friendly display. Hide mood/set_mood calls entirely. For memory writes: show a subtle confirmation ("Memory saved"). For memory recalls: show something about the retrieved content (exact design TBD — needs design thought). Add Settings toggle to show full technical details (current raw view) for power users; when enabled, also surface normally-hidden info like full memory save/recall payloads from the log.
 - **llama-server args drift** — launch args in `server.py` may have drifted from current llama.cpp API. Needs a pass against current docs.
 - **Import QA round-trip** — ongoing edge case testing as real use surfaces issues.
-- **Companion Wizard appearance step titles** — swap subtitle/heading order. Currently: small="Step 02 - face", large="How do they look?". Should be: small="Step 02 - How do they look?", large="Face". Apply to all appearance sub-steps.
-- **Companion Wizard avatar PNG normalization** — on compile, convert avatar to PNG regardless of upload format (JPG, WEBP, etc.) so embedded card image is always PNG. If no avatar uploaded, render the current silhouette SVG to a PNG canvas and use that. Prevents blank avatar slot.
 - **Setup Wizard — model step downloaded state on load** — `_applyModelStatus` runs during system check, but if user navigates directly to model step without running check (e.g. back-nav from engine step), downloaded state won't be applied. Consider calling `_applyModelStatus` also on `goTo('model')` with a lightweight fetch, or caching last status.
 - **Setup Wizard — system check extras reporting** — extend the system check step to detect extras (same logic as `GET /api/setup/extras-status`). Show result inline only if found ("✓ Kokoro found at …"). Loading label "Checking for extras…" disappears silently if nothing found.
 - **Settings — show resolved paths for extras** — after wizard or detection, Settings should display `./features/packages/` path and espeak binary path so user can verify what's actually being used. Paths already stored in config; just needs Settings UI wiring.
@@ -150,6 +162,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 ## Needs looking into
 
 - **Companion Mood activation** — Companions use moods inconsistently or not at all. How are we instructing mood tool usage? Something we should change?
+	- Adding a sentence to identity file helps with this ("You are expressive and change your active mood to reflect how you feel."), but it doesn't seem like the companion has knowledge of what their current active mood is? Perhaps we should inject the Mood description in another way? Also double check we are actually injecting it somewhere.
 
 ---
 
@@ -159,12 +172,13 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Companion Wizard orb animations** — the orb needs to feel alive throughout the whole wizard (currently too static). Requirements gathered: orb present on every step; gentle idle bounce + swirling energy effect; first step shows empty orb (no silhouette, just the circle + ambient color/glow). Silhouette appears only after type/gender chosen, disappears if deselected. Each user selection optionally streams particles into the orb. Needs reference images, animation spec, and a discussion of what's feasible in CSS/canvas vs. too resource-heavy. Design conversation before any implementation.
 - **Companion type card theming + orb color absorption** — each companion type card (Assistant / Friend / Companion / Role-play) should have its own color theme. Selecting a type changes the orb's color scheme, as if the orb absorbs that "energy" and takes that shape. If particle streaming is implemented, the color shift should be delayed until particles start arriving and fade in until they stop. Each type also ships with a corresponding default Presence preset baked in. Needs color palette decisions and animation timing spec. Ties into orb animation design session above.
-- **Companion Templates section** — premade companions that ship with SENNI, plus a way for users to recreate existing companions from within the app. Entry point: a button near the Import button that opens a selection window. Needs design: how templates are stored (JSON? partial config? full companion folder zip?), how they're browsed, whether user can submit community templates. See `design/FEATURES.md` → Companion section.
+- **Companion Templates section** — premade companions that ship with SENNI, plus a way for users to recreate existing companions from within the app. Entry point: a button near the Import button that opens a selection window. Needs design: how templates are stored (JSON? partial config? full companion folder zip?), how they're browsed, whether user can submit community templates. See `design/FEATURES.md` → Companion section. This could tie into editing existing companions via the Companion Wizard perhaps.
 - **Main Chat UI redesign** — "smoother, fuller, cozier". The companion wizard has established the visual language — now apply it to the main app. Known starting points: sidebar companion state card (mood, recent memory), memory viewer/editor panel. Do this before Tauri so the app Tauri wraps is already polished. See `design/FEATURES.md` → Sidebar/UI section.
 - **Memory viewer/editor** — browse/edit/delete soul/, mind/, and ChromaDB notes. Duplicate dedup UI. Can roll into chat UI design session. See `design/FEATURES.md` → Memory section.
 - **Closeness/relationship progression** — may become gamified (develop closeness over time). Wizard closeness step is partially blocked on this.
 - **Companion Templates rework** — templates need redesigning to fit memory system + Wizard + Mood. See `design/FEATURES.md` → Companion section.
 - **Wizard appearance sections** — hair style grid, face shape, eyes, nose, outfit system. Waiting on layered avatar design. See `design/WIZARD.md`.
+- **Image generation tool** — companion calls a local image model to generate an image posted in chat like a photo in a messaging app. Design needed: tool schema, how the image is embedded in the chat bubble, UX for "companion sending a photo". With a LoRA or Qwen Image Edit, companion could generate images of themselves to match the scene. Hardware-dependent — blocked on new PC (RTX 5060 Ti). Candidate model: Z-Image Turbo or similar fast local diffusion.
 
 ---
 
@@ -186,6 +200,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 - **Layered avatar / character creator system** — full design session needed, but asset creation is blocked on new PC + OmniSVG experiments. OmniSVG (8.5GB) fits comfortably on RTX 5060 Ti 16GB. See `design/CHARA_CARD.md` → Appearance sections.
 - **Silhouette morphing** — shelved in favour of layered avatar system. Revisit after layered avatar design session.
 - **Species silhouette variants** — deferred with silhouette morphing. Short-term: use color-shifting (see Quick Wins).
+- **Image generation tool** — blocked on new PC (RTX 5060 Ti needed for fast local diffusion). Design session queued above.
 - **TTS upgrade** — newer realistic TTS models (Qwen Audio etc.) worth evaluating once new PC is up. Kokoro on CPU is too slow on current i5-7600K; CUDA on 5060 Ti should be near-instant.
 - **App Sounds** — Just an idea right now. App has only TTS, no other audio. Would add a lot of ambiance and polish.
 - **Cozy Mode** — full sensory layer (lighting, ambient sounds, warm orb). Wishlist, needs visual/interaction design. See `design/FEATURES.md` → Cozy Mode.

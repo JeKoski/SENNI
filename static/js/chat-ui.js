@@ -25,7 +25,7 @@ function updateContextBar(tokens) {
     ? `${pct}% — ${t.toLocaleString()} / ${_contextSize.toLocaleString()} tokens`
     : `${_contextSize.toLocaleString()} token context`;
 
-  bar.className = 'ctx-bar-fill';
+  bar.className = 'ctx-token-fill ctx-bar-fill';
   if      (pct >= 85) bar.classList.add('ctx-danger');
   else if (pct >= 66) bar.classList.add('ctx-warning');
   else if (pct >= 50) bar.classList.add('ctx-caution');

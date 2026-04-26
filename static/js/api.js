@@ -143,16 +143,15 @@ async function callModel(system, messages, abortSignal = null) {
     let { text: rawText, thinkContent, structuredCalls, finishReason, bubbleHandle, usageData } = result;
 
     // Extract inline <think> block if model didn't use reasoning_content field.
+    // Only call onThinking here for the inline case — streaming reasoning_content
+    // already called onThinking live during _streamRound.
     if (!thinkContent) {
       const thinkMatch = rawText.match(/^<think>([\s\S]*?)<\/think>\s*/);
       if (thinkMatch) {
         thinkContent = thinkMatch[1].trim();
         rawText      = rawText.slice(thinkMatch[0].length).trim();
+        if (typeof onThinking === "function") onThinking(thinkContent);
       }
-    }
-
-    if (thinkContent && typeof onThinking === "function") {
-      onThinking(thinkContent);
     }
 
     if (usageData && typeof onUsageUpdate === "function") {
@@ -471,6 +470,10 @@ function _createStreamBubble() {
   const row    = document.createElement("div");
   row.className = "msg-row companion stream-row";
   row.id        = "stream-bubble-row";
+
+  const msgOrb = document.createElement("div");
+  msgOrb.className = "msg-orb";
+  row.appendChild(msgOrb);
 
   const wrap   = document.createElement("div");
   const bubble = document.createElement("div");

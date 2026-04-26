@@ -19,12 +19,13 @@
   <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-resize-handle" id="sidebar-handle"></div>
+    <!-- Portrait card -->
     <div class="companion-header">
-      <div class="avatar" id="companion-avatar">✦</div>
+      <div class="avatar" id="companion-avatar"></div>
       <div class="companion-name" id="companion-name">…</div>
       <div class="companion-status-row">
-        <div class="companion-status">
-          <svg class="status-dot-svg" width="16" height="16" viewBox="0 0 16 16">
+        <div class="companion-status" id="companion-status">
+          <svg class="status-dot-svg" width="12" height="12" viewBox="0 0 16 16">
             <circle cx="8" cy="8" r="3" fill="#6dd4a8">
               <animate attributeName="fill-opacity" values="0.8;1;0.8" dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
             </circle>
@@ -36,33 +37,62 @@
           </svg>
           <span id="status-text">online</span>
         </div>
-        <button class="companion-gear-btn" onclick="openCompanionWindow()" title="Companion settings">⚙</button>
       </div>
+    </div>
+
+    <!-- Mood strip -->
+    <div class="sidebar-mood-strip" id="sidebar-mood-strip" style="display:none">
+      <span class="sidebar-mood-label">Mood</span>
+      <span class="sidebar-mood-dot" id="sidebar-mood-dot"></span>
+      <span class="sidebar-mood-name" id="sidebar-mood-name">—</span>
     </div>
 
     <!-- Chat tabs -->
     <div class="sidebar-section" id="tabs-section">
-      <div class="sidebar-label" style="display:flex;align-items:center;justify-content:space-between">
+      <div class="sidebar-label">
         Chats
-        <button class="new-tab-btn" onclick="newTab()" title="New chat">+</button>
+        <button class="sidebar-label-btn" id="chats-menu-btn" onclick="toggleChatsMenu(event)" title="Chat options">⚙</button>
+      </div>
+      <!-- Chats ⋯ dropdown -->
+      <div class="chats-menu" id="chats-menu">
+        <button class="chat-header-menu-item" onclick="newTab();closeChatsMenu()">+ New Chat</button>
+        <div class="chat-header-menu-divider"></div>
+        <button class="chat-header-menu-item" onclick="exportHistory();closeChatsMenu()">↑ Export</button>
+        <button class="chat-header-menu-item" onclick="importHistory();closeChatsMenu()">↓ Import</button>
       </div>
       <div id="tab-list"></div>
     </div>
-
 
     <div style="flex:1"></div>
 
     <div class="sidebar-footer">
       <button class="footer-pill" onclick="openSettings()">⚙ Settings</button>
       <button class="footer-pill" onclick="restartServer()" id="restart-btn">↺ Restart</button>
-      <button class="footer-pill" onclick="exportHistory()">↓ Export</button>
-      <button class="footer-pill" onclick="importHistory()">↑ Import</button>
-      <button class="footer-pill" id="hb-manual-btn" onclick="heartbeatManual()" style="display:none">✦ Heartbeat</button>
+      <button class="footer-pill" id="hb-manual-btn" onclick="heartbeatManual()" style="display:none;grid-column:1/-1">✦ Heartbeat</button>
     </div>
   </aside>
 
   <!-- ── Main chat ────────────────────────────────────────────────────────── -->
   <main class="chat-area">
+
+    <!-- Chat header strip -->
+    <header class="chat-header" id="chat-header">
+      <div class="chat-header-sphere" id="chat-header-sphere"></div>
+      <div class="chat-header-info">
+        <div class="chat-header-name" id="chat-header-name">…</div>
+        <div class="chat-header-meta" id="chat-header-meta">&nbsp;</div>
+      </div>
+      <div class="chat-header-actions">
+        <button class="chat-header-btn" onclick="toggleHeaderMenu(event)" title="More options" id="header-menu-btn">⋯</button>
+      </div>
+      <!-- ⋯ dropdown -->
+      <div class="chat-header-menu" id="chat-header-menu">
+        <button class="chat-header-menu-item" onclick="openCompanionWindow();closeHeaderMenu()">⚙ Companion Settings</button>
+        <div class="chat-header-menu-divider"></div>
+        <button class="chat-header-menu-item" onclick="openMemoryManager();closeHeaderMenu()">◈ Memory Manager</button>
+      </div>
+    </header>
+
     <!-- messages-wrap: position:relative so #orb-home overlays bottom-left -->
     <div class="messages-wrap">
       <div class="messages" id="messages">
@@ -97,43 +127,42 @@
       </div>
     </div>
 
-    <!-- Context usage bar -->
-    <div id="ctx-bar-wrap">
-      <div id="ctx-bar-track">
-        <div id="ctx-bar-fill" class="ctx-bar-fill"></div>
-      </div>
-      <div id="ctx-bar-meta">
-        <span id="ctx-bar-label"></span>
-        <div id="ctx-bar-actions">
-          <button onclick="newChat(true)"  title="Keep visible, reset context">↺ Reset context</button>
-          <button onclick="newChat(false)" title="Clear screen and context">✕ Clear chat</button>
-        </div>
-      </div>
-    </div>
-
-
-
     <div class="input-bar" id="input-bar">
       <!-- Attachment preview strip (shown when files are queued) -->
       <div id="attachment-strip" style="display:none"></div>
-      <div class="input-wrap" id="input-wrap">
-        <button class="attach-btn" id="attach-btn" onclick="openAttachMenu(event)" title="Attach file">+</button>
-        <button class="mic-btn"    id="mic-btn"    onclick="voiceStart()"           title="Voice input">🎙</button>
-        <div id="voice-indicator" class="voice-indicator" style="display:none">
-          <span class="voice-dot"></span>
-          <span id="voice-timer">0:00</span>
-          <button class="voice-stop-btn" onclick="voiceStop()" title="Stop recording">■</button>
-        </div>
-        <textarea
-          id="msg-input"
-          placeholder="Say something…"
-          rows="1"
-          onkeydown="handleKey(event)"
-          oninput="autoResize(this)"
-        ></textarea>
+      <!-- Small token meter row -->
+      <div class="ctx-meta-row" id="ctx-bar-wrap">
+        <span id="ctx-bar-label" style="opacity:0.7"></span>
+        <span class="ctx-token-bar"><span class="ctx-token-fill ctx-bar-fill" id="ctx-bar-fill"></span></span>
+        <span id="ctx-bar-actions" style="display:none">
+          <button onclick="newChat(true)"  title="Keep visible, reset context" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:10.5px;font-family:'DM Mono',monospace;letter-spacing:.05em;padding:0 4px">↺ Reset</button>
+          <button onclick="newChat(false)" title="Clear screen and context"    style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:10.5px;font-family:'DM Mono',monospace;letter-spacing:.05em;padding:0 4px">✕ Clear</button>
+        </span>
       </div>
-      <button class="send-btn" id="send-btn" onclick="sendMessage()" disabled title="Send">↑</button>
-      <button class="stop-btn" id="stop-btn" onclick="stopGeneration()" title="Stop generation" style="display:none">■</button>
+      <!-- Composer row -->
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div class="input-wrap" id="input-wrap">
+          <button class="attach-btn" id="attach-btn" onclick="openAttachMenu(event)" title="Attach file">+</button>
+          <button class="mic-btn"    id="mic-btn"    onclick="voiceStart()"           title="Voice input">🎙</button>
+          <div id="voice-indicator" class="voice-indicator" style="display:none">
+            <span class="voice-dot"></span>
+            <span id="voice-timer">0:00</span>
+            <button class="voice-stop-btn" onclick="voiceStop()" title="Stop recording">■</button>
+          </div>
+          <textarea
+            id="msg-input"
+            placeholder="Say something…"
+            rows="1"
+            onkeydown="handleKey(event)"
+            oninput="autoResize(this)"
+          ></textarea>
+          <div style="display:flex;gap:2px;align-items:center;margin-bottom:4px;flex-shrink:0">
+            <button class="stop-btn" id="stop-btn" onclick="stopGeneration()" title="Stop generation" style="display:none">■</button>
+            <button class="stop-btn tts-stop-btn" id="tts-stop-btn" onclick="ttsStop()" title="Stop voice" style="display:none">♪</button>
+          </div>
+        </div>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()" disabled title="Send">↑</button>
+      </div>
     </div>
 
     <!-- Attach menu popup -->

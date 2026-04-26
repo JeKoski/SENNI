@@ -572,22 +572,33 @@ def save_companion_config(companion_folder: str, data: dict) -> None:
 
 def write_avatar_file(companion_folder: str, data_url: str, slot: str = 'orb') -> str:
     """
-    Write a base64 data URL to disk as an avatar image file.
-    slot: 'orb'     → avatar.ext
-          'sidebar' → sidebar_avatar.ext
+    Write a base64 data URL to disk as an avatar image file, always as PNG.
+    slot: 'orb'     → avatar.png
+          'sidebar' → sidebar_avatar.png
+    Falls back to original format if Pillow is unavailable.
     Returns the filename saved, or '' on failure.
     """
     try:
         header, b64 = data_url.split(',', 1)
-        mime = header.split(';')[0].split(':')[1] if ':' in header else 'image/jpeg'
-        if 'png'  in mime: ext = '.png'
-        elif 'gif' in mime: ext = '.gif'
-        elif 'webp' in mime: ext = '.webp'
-        else: ext = '.jpg'
-        prefix   = 'avatar' if slot == 'orb' else 'sidebar_avatar'
-        filename = f"{prefix}{ext}"
-        (COMPANIONS_DIR / companion_folder / filename).write_bytes(base64.b64decode(b64))
-        return filename
+        raw    = base64.b64decode(b64)
+        prefix = 'avatar' if slot == 'orb' else 'sidebar_avatar'
+        dest   = COMPANIONS_DIR / companion_folder / f"{prefix}.png"
+        try:
+            import io as _io
+            from PIL import Image
+            img = Image.open(_io.BytesIO(raw)).convert('RGBA')
+            img.save(str(dest), 'PNG')
+            return f"{prefix}.png"
+        except Exception:
+            # Pillow unavailable — save in original format
+            mime = header.split(';')[0].split(':')[1] if ':' in header else 'image/jpeg'
+            if 'png' in mime:   ext = '.png'
+            elif 'gif' in mime: ext = '.gif'
+            elif 'webp' in mime: ext = '.webp'
+            else:               ext = '.jpg'
+            filename = f"{prefix}{ext}"
+            (COMPANIONS_DIR / companion_folder / filename).write_bytes(raw)
+            return filename
     except Exception:
         return ""
 

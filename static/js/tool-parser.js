@@ -20,10 +20,10 @@ const TOOL_DEFINITIONS = [
     function: {
       name: "memory",
       description:
-        "Read, write, or list the companion's markdown memory files. " +
-        "soul/ = identity & user profile (persistent). " +
-        "mind/ = current session notes. memory/ = long-term archive. " +
-        "Always write complete markdown files.",
+        "Read and write the companion's markdown files. " +
+        "soul/ = permanent reference (identity, user profile). " +
+        "mind/ = session notes and topic files, not loaded into active context automatically. " +
+        "Always write the complete file content.",
       parameters: {
         type: "object",
         properties: {
@@ -69,12 +69,10 @@ const TOOL_DEFINITIONS = [
     function: {
       name: "write_memory",
       description:
-        "Write a memory note to long-term episodic storage. " +
-        "Use sparingly — 2 to 5 times per session for moments genuinely worth keeping. " +
-        "Supply the memory in your own voice. " +
-        "Set emotional_valence (-1.0 negative to 1.0 positive) and intensity (0.0 to 1.0). " +
-        "Provide a context_summary: a brief phrase describing the conversational moment " +
-        "so this memory can link to related ones later.",
+        "Encode a vivid moment, insight, or meaningful fact into long-term episodic memory. " +
+        "Write in your own voice. " +
+        "Set emotional_valence (-1.0 to 1.0), intensity (0.0 to 1.0), and a context_summary " +
+        "(short phrase) so this memory surfaces and links correctly later.",
       parameters: {
         type: "object",
         properties: {
@@ -120,11 +118,9 @@ const TOOL_DEFINITIONS = [
     function: {
       name: "retrieve_memory",
       description:
-        "Deliberately recall memories related to a topic or query. " +
-        "Use when you want to surface something you may have encoded previously — " +
-        "a fact about the user, a pattern you noticed, a moment that felt significant. " +
-        "Returns the most relevant notes from long-term storage. " +
-        "You do not need to call this for things already in the current conversation.",
+        "Recall memories related to a topic or query — use when you might have encoded " +
+        "something relevant that isn't in the current conversation. " +
+        "Returns the most semantically similar notes from long-term storage.",
       parameters: {
         type: "object",
         properties: {
