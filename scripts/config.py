@@ -207,22 +207,43 @@ def detect_gpu() -> str:
         except Exception:
             pass
 
-    # ── Windows: query WMIC ───────────────────────────────────────────────────
+    # ── Windows: query GPU info ───────────────────────────────────────────────
     # Check discrete GPUs before integrated — modern Intel CPUs always have
-    # integrated UHD/Arc graphics, so checking nvidia/amd first is critical.
+    # integrated UHD/Arc graphics, so nvidia/amd must be checked first.
+    # WMIC is deprecated in Win11; PowerShell is the reliable fallback.
     if system == "Windows":
+        def _parse_gpu(output: str) -> str | None:
+            o = output.lower()
+            if "nvidia" in o:
+                return "nvidia"
+            if "amd" in o or "radeon" in o:
+                return "amd"
+            if "intel" in o:
+                return "intel"
+            return None
+
+        # Try PowerShell first (works on Win10/11)
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "Get-WmiObject Win32_VideoController | Select-Object -ExpandProperty Name"],
+                capture_output=True, text=True, timeout=8
+            )
+            gpu = _parse_gpu(result.stdout)
+            if gpu:
+                return gpu
+        except Exception:
+            pass
+
+        # WMIC fallback (deprecated but still present on older Win10 installs)
         try:
             result = subprocess.run(
                 ["wmic", "path", "win32_videocontroller", "get", "name"],
                 capture_output=True, text=True, timeout=5
             )
-            output = result.stdout.lower()
-            if "nvidia" in output:
-                return "nvidia"
-            if "amd" in output or "radeon" in output:
-                return "amd"
-            if "intel" in output:
-                return "intel"
+            gpu = _parse_gpu(result.stdout)
+            if gpu:
+                return gpu
         except Exception:
             pass
 

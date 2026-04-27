@@ -257,10 +257,36 @@ async def api_mmproj_candidates(model_path: str = ""):
 
 def _run_file_dialog(title: str, filetypes: list, initialdir: str | None = None) -> str | None:
     """
-    Open a native OS file-picker dialog via tkinter.
+    Open a native OS file-picker dialog.
+    Windows: uses PowerShell + Windows Forms (works in PyInstaller embed — no tkinter needed).
+    Linux/Mac: uses tkinter.
     Must run in a worker thread — NOT the asyncio event loop thread.
-    On Windows tkinter requires its own thread separate from the event loop.
     """
+    if IS_WIN:
+        # Convert tkinter filetypes [("GGUF files", "*.gguf"), ("All files", "*.*")]
+        # → Windows Forms filter "GGUF files (*.gguf)|*.gguf|All files (*.*)|*.*"
+        filter_str = "|".join(f"{desc} ({pat})|{pat}" for desc, pat in filetypes)
+        init = initialdir if (initialdir and Path(initialdir).exists()) else ""
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "$d = New-Object System.Windows.Forms.OpenFileDialog;"
+            f"$d.Title = '{title}';"
+            f"$d.Filter = '{filter_str}';"
+            f"$d.InitialDirectory = '{init}';"
+            "$d.Multiselect = $false;"
+            "if ($d.ShowDialog() -eq 'OK') { $d.FileName }"
+        )
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True, text=True, timeout=120,
+            )
+            path = result.stdout.strip()
+            return path if path else None
+        except Exception:
+            return None
+
+    # Linux / Mac — tkinter
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -281,9 +307,30 @@ def _run_file_dialog(title: str, filetypes: list, initialdir: str | None = None)
 
 def _run_folder_dialog(title: str) -> str | None:
     """
-    Open a native OS folder-picker dialog via tkinter.
+    Open a native OS folder-picker dialog.
+    Windows: uses PowerShell + Windows Forms.
+    Linux/Mac: uses tkinter.
     Must run in a worker thread — NOT the asyncio event loop thread.
     """
+    if IS_WIN:
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "$d = New-Object System.Windows.Forms.FolderBrowserDialog;"
+            f"$d.Description = '{title}';"
+            "$d.ShowNewFolderButton = $true;"
+            "if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }"
+        )
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True, text=True, timeout=120,
+            )
+            path = result.stdout.strip()
+            return path if path else None
+        except Exception:
+            return None
+
+    # Linux / Mac — tkinter
     try:
         import tkinter as tk
         from tkinter import filedialog
