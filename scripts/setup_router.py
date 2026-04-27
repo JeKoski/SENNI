@@ -113,6 +113,23 @@ def _gpu_to_build(gpu: str, oneapi: bool) -> str:
     return "cpu"
 
 
+def _find_cudart_asset(assets: list[dict], main_asset_name: str) -> dict | None:
+    """Find matching cudart DLL zip for a CUDA binary asset (Windows CUDA only)."""
+    import re
+    m = re.search(r"cuda-(\d+\.\d+)", main_asset_name)
+    cuda_ver = m.group(1) if m else None
+    # Prefer version-matched asset, fall back to any win cudart
+    candidates = [
+        a for a in assets
+        if a["name"].lower().startswith("cudart-") and "win-cuda" in a["name"].lower()
+    ]
+    if cuda_ver:
+        for a in candidates:
+            if cuda_ver in a["name"]:
+                return a
+    return candidates[0] if candidates else None
+
+
 def _find_binary_asset(assets: list[dict], build_type: str) -> dict | None:
     """Return best-matching GitHub release asset for build_type, with fallback."""
     platform_patterns = BINARY_PATTERNS.get(SYSTEM, {})
@@ -352,6 +369,35 @@ async def setup_download_binary(request: Request):
                 return
 
         await dl_task
+
+        # ── CUDA on Windows: also grab cudart DLLs ───────────────────────────
+        if IS_WIN and build == "cuda":
+            cudart_asset = _find_cudart_asset(release.get("assets", []), asset["name"])
+            if cudart_asset:
+                cudart_path = dest_dir / cudart_asset["name"]
+                yield _sse({"type": "status", "label": f"Downloading {cudart_asset['name']}…",
+                            "total": cudart_asset.get("size", 0)})
+                cudart_queue = asyncio.Queue()
+                cudart_dl = functools.partial(
+                    _download_to_queue, cudart_asset["browser_download_url"],
+                    cudart_path, cudart_queue, loop
+                )
+                cudart_task = loop.run_in_executor(None, cudart_dl)
+                while True:
+                    msg = await cudart_queue.get()
+                    if msg["type"] == "progress":
+                        yield _sse(msg)
+                    elif msg["type"] == "download_done":
+                        break
+                    elif msg["type"] == "error":
+                        yield _sse({"type": "status", "label": "cudart download failed — continuing anyway"})
+                        break
+                await cudart_task
+                if cudart_path.exists():
+                    await loop.run_in_executor(
+                        None, functools.partial(_extract_binary, cudart_path, dest_dir)
+                    )
+                    cudart_path.unlink(missing_ok=True)
 
         yield _sse({"type": "status", "label": "Extracting…"})
         binary_path = await loop.run_in_executor(

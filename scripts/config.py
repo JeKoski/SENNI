@@ -208,6 +208,8 @@ def detect_gpu() -> str:
             pass
 
     # ── Windows: query WMIC ───────────────────────────────────────────────────
+    # Check discrete GPUs before integrated — modern Intel CPUs always have
+    # integrated UHD/Arc graphics, so checking nvidia/amd first is critical.
     if system == "Windows":
         try:
             result = subprocess.run(
@@ -215,12 +217,12 @@ def detect_gpu() -> str:
                 capture_output=True, text=True, timeout=5
             )
             output = result.stdout.lower()
-            if "intel" in output:
-                return "intel"
             if "nvidia" in output:
                 return "nvidia"
             if "amd" in output or "radeon" in output:
                 return "amd"
+            if "intel" in output:
+                return "intel"
         except Exception:
             pass
 
