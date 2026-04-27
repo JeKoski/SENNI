@@ -253,6 +253,80 @@ async def api_mmproj_candidates(model_path: str = ""):
     return {"candidates": find_mmproj_candidates(model_path)}
 
 
+# ── Windows native file dialogs via ctypes ────────────────────────────────────
+# Uses Win32 GetOpenFileName / SHBrowseForFolder directly — no tkinter or
+# PowerShell needed. Works in PyInstaller embed builds on all Windows versions.
+
+def _win_file_dialog_ps(title: str, filetypes: list, initialdir: str | None = None) -> str | None:
+    """
+    File picker via PowerShell + Windows Forms.
+    PowerShell runs STA by default — no COM init needed.
+    A tiny invisible topmost Form is used as owner so the dialog appears in front.
+    """
+    filter_str = "|".join(f"{desc} ({pat})|{pat}" for desc, pat in filetypes)
+    init = initialdir if (initialdir and Path(initialdir).exists()) else ""
+    script = ";".join([
+        "Add-Type -AssemblyName System.Windows.Forms",
+        "Add-Type -AssemblyName System.Drawing",
+        "$owner = New-Object System.Windows.Forms.Form",
+        "$owner.TopMost = $true",
+        "$owner.StartPosition = 'Manual'",
+        "$owner.Location = New-Object System.Drawing.Point(-2000,-2000)",
+        "$owner.Size = New-Object System.Drawing.Size(1,1)",
+        "$owner.Show()",
+        "$d = New-Object System.Windows.Forms.OpenFileDialog",
+        f"$d.Title = '{title}'",
+        f"$d.Filter = '{filter_str}'",
+        f"$d.InitialDirectory = '{init}'",
+        "$d.Multiselect = $false",
+        "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.FileName }",
+        "$owner.Dispose()",
+    ])
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Sta", "-Command", script],
+            capture_output=True, text=True, timeout=300,
+        )
+        path = result.stdout.strip()
+        if result.stderr.strip():
+            log.warning("_win_file_dialog_ps stderr: %s", result.stderr.strip())
+        return path if path else None
+    except Exception as e:
+        log.warning("_win_file_dialog_ps error: %s", e)
+        return None
+
+
+def _win_folder_dialog_ps(title: str) -> str | None:
+    """Folder picker via PowerShell + Windows Forms, topmost owner form."""
+    script = ";".join([
+        "Add-Type -AssemblyName System.Windows.Forms",
+        "Add-Type -AssemblyName System.Drawing",
+        "$owner = New-Object System.Windows.Forms.Form",
+        "$owner.TopMost = $true",
+        "$owner.StartPosition = 'Manual'",
+        "$owner.Location = New-Object System.Drawing.Point(-2000,-2000)",
+        "$owner.Size = New-Object System.Drawing.Size(1,1)",
+        "$owner.Show()",
+        "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
+        f"$d.Description = '{title}'",
+        "$d.ShowNewFolderButton = $true",
+        "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath }",
+        "$owner.Dispose()",
+    ])
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Sta", "-Command", script],
+            capture_output=True, text=True, timeout=300,
+        )
+        path = result.stdout.strip()
+        if result.stderr.strip():
+            log.warning("_win_folder_dialog_ps stderr: %s", result.stderr.strip())
+        return path if path else None
+    except Exception as e:
+        log.warning("_win_folder_dialog_ps error: %s", e)
+        return None
+
+
 # ── API: browse (native OS file picker) ───────────────────────────────────────
 
 def _run_file_dialog(title: str, filetypes: list, initialdir: str | None = None) -> str | None:
@@ -263,28 +337,7 @@ def _run_file_dialog(title: str, filetypes: list, initialdir: str | None = None)
     Must run in a worker thread — NOT the asyncio event loop thread.
     """
     if IS_WIN:
-        # Convert tkinter filetypes [("GGUF files", "*.gguf"), ("All files", "*.*")]
-        # → Windows Forms filter "GGUF files (*.gguf)|*.gguf|All files (*.*)|*.*"
-        filter_str = "|".join(f"{desc} ({pat})|{pat}" for desc, pat in filetypes)
-        init = initialdir if (initialdir and Path(initialdir).exists()) else ""
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms;"
-            "$d = New-Object System.Windows.Forms.OpenFileDialog;"
-            f"$d.Title = '{title}';"
-            f"$d.Filter = '{filter_str}';"
-            f"$d.InitialDirectory = '{init}';"
-            "$d.Multiselect = $false;"
-            "if ($d.ShowDialog() -eq 'OK') { $d.FileName }"
-        )
-        try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
-                capture_output=True, text=True, timeout=120,
-            )
-            path = result.stdout.strip()
-            return path if path else None
-        except Exception:
-            return None
+        return _win_file_dialog_ps(title, filetypes, initialdir)
 
     # Linux / Mac — tkinter
     try:
@@ -313,22 +366,7 @@ def _run_folder_dialog(title: str) -> str | None:
     Must run in a worker thread — NOT the asyncio event loop thread.
     """
     if IS_WIN:
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms;"
-            "$d = New-Object System.Windows.Forms.FolderBrowserDialog;"
-            f"$d.Description = '{title}';"
-            "$d.ShowNewFolderButton = $true;"
-            "if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }"
-        )
-        try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
-                capture_output=True, text=True, timeout=120,
-            )
-            path = result.stdout.strip()
-            return path if path else None
-        except Exception:
-            return None
+        return _win_folder_dialog_ps(title)
 
     # Linux / Mac — tkinter
     try:
@@ -777,3 +815,59 @@ async def api_factory_reset():
 async def api_shutdown_model():
     kill_llama_server()
     return {"ok": True}
+
+
+# ── Filesystem browser ────────────────────────────────────────────────────────
+
+@app.get("/api/fs/ls")
+async def api_fs_ls(path: str = ""):
+    """
+    List a directory for the client-side file browser modal.
+    Windows + empty path → returns drive list.
+    Otherwise returns sorted entries (dirs first) for the given path.
+    """
+    import string as _string
+
+    # Windows with no path → drive list
+    if IS_WIN and not path:
+        drives = [f"{d}:\\" for d in _string.ascii_uppercase if Path(f"{d}:\\").exists()]
+        return {"path": "", "parent": None, "drives": drives, "entries": [], "sep": "\\"}
+
+    target = Path(path).resolve() if path else Path.home()
+
+    if not target.exists():
+        return JSONResponse({"error": "Path does not exist"}, status_code=404)
+    if not target.is_dir():
+        return JSONResponse({"error": "Not a directory"}, status_code=400)
+
+    entries = []
+    try:
+        items = sorted(target.iterdir(), key=lambda x: (x.is_file(), x.name.lower()))
+        for item in items:
+            try:
+                e = {"name": item.name, "type": "dir" if item.is_dir() else "file"}
+                if item.is_file():
+                    try:
+                        e["size"] = item.stat().st_size
+                    except OSError:
+                        e["size"] = 0
+                entries.append(e)
+            except (PermissionError, OSError):
+                pass
+    except (PermissionError, OSError) as exc:
+        return JSONResponse({"error": str(exc)}, status_code=403)
+
+    parent_p = target.parent
+    if parent_p == target:
+        # At filesystem root — on Windows signal "go to drives list"
+        parent = "" if IS_WIN else None
+    else:
+        parent = str(parent_p)
+
+    return {
+        "path":    str(target),
+        "parent":  parent,
+        "drives":  [],
+        "entries": entries,
+        "sep":     "\\" if IS_WIN else "/",
+    }

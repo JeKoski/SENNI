@@ -632,16 +632,14 @@ async function browseFile(type) {
   const chip   = document.getElementById(chipId);
   if (chip) chip.style.opacity = '0.6';
   try {
-    const body = { type };
     const knownPath = type === 'binary' ? enginePath : type === 'model' ? modelPath : mmprojPath;
-    if (knownPath) {
-      const parts = knownPath.replace(/\\/g, '/').split('/');
-      parts.pop();
-      body.initial_dir = parts.join('/') || '/';
-    }
-    const res  = await fetch('/api/browse', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    const data = await res.json();
-    if (data.ok && data.path)      _applyPath(type, data.path);
+    const startPath = knownPath
+      ? knownPath.replace(/\\/g, '/').split('/').slice(0, -1).join('/') || ''
+      : '';
+    const extensions = (type === 'model' || type === 'mmproj') ? ['.gguf'] : [];
+    const titles     = { binary: 'Select llama-server binary', model: 'Select model file (.gguf)', mmproj: 'Select mmproj file (.gguf)' };
+    const data = await fileBrowser.open({ title: titles[type] || 'Select file', mode: 'file', extensions, startPath });
+    if (data.ok && data.path)            _applyPath(type, data.path);
     else if (data.reason !== 'cancelled') _showPathFallback(type);
   } catch (e) { _showPathFallback(type); }
   finally     { if (chip) chip.style.opacity = '1'; }

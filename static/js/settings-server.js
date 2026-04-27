@@ -159,27 +159,20 @@ async function spBrowse(type) {
   const disp = document.getElementById(dispId);
   const originalText  = disp?.textContent;
   const originalClass = disp?.className;
-  if (disp) { disp.textContent = '…'; }
+  if (disp) disp.textContent = '…';
+
+  const titles = { binary: 'Select llama-server binary', model: 'Select model file (.gguf)', mmproj: 'Select mmproj file (.gguf)' };
+  const extensions = (type === 'model' || type === 'mmproj') ? ['.gguf'] : [];
 
   try {
-    const res  = await fetch('/api/browse', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ type }),
-    });
-    const data = await res.json();
-
+    const data = await fileBrowser.open({ title: titles[type] || 'Select file', mode: 'file', extensions });
     if (data.ok && data.path) {
       _spApplyBrowsedPath(type, data.path);
-    } else if (data.reason !== 'cancelled') {
-      if (disp) { disp.textContent = originalText; disp.className = originalClass; }
-      _spShowPathFallback(type, dispId);
     } else {
       if (disp) { disp.textContent = originalText; disp.className = originalClass; }
     }
   } catch (e) {
     if (disp) { disp.textContent = originalText; disp.className = originalClass; }
-    _spShowPathFallback(type, dispId);
   }
 }
 
@@ -313,27 +306,18 @@ async function spBrowseTts(type) {
   disp.textContent = '…';
 
   // voices → folder picker; espeak → espeak binary picker; python → python picker
-  const browseType = type === 'voices' ? 'folder'
-                   : type === 'python' ? 'python'
-                   :                     'espeak';
-
-  const browseBody = browseType === 'folder'
-    ? { type: 'folder', title: 'Select Kokoro voices folder' }
-    : { type: browseType };
+  const isFolder = type === 'voices';
+  const titles   = { voices: 'Select Kokoro voices folder', python: 'Select Python executable', espeak: 'Select espeak-ng binary' };
 
   try {
-    const res  = await fetch('/api/browse', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(browseBody),
-    });
-    const data = await res.json();
+    const data = await fileBrowser.open({ title: titles[type] || 'Select file', mode: isFolder ? 'dir' : 'file' });
     if (data.ok && data.path) {
       disp.textContent = data.path.split(/[\\/]/).pop();
       disp.title       = data.path;
       disp.className   = 'sp-file-display set';
       spMarkServerDirty();
       return;
-    } else if (data.reason === 'cancelled') {
+    } else {
       disp.textContent = original.text; disp.className = original.cls;
       return;
     }
