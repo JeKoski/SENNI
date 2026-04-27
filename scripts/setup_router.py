@@ -137,7 +137,10 @@ def _find_binary_asset(assets: list[dict], build_type: str) -> dict | None:
     def _match(btype: str) -> dict | None:
         for pattern in platform_patterns.get(btype, []):
             for asset in assets:
-                if pattern.lower() in asset["name"].lower():
+                name = asset["name"].lower()
+                if name.startswith("cudart-"):
+                    continue  # cudart DLL zips are not the main binary
+                if pattern.lower() in name:
                     return asset
         return None
 

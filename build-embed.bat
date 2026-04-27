@@ -14,6 +14,15 @@ if not exist "%PYTHON%" (
     pause & exit /b 1
 )
 
+:: Install core runtime deps into embed so PyInstaller can analyse them.
+:: Excludes chromadb/sentence-transformers — heavy, and excluded in the spec anyway.
+"%PYTHON%" -c "import fastapi" 2>nul
+if errorlevel 1 (
+    echo Installing core dependencies into python-embed...
+    "%PYTHON%" -m pip install fastapi "uvicorn[standard]" python-multipart ddgs httpx beautifulsoup4 Pillow
+    if errorlevel 1 ( echo Dependency install failed & pause & exit /b 1 )
+)
+
 :: Install PyInstaller into embed if not already present
 "%PYTHON%" -c "import PyInstaller" 2>nul
 if errorlevel 1 (

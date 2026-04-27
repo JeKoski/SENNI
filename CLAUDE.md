@@ -36,16 +36,16 @@ Search for it using project knowledge before doing anything else.
 
 ## Project overview
 
-SENNI is a local AI companion framework. Currently running with Gemma 4 E4B Q4_K_M, Intel Arc A750 GPU.
+SENNI is a local AI companion framework. Currently running with Gemma 4 E4B Q4_K_M, RTX 5060 Ti GPU (CUDA).
 
 Two servers:
 
 - **Python bridge** (`scripts/server.py`) — FastAPI, handles UI, tools, config. Needs terminal restart for changes.
 - **llama-server** — the model itself. Can be restarted in-app.
 
-Runs on Linux (primary dev) and Windows (also tested and supported). Currently on Windows.
+Runs on Linux (primary dev) and Windows (also tested and supported). Currently on Windows (new machine: Core Ultra 7 270K + RTX 5060 Ti 16GB + 32GB DDR5 at 4800MHz stock — XMP unstable, waiting on firmware).
 
-**New PC incoming (within 1-2 weeks as of 2026-04-17):** Core Ultra 7 270K + RTX 5060 Ti 16GB + 32GB DDR5. Will need CUDA llama-server build (switching from SYCL/Intel Arc). Larger models and OmniSVG become viable.
+**Build pipeline:** Use `build-embed.bat` (no system Python needed — uses python-embed). Use `run-built.bat` to launch built exe with terminal kept open on exit/crash.
 
 ---
 
@@ -140,6 +140,59 @@ Copying a companion folder between installs:
 - **BACKLOG.md** — all pending work: quick wins, design sessions needed, on-hold items. Single source of truth for "what's next".
 - **design/*.md** — system docs and design decisions. Update when the relevant system is touched.
 - Rule: when we touch a system in a session, we document it in that session. Don't defer.
+
+---
+
+## Session notes — 2026-04-27 (New machine setup + file browser)
+
+**New machine running. CUDA setup wizard fixed. Server-side file browser built.**
+
+### What changed
+
+**`scripts/config.py` — GPU detection fix:**
+- Windows now checks NVIDIA before Intel — Core Ultra 7 has integrated UHD which was matching first
+- Added PowerShell `Get-WmiObject` as primary detection method (WMIC deprecated on Win11), WMIC kept as fallback
+
+**`scripts/setup_router.py` — CUDA download fixes:**
+- `_find_binary_asset` now skips `cudart-` prefixed assets — they were matching before `llama-b*-bin-win-cuda-*` alphabetically, causing the wrong zip to be downloaded as the main binary
+- `_find_cudart_asset` + cudart download block added — downloads matching `cudart-llama-bin-win-cuda-*.zip` alongside main binary and extracts DLLs (cublas64, cublasLt64, cudart64) to same dir
+
+**`build-embed.bat` — embed-based build pipeline:**
+- Installs core deps (fastapi, uvicorn, etc.) into python-embed before PyInstaller runs
+- Checks/installs PyInstaller into embed
+- No system Python required
+
+**`run-built.bat` — launch helper:**
+- Runs `dist\senni-backend\senni-backend.exe`, keeps terminal open on exit/crash, shows exit code
+
+**`scripts/server.py` — server-side file browser endpoint + dialog cleanup:**
+- `GET /api/fs/ls?path=...` — directory listing for file browser modal. Windows with empty path returns drive list. Dirs-first sort. Per-entry error handling for permission-denied items.
+- Replaced tkinter/ctypes/PowerShell native dialog attempts with `_win_file_dialog_ps` / `_win_folder_dialog_ps` (kept as dead code for now — superseded by client-side modal)
+
+**`static/js/file-browser.js` — new cross-platform file browser modal:**
+- `fileBrowser.open({title, mode, extensions, startPath})` → Promise
+- Navigates server filesystem via `/api/fs/ls`. Windows drive list at root. Breadcrumb nav. Dirs-first. Extension filtering (non-matching files dimmed). Double-click to confirm. Keyboard (Escape/Enter).
+
+**`static/css/file-browser.css` — modal styles using existing token system**
+
+**`static/js/wizard.js`, `static/js/settings-server.js` — all three browse call sites updated:**
+- `browseFile()` in wizard.js — uses `fileBrowser.open()`
+- `spBrowse()` in settings-server.js — uses `fileBrowser.open()`
+- TTS browse in settings-server.js — uses `fileBrowser.open()`
+
+**`static/wizard.html`, `static/chat.html` — load file-browser.js + file-browser.css**
+
+### Status on new machine
+- GPU auto-detection: ✅ NVIDIA found
+- llama-server CUDA download: ✅ (cudart DLLs + main binary)
+- File browser: built but not yet tested in built version (session ended before test)
+- Full setup end-to-end: not yet verified
+
+### Next session
+- Test file browser in built app
+- Verify llama-server boots with CUDA build
+- Complete setup end-to-end (model download, first boot)
+- Then: Settings Features tab or Gemma4 debugging
 
 ---
 
