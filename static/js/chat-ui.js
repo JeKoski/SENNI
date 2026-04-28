@@ -16,19 +16,24 @@ function updateContextBar(tokens) {
   const t   = tokens ?? _tabs?.find(t => t.id === _activeTabId)?.tokens ?? _contextTokens ?? 0;
   const pct = (_contextSize > 0) ? Math.min(100, Math.round((t / _contextSize) * 100)) : 0;
 
-  const bar   = document.getElementById('ctx-bar-fill');
-  const label = document.getElementById('ctx-bar-label');
-  if (!bar || !label) return;
+  const bar = document.getElementById('ctx-bar-fill');
+  const cap = document.getElementById('ctx-cap');
+  const pctEl = document.getElementById('ctx-pct');
+  if (!bar) return;
 
   bar.style.width = pct + '%';
-  label.textContent = t > 0
-    ? `${pct}% — ${t.toLocaleString()} / ${_contextSize.toLocaleString()} tokens`
-    : `${_contextSize.toLocaleString()} token context`;
-
   bar.className = 'ctx-token-fill ctx-bar-fill';
   if      (pct >= 85) bar.classList.add('ctx-danger');
   else if (pct >= 66) bar.classList.add('ctx-warning');
   else if (pct >= 50) bar.classList.add('ctx-caution');
+
+  // Cap label: e.g. "32k" from 32768
+  if (cap && _contextSize > 0) {
+    cap.textContent = Math.floor(_contextSize / 1024) + 'k';
+  }
+
+  // Percentage label — show 0% when no tokens yet
+  if (pctEl) pctEl.textContent = pct + '%';
 
   if (typeof heartbeatOnContextThreshold === 'function') {
     heartbeatOnContextThreshold(pct);

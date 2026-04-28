@@ -633,14 +633,14 @@ async function browseFile(type) {
   if (chip) chip.style.opacity = '0.6';
   try {
     const knownPath = type === 'binary' ? enginePath : type === 'model' ? modelPath : mmprojPath;
-    const startPath = knownPath
-      ? knownPath.replace(/\\/g, '/').split('/').slice(0, -1).join('/') || ''
+    const initialDir = knownPath
+      ? knownPath.replace(/\//g, '\\').split('\\').slice(0, -1).join('\\') || ''
       : '';
-    const extensions = (type === 'model' || type === 'mmproj') ? ['.gguf'] : [];
-    const titles     = { binary: 'Select llama-server binary', model: 'Select model file (.gguf)', mmproj: 'Select mmproj file (.gguf)' };
-    const data = await fileBrowser.open({ title: titles[type] || 'Select file', mode: 'file', extensions, startPath });
-    if (data.ok && data.path)            _applyPath(type, data.path);
-    else if (data.reason !== 'cancelled') _showPathFallback(type);
+    const res  = await fetch('/api/browse', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, initial_dir: initialDir }) });
+    const data = await res.json();
+    if (data.ok && data.path)  _applyPath(type, data.path);
+    else if (!data.ok && data.reason !== 'cancelled') _showPathFallback(type);
   } catch (e) { _showPathFallback(type); }
   finally     { if (chip) chip.style.opacity = '1'; }
 }
@@ -821,7 +821,7 @@ async function _startBoot() {
   const res = await fetch('/api/setup', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
-      model_path: modelPath, mmproj_path: multimodal ? mmprojPath : '',
+      binary_path: enginePath, model_path: modelPath, mmproj_path: multimodal ? mmprojPath : '',
       gpu_type: gpuBrand, ngl: 99, port_bridge: 8000, port_model: 8081,
       tts_enabled: featTts, memory_enabled: featMemory,
     })

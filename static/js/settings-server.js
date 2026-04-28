@@ -165,7 +165,9 @@ async function spBrowse(type) {
   const extensions = (type === 'model' || type === 'mmproj') ? ['.gguf'] : [];
 
   try {
-    const data = await fileBrowser.open({ title: titles[type] || 'Select file', mode: 'file', extensions });
+    const res  = await fetch('/api/browse', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type }) });
+    const data = await res.json();
     if (data.ok && data.path) {
       _spApplyBrowsedPath(type, data.path);
     } else {
@@ -310,7 +312,10 @@ async function spBrowseTts(type) {
   const titles   = { voices: 'Select Kokoro voices folder', python: 'Select Python executable', espeak: 'Select espeak-ng binary' };
 
   try {
-    const data = await fileBrowser.open({ title: titles[type] || 'Select file', mode: isFolder ? 'dir' : 'file' });
+    const browseType = isFolder ? 'folder' : type;
+    const res  = await fetch('/api/browse', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: browseType, title: titles[type] }) });
+    const data = await res.json();
     if (data.ok && data.path) {
       disp.textContent = data.path.split(/[\\/]/).pop();
       disp.title       = data.path;

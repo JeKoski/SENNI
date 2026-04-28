@@ -254,77 +254,164 @@ async def api_mmproj_candidates(model_path: str = ""):
 
 
 # ── Windows native file dialogs via ctypes ────────────────────────────────────
-# Uses Win32 GetOpenFileName / SHBrowseForFolder directly — no tkinter or
-# PowerShell needed. Works in PyInstaller embed builds on all Windows versions.
+# Calls GetOpenFileNameW / SHBrowseForFolderW directly — no subprocess, no
+# PowerShell startup delay. Works in PyInstaller embed builds on all Windows.
+#
+# Foreground trick: create a tiny off-screen WS_EX_TOPMOST | WS_VISIBLE window
+# and call SetForegroundWindow on it before showing the dialog. The dialog
+# inherits the owner's topmost/foreground status and appears in front of the
+# browser window.
 
-def _win_file_dialog_ps(title: str, filetypes: list, initialdir: str | None = None) -> str | None:
-    """
-    File picker via PowerShell + Windows Forms.
-    PowerShell runs STA by default — no COM init needed.
-    A tiny invisible topmost Form is used as owner so the dialog appears in front.
-    """
-    filter_str = "|".join(f"{desc} ({pat})|{pat}" for desc, pat in filetypes)
-    init = initialdir if (initialdir and Path(initialdir).exists()) else ""
-    script = ";".join([
-        "Add-Type -AssemblyName System.Windows.Forms",
-        "Add-Type -AssemblyName System.Drawing",
-        "$owner = New-Object System.Windows.Forms.Form",
-        "$owner.TopMost = $true",
-        "$owner.StartPosition = 'Manual'",
-        "$owner.Location = New-Object System.Drawing.Point(-2000,-2000)",
-        "$owner.Size = New-Object System.Drawing.Size(1,1)",
-        "$owner.Show()",
-        "$d = New-Object System.Windows.Forms.OpenFileDialog",
-        f"$d.Title = '{title}'",
-        f"$d.Filter = '{filter_str}'",
-        f"$d.InitialDirectory = '{init}'",
-        "$d.Multiselect = $false",
-        "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.FileName }",
-        "$owner.Dispose()",
-    ])
-    try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-Sta", "-Command", script],
-            capture_output=True, text=True, timeout=300,
-        )
-        path = result.stdout.strip()
-        if result.stderr.strip():
-            log.warning("_win_file_dialog_ps stderr: %s", result.stderr.strip())
-        return path if path else None
-    except Exception as e:
-        log.warning("_win_file_dialog_ps error: %s", e)
-        return None
+def _win_owner_hwnd() -> int:
+    """Create a 1×1 off-screen topmost window; returns HWND (0 on failure)."""
+    import ctypes as _ct
+    hwnd = _ct.windll.user32.CreateWindowExW(
+        0x00000008,               # WS_EX_TOPMOST
+        "STATIC", "",
+        0x80000000 | 0x10000000,  # WS_POPUP | WS_VISIBLE
+        -2000, -2000, 1, 1,
+        0, 0, 0, None,
+    )
+    if hwnd:
+        _ct.windll.user32.SetForegroundWindow(hwnd)
+    return hwnd or 0
 
 
-def _win_folder_dialog_ps(title: str) -> str | None:
-    """Folder picker via PowerShell + Windows Forms, topmost owner form."""
-    script = ";".join([
-        "Add-Type -AssemblyName System.Windows.Forms",
-        "Add-Type -AssemblyName System.Drawing",
-        "$owner = New-Object System.Windows.Forms.Form",
-        "$owner.TopMost = $true",
-        "$owner.StartPosition = 'Manual'",
-        "$owner.Location = New-Object System.Drawing.Point(-2000,-2000)",
-        "$owner.Size = New-Object System.Drawing.Size(1,1)",
-        "$owner.Show()",
-        "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
-        f"$d.Description = '{title}'",
-        "$d.ShowNewFolderButton = $true",
-        "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath }",
-        "$owner.Dispose()",
-    ])
-    try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-Sta", "-Command", script],
-            capture_output=True, text=True, timeout=300,
-        )
-        path = result.stdout.strip()
-        if result.stderr.strip():
-            log.warning("_win_folder_dialog_ps stderr: %s", result.stderr.strip())
-        return path if path else None
-    except Exception as e:
-        log.warning("_win_folder_dialog_ps error: %s", e)
-        return None
+def _win_file_dialog_ctypes(title: str, filetypes: list, initialdir: str | None = None) -> str | None:
+    """File picker via Win32 GetOpenFileNameW.
+    Must run on a thread with STA COM initialised — use _win_dialog_thread()."""
+    import ctypes
+    from ctypes import wintypes, create_unicode_buffer, byref, c_wchar_p, c_void_p
+
+    parts = []
+    for desc, pat in filetypes:
+        parts += [desc, pat]
+    filt = "\0".join(parts) + "\0\0"
+
+    hwnd = _win_owner_hwnd()
+    buf  = create_unicode_buffer(32768)
+
+    class OPENFILENAMEW(ctypes.Structure):
+        _fields_ = [
+            ("lStructSize",       wintypes.DWORD),
+            ("hwndOwner",         wintypes.HWND),
+            ("hInstance",         wintypes.HINSTANCE),
+            ("lpstrFilter",       c_wchar_p),
+            ("lpstrCustomFilter", c_wchar_p),
+            ("nMaxCustFilter",    wintypes.DWORD),
+            ("nFilterIndex",      wintypes.DWORD),
+            ("lpstrFile",         c_wchar_p),
+            ("nMaxFile",          wintypes.DWORD),
+            ("lpstrFileTitle",    c_wchar_p),
+            ("nMaxFileTitle",     wintypes.DWORD),
+            ("lpstrInitialDir",   c_wchar_p),
+            ("lpstrTitle",        c_wchar_p),
+            ("Flags",             wintypes.DWORD),
+            ("nFileOffset",       wintypes.WORD),
+            ("nFileExtension",    wintypes.WORD),
+            ("lpstrDefExt",       c_wchar_p),
+            ("lCustData",         wintypes.LPARAM),
+            ("lpfnHook",          c_void_p),
+            ("lpTemplateName",    c_wchar_p),
+            ("pvReserved",        c_void_p),
+            ("dwReserved",        wintypes.DWORD),
+            ("FlagsEx",           wintypes.DWORD),
+        ]
+
+    ofn = OPENFILENAMEW()
+    ofn.lStructSize    = ctypes.sizeof(OPENFILENAMEW)
+    ofn.hwndOwner      = hwnd
+    ofn.lpstrFilter    = filt
+    ofn.lpstrFile      = ctypes.cast(buf, c_wchar_p)
+    ofn.nMaxFile       = 32768
+    ofn.lpstrTitle     = title
+    ofn.lpstrInitialDir = initialdir or ""
+    # OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR
+    ofn.Flags          = 0x1000 | 0x0800 | 0x0008
+
+    ok = ctypes.windll.comdlg32.GetOpenFileNameW(byref(ofn))
+    if not ok:
+        err = ctypes.windll.comdlg32.CommDlgExtendedError()
+        if err:  # 0 = user cancelled, non-zero = real error
+            log.warning("GetOpenFileNameW failed: CommDlgExtendedError=0x%X", err)
+    if hwnd:
+        ctypes.windll.user32.DestroyWindow(hwnd)
+    return buf.value if ok else None
+
+
+def _win_folder_dialog_ctypes(title: str) -> str | None:
+    """Folder picker via SHBrowseForFolderW. Called on an STA thread by _win_dialog_thread."""
+    import ctypes
+    from ctypes import wintypes, create_unicode_buffer, byref, c_void_p, c_wchar_p
+
+    shell32 = ctypes.windll.shell32
+    ole32   = ctypes.windll.ole32
+    hwnd    = _win_owner_hwnd()
+
+    class BROWSEINFOW(ctypes.Structure):
+        _fields_ = [
+            ("hwndOwner",      wintypes.HWND),
+            ("pidlRoot",       c_void_p),
+            ("pszDisplayName", c_wchar_p),
+            ("lpszTitle",      c_wchar_p),
+            ("ulFlags",        wintypes.UINT),
+            ("lpfn",           c_void_p),
+            ("lParam",         wintypes.LPARAM),
+            ("iImage",         ctypes.c_int),
+        ]
+
+    display = create_unicode_buffer(260)
+    bi = BROWSEINFOW()
+    bi.hwndOwner      = hwnd
+    bi.pszDisplayName = ctypes.cast(display, c_wchar_p)
+    bi.lpszTitle      = title
+    # BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE | BIF_EDITBOX
+    bi.ulFlags        = 0x0001 | 0x0040 | 0x0010
+
+    pidl   = shell32.SHBrowseForFolderW(byref(bi))
+    result = None
+    if pidl:
+        path_buf = create_unicode_buffer(32768)
+        if shell32.SHGetPathFromIDListW(pidl, path_buf):
+            result = path_buf.value
+        ole32.CoTaskMemFree(pidl)
+
+    if hwnd:
+        ctypes.windll.user32.DestroyWindow(hwnd)
+    return result
+
+
+# ── STA thread runner ─────────────────────────────────────────────────────────
+# GetOpenFileNameW and SHBrowseForFolderW both need COM initialised as STA.
+# The asyncio thread-pool workers are MTA by default, so we spawn a fresh
+# thread, initialise COM as STA, run the dialog, then tear down.
+
+def _win_dialog_thread(fn, *args) -> str | None:
+    """Run a ctypes dialog function on a dedicated STA thread and return the result."""
+    import threading
+    result_box: list = [None]
+    exc_box:    list = [None]
+
+    def _run():
+        import ctypes as _ctypes
+        ole32 = _ctypes.windll.ole32
+        # COINIT_APARTMENTTHREADED = 0x2
+        hr = ole32.CoInitializeEx(None, 0x2)
+        try:
+            result_box[0] = fn(*args)
+        except Exception as e:
+            exc_box[0] = e
+        finally:
+            if hr in (0, 1):  # S_OK or S_FALSE (already initialised)
+                ole32.CoUninitialize()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout=310)  # slightly longer than the 300s dialog timeout
+
+    if exc_box[0]:
+        log.warning("Dialog thread error: %s", exc_box[0])
+    return result_box[0]
 
 
 # ── API: browse (native OS file picker) ───────────────────────────────────────
@@ -332,12 +419,11 @@ def _win_folder_dialog_ps(title: str) -> str | None:
 def _run_file_dialog(title: str, filetypes: list, initialdir: str | None = None) -> str | None:
     """
     Open a native OS file-picker dialog.
-    Windows: uses PowerShell + Windows Forms (works in PyInstaller embed — no tkinter needed).
+    Windows: uses ctypes GetOpenFileNameW — instant, no subprocess.
     Linux/Mac: uses tkinter.
-    Must run in a worker thread — NOT the asyncio event loop thread.
     """
     if IS_WIN:
-        return _win_file_dialog_ps(title, filetypes, initialdir)
+        return _win_dialog_thread(_win_file_dialog_ctypes, title, filetypes, initialdir)
 
     # Linux / Mac — tkinter
     try:
@@ -361,12 +447,11 @@ def _run_file_dialog(title: str, filetypes: list, initialdir: str | None = None)
 def _run_folder_dialog(title: str) -> str | None:
     """
     Open a native OS folder-picker dialog.
-    Windows: uses PowerShell + Windows Forms.
+    Windows: uses ctypes SHBrowseForFolderW on a dedicated STA thread.
     Linux/Mac: uses tkinter.
-    Must run in a worker thread — NOT the asyncio event loop thread.
     """
     if IS_WIN:
-        return _win_folder_dialog_ps(title)
+        return _win_dialog_thread(_win_folder_dialog_ctypes, title)
 
     # Linux / Mac — tkinter
     try:
@@ -592,10 +677,15 @@ async def api_setup(request: Request):
     # load_config() returns DEFAULTS on first run (no config.json yet).
     config = load_config()
 
+    binary_path = body.get("binary_path", "")
     model_path  = body.get("model_path", "")
     mmproj_path = body.get("mmproj_path", "")
     gpu_type    = body.get("gpu_type") or detect_gpu()
 
+    if binary_path:
+        config["server_binary"] = binary_path
+        if not isinstance(config.get("server_binaries"), dict): config["server_binaries"] = {}
+        config["server_binaries"][system] = binary_path
     config["model_path"]  = model_path
     config["mmproj_path"] = mmproj_path
     config["gpu_type"]    = gpu_type

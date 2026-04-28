@@ -653,7 +653,7 @@ async def setup_install_extras(request: Request):
                         push({"type": "log", "line": line})
 
                 py  = _get_pip_python()
-                cmd = [py, "-m", "pip", "install", "--upgrade", "--no-cache-dir"]
+                cmd = [py, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "--no-warn-script-location"]
                 if mode == "target":
                     cmd += ["--target", str(FEATURES_PACKAGES_DIR)]
                 cmd.extend(pkgs)

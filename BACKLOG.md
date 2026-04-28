@@ -133,7 +133,9 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Thinking pills duplicated after final response** — thinking pill appears once during streaming, then duplicates when the final response is rendered. Likely the provisional bubble's think content isn't cleaned up before the final bubble is inserted.
 - **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks (no closing `<tool_call|>`); `stripGemma4Artifacts()` cleans trailing artifacts before display. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging now in place — check browser console on next occurrence to determine actual rawText format and whether it's a prose-before-call issue or format mismatch.
-- **Setup end-to-end on new machine not yet verified** — GPU detection and llama CUDA download fixed (2026-04-27). File browser built. Full flow (model download → first boot) not yet tested.
+- **Setup end-to-end on new machine not yet verified** — GPU detection, llama CUDA download, file picker (ctypes native dialogs), and binary path saving all fixed (2026-04-28). Full flow (model download → first boot → chat) not yet tested end-to-end.
+- **Linux SYCL: downloads Windows asset on Linux** — `_find_binary_asset` appears to match the Windows SYCL zip when running on Linux. Needs investigation on a Linux machine — likely a platform-string mismatch in the asset filter. Archive extraction path structure also unknown (may affect where llama-server lands).
+- **Context bar layout: visual check needed** — redesigned in 2026-04-28 session (ctx-label / ctx-cap / bar / ctx-pct format). `margin-right: 56px` is an approximation. Verify alignment with composer in a live session.
 
 
 ---

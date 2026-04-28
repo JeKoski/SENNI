@@ -19,7 +19,7 @@ if not exist "%PYTHON%" (
 "%PYTHON%" -c "import fastapi" 2>nul
 if errorlevel 1 (
     echo Installing core dependencies into python-embed...
-    "%PYTHON%" -m pip install fastapi "uvicorn[standard]" python-multipart ddgs httpx beautifulsoup4 Pillow
+    "%PYTHON%" -m pip install --no-warn-script-location fastapi "uvicorn[standard]" python-multipart ddgs httpx beautifulsoup4 Pillow
     if errorlevel 1 ( echo Dependency install failed & pause & exit /b 1 )
 )
 
@@ -27,7 +27,7 @@ if errorlevel 1 (
 "%PYTHON%" -c "import PyInstaller" 2>nul
 if errorlevel 1 (
     echo Installing PyInstaller into python-embed...
-    "%PYTHON%" -m pip install pyinstaller
+    "%PYTHON%" -m pip install --no-warn-script-location pyinstaller
     if errorlevel 1 ( echo PyInstaller install failed & pause & exit /b 1 )
 )
 

@@ -158,6 +158,10 @@ async function callModel(system, messages, abortSignal = null) {
       onUsageUpdate(usageData.prompt_tokens || 0, usageData.total_tokens || 0);
     }
 
+    // Log full response text whenever a tool call is about to execute
+    // (plain replies are logged further down; this covers all tool paths)
+    if (rawText) console.log("[api] response text:", rawText.slice(0, 400));
+
     // ── Path A: structured tool_calls (OpenAI format) ─────────────────────
     // llama-server may parse some model formats natively into tool_calls.
     // delta.tool_calls are accumulated during streaming in _streamRound.
@@ -553,9 +557,16 @@ async function _enforceReadBeforeWrite(args) {
 }
 
 // ── Execute one tool ──────────────────────────────────────────────────────────
+let _toolPillSeq = 0;
+
 async function _execTool(name, args) {
-  console.log(`[tool] ${name}`, args);
+  console.log(`[tool] ${name}`, JSON.stringify(args).slice(0, 300));
   if (typeof onToolCall === "function") onToolCall(name, args, "loading");
+
+  // Show pill in chat timeline
+  const pillEl = (typeof appendToolIndicator === "function")
+    ? appendToolIndicator(name, args, `tool-${++_toolPillSeq}`)
+    : null;
 
   let result = "";
   try {
@@ -585,8 +596,9 @@ async function _execTool(name, args) {
     result = `Error: ${e.message}`;
   }
 
+  if (pillEl && typeof markToolIndicatorDone === "function") markToolIndicatorDone(pillEl, String(result));
   if (typeof onToolCall === "function") onToolCall(name, args, "done", result);
-  console.log(`[tool result] ${name}:`, String(result).slice(0, 120));
+  console.log(`[tool result] ${name}:`, String(result).slice(0, 300));
   return result;
 }
 
