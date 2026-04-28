@@ -92,11 +92,13 @@ async def api_history_save(request: Request):
     except Exception:
         meta = {}
 
+    preview = body.get("preview", "")
     meta.update({
         "tab_id": tab_id,
         "title": title,
         "tokens": tokens,
         "vision_mode": vision_mode,
+        "preview": preview,
         "last_saved": datetime.now(timezone.utc).isoformat(),
         "latest_session": session_id,
     })

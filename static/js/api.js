@@ -349,6 +349,7 @@ async function _streamRound(url, system, msgs, gen, abortSignal) {
         frequency_penalty: gen.frequency_penalty ?? 0.0,
         ...(gen.dry_multiplier ? { dry_multiplier: gen.dry_multiplier, dry_base: gen.dry_base ?? 1.75, dry_allowed_length: gen.dry_allowed_length ?? 2 } : {}),
         stream:            true,
+        stream_options:    { include_usage: true },
       }),
     });
 
@@ -374,11 +375,12 @@ async function _streamRound(url, system, msgs, gen, abortSignal) {
         let parsed;
         try { parsed = JSON.parse(raw); } catch { continue; }
 
+        if (parsed.usage) usageData = parsed.usage;
+
         const choice = parsed.choices?.[0];
         if (!choice) continue;
 
         if (choice.finish_reason) finishReason = choice.finish_reason;
-        if (parsed.usage) usageData = parsed.usage;
 
         const delta = choice.delta;
         if (!delta) continue;
@@ -557,16 +559,9 @@ async function _enforceReadBeforeWrite(args) {
 }
 
 // ── Execute one tool ──────────────────────────────────────────────────────────
-let _toolPillSeq = 0;
-
 async function _execTool(name, args) {
   console.log(`[tool] ${name}`, JSON.stringify(args).slice(0, 300));
   if (typeof onToolCall === "function") onToolCall(name, args, "loading");
-
-  // Show pill in chat timeline
-  const pillEl = (typeof appendToolIndicator === "function")
-    ? appendToolIndicator(name, args, `tool-${++_toolPillSeq}`)
-    : null;
 
   let result = "";
   try {
@@ -596,7 +591,6 @@ async function _execTool(name, args) {
     result = `Error: ${e.message}`;
   }
 
-  if (pillEl && typeof markToolIndicatorDone === "function") markToolIndicatorDone(pillEl, String(result));
   if (typeof onToolCall === "function") onToolCall(name, args, "done", result);
   console.log(`[tool result] ${name}:`, String(result).slice(0, 300));
   return result;

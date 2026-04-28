@@ -29,7 +29,7 @@ function updateContextBar(tokens) {
 
   // Cap label: e.g. "32k" from 32768
   if (cap && _contextSize > 0) {
-    cap.textContent = Math.floor(_contextSize / 1024) + 'k';
+    cap.textContent = Math.round(_contextSize / 1000) + 'k';
   }
 
   // Percentage label — show 0% when no tokens yet

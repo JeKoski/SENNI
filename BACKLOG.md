@@ -94,10 +94,10 @@ Goal: zero-dependency install for end users. Double-click → runs. Auto-updates
 Visual redesign + step structure complete (`wizard.html` / `wizard.css` / `wizard.js` rewritten 2026-04-19).
 Backend wiring complete (2026-04-19 session 2): `scripts/setup_router.py` added with all 4 endpoints live.
 Remaining Phase 1 work:
-- **espeak-ng install/bundle** — espeak is a system binary (not pip). Wizard detects and warns if missing. For distribution: bundle a portable espeak-ng binary inside the Tauri package, auto-set `config["tts"]["espeak_path"]`. Deferred to Phase 3 / Tauri packaging.
-- **Checksum verify on downloads** — not yet implemented. llama.cpp releases don't publish checksums; could do size check only.
-- **Senni companion folder** (`companions/senni/`) — create with config + avatar so Meet Senni step shows real portrait. Portrait placeholder JPG already at `static/images/senni_placeholder.jpg`.
-- **End-to-end test** — run wizard on a clean install to verify binary download + extraction + model download + extras install flow
+- **espeak-ng install/bundle** — on newer kokoro (misaki G2P), English TTS works without espeak. Non-English voices may still need it. Error messaging should reflect platform reality (Linux likely still needs it). Deferred to Settings redesign + Tauri packaging.
+- **Download size check** — not yet implemented. llama.cpp releases don't publish checksums; check `Content-Length` header vs bytes received. Warn + offer retry on mismatch. Quick win in `scripts/setup_router.py`.
+- **Senni companion folder** ✓ — wired up; app copies `templates/companions/senni` on boot if not present.
+- **End-to-end test** ✓ — verified on fresh Windows machine (2026-04-28): CUDA binary download, model download, file picker, TTS + memory install all working.
 
 **Phase 2 — PyInstaller sidecar**
 Compile Python backend (`main.py` + all scripts + static files) into a single binary via PyInstaller.
@@ -131,11 +131,9 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ## Bugs
 
-- **Thinking pills duplicated after final response** — thinking pill appears once during streaming, then duplicates when the final response is rendered. Likely the provisional bubble's think content isn't cleaned up before the final bubble is inserted.
-- **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks (no closing `<tool_call|>`); `stripGemma4Artifacts()` cleans trailing artifacts before display. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging now in place — check browser console on next occurrence to determine actual rawText format and whether it's a prose-before-call issue or format mismatch.
-- **Setup end-to-end on new machine not yet verified** — GPU detection, llama CUDA download, file picker (ctypes native dialogs), and binary path saving all fixed (2026-04-28). Full flow (model download → first boot → chat) not yet tested end-to-end.
-- **Linux SYCL: downloads Windows asset on Linux** — `_find_binary_asset` appears to match the Windows SYCL zip when running on Linux. Needs investigation on a Linux machine — likely a platform-string mismatch in the asset filter. Archive extraction path structure also unknown (may affect where llama-server lands).
-- **Context bar layout: visual check needed** — redesigned in 2026-04-28 session (ctx-label / ctx-cap / bar / ctx-pct format). `margin-right: 56px` is an approximation. Verify alignment with composer in a live session.
+- **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks; `stripGemma4Artifacts()` cleans trailing artifacts. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging in place — check browser console on next occurrence.
+- **Linux SYCL: downloads Windows asset on Linux** — `_find_binary_asset` matches the Windows SYCL zip when running on Linux. Needs investigation on a Linux machine — likely a platform-string mismatch in the asset filter. Archive extraction path structure also unknown.
+- **Tool pill behaviour needs further testing** — pills now wired and config-driven; need a live session to verify mood/memory write/relational pills all render and complete correctly. Some weirdness may remain from the earlier double-pill era.
 
 
 ---
