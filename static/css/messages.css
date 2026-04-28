@@ -601,58 +601,46 @@ body.controls-always-visible .msg-controls {
 
 /* ── Context progress bar ─────────────────────────────────────────────────── */
 #ctx-bar-wrap {
-  padding: 5px 40px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 4px 4px;
+  /* Align right edge with the input-wrap corner:
+     send button ≈ 48px + gap 8px = 56px right offset */
+  margin-right: 56px;
 }
-#ctx-bar-track {
-  height: 3px;
-  background: rgba(255,255,255,0.07);
-  border-radius: 99px;
-  overflow: hidden;
-  margin-bottom: 5px;
-  min-width: 0;
+.ctx-label {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  color: var(--text-dim);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
+.ctx-cap {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-width: 24px;
+}
+/* bar track: inherit from base.css .ctx-token-bar (80px inline-block) */
+.ctx-token-bar { flex-shrink: 0; }
 .ctx-bar-fill {
   height: 100%;
   border-radius: 99px;
-  background: #4ade80;
   transition: width .4s ease, background .4s ease;
   width: 0%;
 }
 .ctx-bar-fill.ctx-caution { background: #facc15; }
 .ctx-bar-fill.ctx-warning { background: #fb923c; }
 .ctx-bar-fill.ctx-danger  { background: #f87171; }
-
-#ctx-bar-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-#ctx-bar-label {
-  font-size: 10.5px;
-  color: var(--text-dim);
+.ctx-pct {
+  font-size: 10px;
   font-family: 'DM Mono', monospace;
-  white-space: nowrap;
-}
-#ctx-bar-actions {
-  display: flex;
-  gap: 6px;
-}
-#ctx-bar-actions button {
-  background: none;
-  border: none;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 11px;
   color: var(--text-dim);
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 5px;
-  transition: color .15s, background .15s;
-  white-space: nowrap;
-}
-#ctx-bar-actions button:hover {
-  color: var(--text-muted);
-  background: var(--surface2);
+  flex-shrink: 0;
+  min-width: 26px;
 }
 
 /* ── Welcome / empty state ────────────────────────────────────────────────── */
@@ -709,7 +697,7 @@ body.controls-always-visible .msg-controls {
 
 /* ── Per-message orb (companion messages) ───────────────────────────────── */
 .msg-orb {
-  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; margin-top: 18px;
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; margin-top: 6px;
   background:
     radial-gradient(circle at 38% 32%, color-mix(in srgb, var(--active-mood-color) 55%, white) 0%, transparent 55%),
     radial-gradient(circle at 62% 68%, var(--active-mood-color) 0%, transparent 55%),

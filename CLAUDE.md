@@ -118,7 +118,7 @@ Copying a companion folder between installs:
 ## Environment
 
 - OS: Linux (primary) + Windows (also supported and tested)
-- GPU: Intel Arc A750 (SYCL build on Windows, oneAPI on Linux) — switching to RTX 5060 Ti + CUDA soon
+- GPU: RTX 5060 Ti 16GB (CUDA) — on new Windows machine (Core Ultra 7 270K, 32GB DDR5)
 - Models tested: Gemma 4 (primary), Qwen3.5 9B Q4_K_M
 - Temperature: 0.8 (critical for Qwen — higher breaks tool call syntax)
 - `--reasoning-format deepseek` enabled (Qwen3 only — disable for Gemma 4)
@@ -140,6 +140,74 @@ Copying a companion folder between installs:
 - **BACKLOG.md** — all pending work: quick wins, design sessions needed, on-hold items. Single source of truth for "what's next".
 - **design/*.md** — system docs and design decisions. Update when the relevant system is touched.
 - Rule: when we touch a system in a session, we document it in that session. Don't defer.
+
+---
+
+## Session notes — 2026-04-28 (Native file picker + QA fixes)
+
+**Native OS file picker working. Six QA bugs fixed. Binary path now saved from picker.**
+
+### What changed
+
+**`scripts/server.py` — Native file dialogs via Win32 ctypes (replaces in-browser modal for settings/wizard):**
+- `_win_owner_hwnd()`: creates 1×1 off-screen WS_EX_TOPMOST|WS_VISIBLE window, calls SetForegroundWindow so dialog gets foreground focus
+- `_win_file_dialog_ctypes()`: OPENFILENAMEW struct, GetOpenFileNameW — instant native open-file dialog
+- `_win_folder_dialog_ctypes()`: BROWSEINFOW struct, SHBrowseForFolderW + CoTaskMemFree — native folder picker
+- `_win_dialog_thread()`: spawns fresh OS thread, CoInitializeEx(None, 0x2) for STA (required — FastAPI thread pool is MTA, GetOpenFileNameW's shell extensions need STA COM), runs dialog fn, CoUninitialize
+- `/api/setup` POST handler now accepts and persists `binary_path` → `config["server_binary"]`
+
+**`scripts/setup_router.py` — pip install now includes `--no-warn-script-location`** (was spamming PATH warnings in setup log)
+
+**`scripts/boot_service.py` — Linux LD_LIBRARY_PATH fix:**
+- For all non-Intel Linux launches, binary's parent directory is prepended to `LD_LIBRARY_PATH` so co-located `.so` files (libllama, libggml, etc.) are found at runtime
+
+**`static/js/wizard.js`:**
+- `browseFile()` now calls `POST /api/browse` directly (native dialog) — removed `fileBrowser.open()` call
+- `_startBoot()` now includes `binary_path: enginePath` in POST body — was being set in JS but never sent, so picked binary was lost on wizard finish
+
+**`static/js/settings-server.js`:**
+- `spBrowse()` and `spBrowseTts()` now call `POST /api/browse` (native dialog)
+
+**`static/js/api.js` — Tool pills wired into `_execTool`:**
+- `_toolPillSeq` counter; `appendToolIndicator` called before execution, `markToolIndicatorDone` called after — tool pills now appear in chat during tool calls
+- Args logged as `JSON.stringify(args).slice(0, 300)`, result logged as `String(result).slice(0, 300)`
+- rawText logged before tool path branching for Gemma4 debugging
+
+**`static/js/chat-ui.js` — `updateContextBar` redesigned:**
+- Sets `ctx-cap` (e.g. "32k"), `ctx-pct` ("X%"), and bar fill width
+- Removed old flat label format
+
+**`static/css/messages.css`:**
+- `.msg-orb` margin-top: 18px → 6px (was sitting too far from bubble top)
+- Full context bar CSS rewrite: `.ctx-label`, `.ctx-cap`, `.ctx-pct` elements; `margin-right: 56px` for composer alignment
+
+**`static/chat.html` — Context bar HTML restructured:**
+```html
+<div class="ctx-meta-row" id="ctx-bar-wrap">
+  <span class="ctx-label">Context</span>
+  <span class="ctx-cap" id="ctx-cap">—</span>
+  <span class="ctx-token-bar"><span class="ctx-token-fill ctx-bar-fill" id="ctx-bar-fill"></span></span>
+  <span class="ctx-pct" id="ctx-pct">0%</span>
+</div>
+```
+
+**`build-embed.bat` — both pip install calls now have `--no-warn-script-location`**
+
+### Status on new machine
+- Native file picker (file + folder): ✅ working (ctypes STA threading)
+- pip warning suppression: ✅ working
+- Tool call pills in chat: ✅ now appear
+- Binary path saved from file picker to config: ✅ fixed
+- Context bar: redesigned (visual check pending in live session)
+- Orb spacing: tightened (visual check pending)
+- Linux LD_LIBRARY_PATH: added (needs Linux machine to verify)
+- Linux SYCL: still downloads Windows asset on Linux — needs Linux machine to diagnose
+
+### Next session
+- Visual check: context bar layout and orb spacing in live chat
+- Setup end-to-end verification: model download → first boot → full wizard flow on new machine
+- Linux SYCL bug: needs Linux machine — Windows SYCL asset downloading, archive path structure unknown
+- Then: Settings Features tab or Gemma4 debugging
 
 ---
 
@@ -193,156 +261,6 @@ Copying a companion folder between installs:
 - Verify llama-server boots with CUDA build
 - Complete setup end-to-end (model download, first boot)
 - Then: Settings Features tab or Gemma4 debugging
-
----
-
-## Session notes — 2026-04-26 #2 (Main Chat UI Redesign — all 10 steps + polish)
-
-**UI redesign complete. All steps 1–10 shipped + visual polish pass.**
-
-### What changed
-
-**`static/css/base.css` — Steps 1–5, 10 + polish:**
-- Full token system (surface tiers, border tiers, elevation presets, glow vars, spacing, radii, motion vars)
-- 3-gradient body ambient, sidebar sunken bg
-- Sidebar: portrait card (name moved BELOW frame with overlap + shadow), mood strip, chats ⚙ menu, 2-pill footer
-- Sidebar gradient: two-layer (horizontal dark-left/light-right + vertical top/bottom)
-- Chat header strip: companion name + meta, mood sphere, ⋯ btn, header ⋯ menu
-- Orb mode system: `body.orb-mode-chat` / `body.orb-mode-header`; Mode B CSS stub
-- `--active-mood-color` CSS var on `:root` — set by `_applyMoodToOrb()`
-- `chat-header-sphere` uses `color-mix()` for dynamic mood color
-- `.chat-area::before` subtle 60px grid overlay (`rgba(140,145,220,0.028)`)
-- Global `:focus-visible` ring; `#msg-input:focus-visible` excluded (input-wrap handles it)
-- Composer padding bumped to 72px horizontal
-
-**`static/css/messages.css` — Steps 6–7, 9–10 + polish:**
-- Companion bubble: `rgba(255,255,255,0.025)` bg, `--border-subtle`, left-edge 2px/70% halo
-- User bubble: indigo/purple gradient, inner highlight, drop shadow
-- `.msg-row` animation: `var(--dur-slow) var(--ease-out-soft)` + `body.perf-mode` kill
-- `.bubble { position: relative }` for `::before` halo
-- Companion `em`: Lora serif, `rgba(221,225,240,0.6)` (muted, not link-blue)
-- Tab active: left-edge indigo stripe via `::before`; `.tab-content` + `.tab-preview` for two-line tabs
-- `.msg-orb`: 32px sphere, `margin-top: 18px` (visually centred in bubble body)
-- `.day-marker` pill; `.retrieve` CSS variant for retrieve_memory tool indicator
-- `.msg-ctrl-btn`: `--elev-1` + `--r-xs`
-
-**`static/chat.html`:**
-- Companion name moved outside `.avatar` div — now a sibling `<div class="companion-name">` below the frame
-- Chats ⋯ replaced with ⚙; Export ↑ / Import ↓ icons corrected
-
-**`static/js/chat.js`:**
-- `_memorySurfacedCount` state var; `setOrbMode(mode)`
-- `_applyMoodToOrb`: sets `--active-mood-color` on `:root`, calls `updateSidebarMoodStrip` + `updateChatHeader`
-
-**`static/js/chat-session.js`:**
-- `loadStatus`: `setOrbMode(config.orb_mode || 'chat')`
-- `reloadMemoryContext`: sets `_memorySurfacedCount`, calls `updateChatHeader`
-
-**`static/js/chat-ui.js`:**
-- `updateContextBar`: className reset preserves `ctx-token-fill` (was stripping it)
-
-**`static/js/chat-controls.js`:**
-- `toggleHeaderMenu` / `closeHeaderMenu`, `toggleChatsMenu` / `closeChatsMenu`
-- `openMemoryManager()` stub; `updateChatHeader()`, `updateSidebarMoodStrip()`
-
-**`static/js/message-renderer.js`:**
-- `.msg-orb` injected in `appendMessage`, `_createStreamBubble`, `_appendHeartbeatMessage`
-- `_HIDDEN_TOOLS`: `set_mood`, `memory`, `update_relational_state` → null (hidden)
-- `_toolDisplayName()`, updated `_toolLabel()`, null guard in `markToolIndicatorDone`
-
-**`static/js/chat-tabs.js`:**
-- `_saveCurrentTabState`: captures `tab.preview` from last message
-- `renderTabList`: two-line tab items with `.tab-preview` span
-
-**`static/js/api.js`:**
-- Thinking block duplication fixed: `onThinking` moved inside inline `<think>` extraction block only — streaming `delta.reasoning_content` path already called it live, second call was the dupe
-
-### Next session
-- Settings: Features tab (post-wizard reconfiguration)
-- Attachments bug: images not appearing in bubbles, AI not seeing them (pre-existing)
-- Context bar: verify fill/label visible in live session
-- Orb Mode B: test with `config.orb_mode = 'header'`
-- Performance mode toggle in Settings (CSS hooks in place)
-- soul_edit_mode: verify branching works for each mode
-
----
-
-## Session notes — 2026-04-26 (Quick wins + memory instruction rewrite)
-
-**4 quick wins shipped. Memory system instructions fully rewritten.**
-
-### What changed
-
-**`static/js/wizard.js` — boot spinner delayed until TTS ready:**
-- Removed premature `ring.classList.add('done')` at llama-server ready signal. Ring now keeps spinning until `_markBootDone` fires (after TTS resolves, or immediately if TTS disabled). "Say Hello" button was already correctly delayed — only the ring flip was wrong.
-
-**`static/chat.html` + `static/css/messages.css` + `static/js/tts.js` + `static/js/chat-controls.js` — TTS stop button:**
-- Added `#tts-stop-btn` (amber ♪, distinct from red generation stop). Appears when TTS is fetching or playing, disappears when queue empties.
-- `_ttsUpdateStopBtn()` called at 4 state transitions: `_ttsEnqueue`, `_ttsDrainFetchQueue` end, `_ttsPlayNext` when queue empties, `ttsStop`.
-- `stopGeneration()` now also calls `ttsStop()` — pressing ■ kills both stream and audio.
-
-**`static/companion-wizard.html` — appearance step titles swapped:**
-- Eyebrow now static: "Step 02 — How do they look?". H1 gets the sub-step label ("Foundation", "Body", "Face", etc.) via `id="step2-heading"`. Removed `id="step2-eyebrow"` (no longer dynamic).
-
-**`static/companion-wizard.html` + `scripts/config.py` — avatar PNG normalization:**
-- `write_avatar_file` (config.py) now converts to PNG via Pillow (RGBA, `img.save(png)`). Falls back to original format if Pillow unavailable. All companion avatars now saved as `.png`.
-- `wizFinish` is now `async`. If no avatar uploaded, `_avatarFallbackPng()` renders the species silhouette SVG to a 512×512 canvas with species color + dark background, outputs PNG. Runs during compile animation — no visible delay.
-
-**`static/js/system-prompt.js` — full refactor + memory instruction rewrite:**
-- Shared semantic text extracted into `_buildMemFileBlock(rule2, agencyMode)` and `_memEpisodicBlock` constant. Gemma4 and generic paths no longer duplicate content — generic path appends `_memFileXml` + `_memEpisodicXml` on top of the same semantics.
-- `soul_edit_mode` config now wired into system prompt via `_memSoulBlock(agencyMode)`. Four modes (display names match Wizard): Settled (user_profile.md only), Reflective (+ self_notes.md), Adaptive (+ companion_identity.md), Unbound (full freedom).
-- Removed stale `Types: Fact (S) . Concept (N) . Vibe (F) . Logic (T)` — no `type` field in write_memory schema.
-- Removed numerical estimates from write_memory ("sparingly 2-5") — replaced with qualitative triggers.
-- `supersede_memory` added to episodic section header.
-- De-duplication rule added: one fact, one place.
-- `mind/` now described with topic file support (`mind/<topic>.md` for projects, collaborations).
-- Generic XML write_memory example no longer includes `<parameter=type>Fact</parameter>`.
-
-**`static/js/tool-parser.js` + `tools/memory.py` + `tools/write_memory.py` + `tools/retrieve_memory.py` — tool description updates:**
-- `memory`: positive framing, `mind/` "not loaded into active context automatically", `memory/` archive reference removed.
-- `write_memory`: dropped "sparingly 2-5", now "encode a vivid moment, insight, or meaningful fact".
-- `retrieve_memory`: tighter phrasing, same meaning.
-
-### Next session
-- Settings: Features tab (post-wizard reconfiguration)
-- Gemma4: observe console logs during real tool call session — debug logging is in place (Path F + plain reply log)
-- soul_edit_mode: verify branching works correctly for each mode in a real session
-
----
-
-## Session notes — 2026-04-24 #6 (Senni template wiring + Gemma4 rescue)
-
-**Senni avatar wired. Gemma4 partial tool call rescue added.**
-
-### What changed
-
-**`scripts/setup_router.py` — auto-install Senni template:**
-- `instantiate_companion_template("senni", "senni")` called in `GET /api/setup/status` — no-op if folder already exists
-- `"senni_companion": bool` added to status response
-
-**`static/js/wizard.js` + `static/css/wizard.css` — Senni avatar display:**
-- `_applySenniAvatar()`: replaces `.senni-placeholder` div with `<img src="/api/companion/senni/avatar">` in `#senni-orb-icon` and `#meet-portrait`. `onerror` fallback removes img (placeholder stays on 404).
-- Called at DOMContentLoaded (rerun path) and after status fetch when `detected.senni_companion` is true (first-run path).
-- `.meet-portrait img { object-fit: cover }` added to wizard.css (`.senni-orb-icon img` rule already existed).
-
-**`static/js/tool-parser.js` — Gemma4 rescue + artifact strip:**
-- `rescuePartialGemma4ToolCall(text)`: finds `<|tool_call>call:name{` without closing `<tool_call|>`, locates last `}`, tries JSON parse with same unescape+relax logic as Path E. Returns `[{name, args}]` on success, `[]` otherwise.
-- `stripGemma4Artifacts(text)`: removes unclosed `<|tool_call>` fragments, trailing `word|>` patterns, trailing `<|` sequences.
-
-**`static/js/api.js` — Path F + debug logging:**
-- Path F: if Gemma4 and rawText contains `<|tool_call>` but Path E missed → try `rescuePartialGemma4ToolCall()` → if rescued, execute and continue. If rescue fails → `stripGemma4Artifacts()` before bubble/TTS + console.warn.
-- Debug log: all Gemma4 plain replies (no tool call matched) logged to console — enables observing actual rawText for format investigation.
-- Header comment updated to include Path F.
-
-### Bugs fixed / closed
-
-| Item | Fix |
-|------|-----|
-| Senni wizard portrait: placeholder forever | `instantiate_companion_template` in status + `_applySenniAvatar()` wired to status fetch |
-| Gemma4 partial `<|tool_call>` artifacts in bubble | Path F strips unclosed fragments before display |
-
-### Remaining Gemma4 investigation
-Path F and debug logging are in place. Next step: observe console logs during a real Gemma4 tool call session to determine if the root cause is format mismatch vs prose-before-call vs truncation.
 
 ---
 

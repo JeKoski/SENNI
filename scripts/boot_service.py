@@ -254,6 +254,13 @@ def _build_and_launch(config: dict) -> None:
         shell_args = {"shell": False}
 
     else:  # Linux
+        # Always add the binary's directory to LD_LIBRARY_PATH so co-located
+        # shared libs (libllama.so, libggml.so, libllama-common.so.0, …) are found.
+        binary_dir = str(Path(binary).parent) if binary else ""
+        if binary_dir:
+            existing = env.get("LD_LIBRARY_PATH", "")
+            env["LD_LIBRARY_PATH"] = (binary_dir + ":" + existing) if existing else binary_dir
+
         if gpu == "intel":
             oneapi_sh  = "/opt/intel/oneapi/setvars.sh"
             safe_cmd   = " ".join(shlex.quote(a) for a in cmd_args)
