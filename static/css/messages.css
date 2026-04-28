@@ -627,6 +627,7 @@ body.controls-always-visible .msg-controls {
 /* bar track: inherit from base.css .ctx-token-bar (80px inline-block) */
 .ctx-token-bar { flex-shrink: 0; }
 .ctx-bar-fill {
+  display: block;
   height: 100%;
   border-radius: 99px;
   transition: width .4s ease, background .4s ease;

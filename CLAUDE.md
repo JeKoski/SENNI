@@ -143,6 +143,53 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-29 (Context bar, tool pills, bubble gap, tab preview)
+
+**Context bar working. Tool pills config-driven with natural language labels. Bubble gap fixed. Tab preview persisted.**
+
+### What changed
+
+**`static/js/api.js`:**
+- `stream_options: { include_usage: true }` added to streaming request body — llama.cpp requires this flag to emit `usage` in streaming chunks at all (the prior chunk-ordering fix was correct but incomplete)
+- Removed duplicate direct `appendToolIndicator` call from `_execTool` — `onToolCall` callback in `chat-session.js` is now the single source, eliminating double pills for visible tools
+
+**`static/js/chat-ui.js`:**
+- Context cap display: `Math.floor(size / 1024)` → `Math.round(size / 1000)` — now shows "128k" for n_ctx=128000 as users expect
+
+**`static/css/messages.css`:**
+- Added `display: block` to `.ctx-bar-fill` — span is inline by default so `width` had no effect; bar now fills correctly
+
+**`static/css/orb.css`:**
+- `margin-bottom: calc(var(--orb-size)...)` was applied to ALL `.msg-row.companion` — changed to `.messages > :last-child` only. Eliminated massive gap between every companion message.
+
+**`static/js/message-renderer.js` — tool pill visibility + labels:**
+- Replaced static `_HIDDEN_TOOLS` set with config-driven `_isHidden(name, args)` function
+- Reads `config.tool_pills` (loaded from server); falls back to sensible defaults if config not yet loaded
+- `memory` reads/lists always hidden (spammy); writes/deletes now visible if `memory_writes` enabled
+- `set_mood` and `update_relational_state` now visible (controlled by `mood` / `relational` toggles)
+- `_toolDisplayName` and `_toolLabel` updated to cover all previously-hidden tools in natural language: "Saved soul/personality.md", "→ curious", "closeness: 4 · trust: high"
+
+**`scripts/config.py` DEFAULTS:**
+- Added `tool_pills` section: `memory_writes`, `mood`, `relational`, `episodic_write`, `episodic_read` (off), `web`, `other` — all true except episodic_read. Settings UI toggles to come in Settings redesign.
+
+**`static/js/chat-tabs.js` + `scripts/history_router.py`:**
+- Tab preview (last-message sub-text) now persisted: sent in save request, stored in `meta.json`, restored in `_loadTabsFromDisk`. Survives page reload.
+
+### Status
+- Context bar: ✅ fills correctly, shows correct k-value
+- Tool pills: ✅ mood/memory writes/relational state all visible; Settings toggles deferred to Settings redesign
+- Bubble gap: ✅ fixed — last-child only gets orb clearance margin
+- Tab preview: ✅ persists across reloads
+- Download size check: still to do (quick win)
+
+### Next session
+- Download size check in `setup_router.py` (quick win — check Content-Length vs bytes received)
+- Settings + Companion Settings UI redesign (design session)
+- Linux testing on Ubuntu 25.10 (old PC)
+- Windows Arc testing via iGPU on new machine
+
+---
+
 ## Session notes — 2026-04-28 (Native file picker + QA fixes)
 
 **Native OS file picker working. Six QA bugs fixed. Binary path now saved from picker.**
