@@ -151,6 +151,7 @@ async function _saveCurrentSessionToDisk() {
         title:            tab.title,
         tokens:           tab.tokens || 0,
         vision_mode:      tab.visionMode || null,
+        preview:          tab.preview || '',
         messages:         _serializeMessages(),
         history:          history,
         images:           images,
@@ -236,6 +237,7 @@ async function _loadTabsFromDisk() {
           created:    meta.created ? new Date(meta.created).getTime() : Date.now(),
           tokens:     meta.tokens || 0,
           visionMode: meta.vision_mode || null,
+          preview:    meta.preview || '',
         }));
     }
   } catch (e) {

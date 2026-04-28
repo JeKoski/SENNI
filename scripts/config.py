@@ -141,6 +141,17 @@ DEFAULTS = {
         "mid_convo_k":     4,
     },
 
+    # Tool pill visibility — which tool categories show activity pills in chat
+    "tool_pills": {
+        "memory_writes":  True,   # soul/mind file saves (memory tool write/delete)
+        "mood":           True,   # set_mood calls
+        "relational":     True,   # update_relational_state calls
+        "episodic_write": True,   # write_memory / supersede_memory (ChromaDB writes)
+        "episodic_read":  False,  # retrieve_memory (spammy — off by default)
+        "web":            True,   # web_search / web_scrape
+        "other":          True,   # any other tools
+    },
+
     # Generation defaults (per-request, no restart needed)
     "generation": {
         "temperature":        1.0,

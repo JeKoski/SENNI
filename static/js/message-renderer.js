@@ -157,11 +157,24 @@ function sealThinkingBlock() {
 }
 
 // ── Tool indicators ───────────────────────────────────────────────────────────
-// Tools hidden from the chat UI by default
-const _HIDDEN_TOOLS = new Set(['set_mood', 'memory', 'update_relational_state']);
+// Returns true if the tool call should NOT show a pill.
+// Reads config.tool_pills (populated from server config) — safe to call before config loads.
+function _isHidden(name, args) {
+  const tp = (typeof config !== 'undefined' && config?.tool_pills) || {};
+  const on = (key, def) => tp[key] ?? def;
+  const action = args?.action;
+  if (name === 'memory')
+    return (action === 'write' || action === 'delete') ? !on('memory_writes', true) : true;
+  if (name === 'set_mood')               return !on('mood', true);
+  if (name === 'update_relational_state') return !on('relational', true);
+  if (name === 'write_memory' || name === 'supersede_memory') return !on('episodic_write', true);
+  if (name === 'retrieve_memory')        return !on('episodic_read', false);
+  if (name === 'web_search' || name === 'web_scrape') return !on('web', true);
+  return !on('other', true);
+}
 
 function appendToolIndicator(name, args, id) {
-  if (_HIDDEN_TOOLS.has(name)) return null;
+  if (_isHidden(name, args)) return null;
   const list = document.getElementById('messages');
   const el   = document.createElement('div');
   const isRetrieve = (name === 'retrieve_memory');
@@ -208,28 +221,47 @@ function markToolIndicatorDone(el, result) {
 
 function _toolDisplayName(name) {
   const map = {
+    memory:                 'Memory',
     write_memory:           'Memory',
     retrieve_memory:        'Memory',
     supersede_memory:       'Memory',
-    update_relational_state:'Memory',
-    web_search:             'Web Search',
+    update_relational_state:'Bond',
+    web_search:             'Search',
     web_scrape:             'Web',
     get_time:               'Time',
     set_mood:               'Mood',
-    memory:                 'File',
   };
   return map[name] || name;
 }
 
 function _toolLabel(name, args) {
-  if (name === 'write_memory') {
-    const summary = args.context_summary || (args.content || '').slice(0, 40);
-    return `+ Saved to ${summary || '…'}`;
+  // markdown memory (soul/mind files)
+  if (name === 'memory') {
+    const file = args?.filename || '';
+    const folder = args?.folder ? args.folder + '/' : '';
+    if (args?.action === 'write')  return `Saved ${folder}${file}`;
+    if (args?.action === 'delete') return `Deleted ${folder}${file}`;
+    return '';
   }
-  if (name === 'retrieve_memory') return `◦ Recalling "${(args.query || '').slice(0, 40)}"`;
-  if (name === 'supersede_memory') return '↺ Updated memory';
-  if (name === 'web_search') return `"${(args.query || '').slice(0, 40)}"`;
-  if (name === 'web_scrape') return (args.url || '').slice(0, 50);
+  // ChromaDB episodic memory
+  if (name === 'write_memory') {
+    const summary = args?.context_summary || (args?.content || '').slice(0, 50);
+    return `Saved · ${summary || '…'}`;
+  }
+  if (name === 'retrieve_memory') return `Recalling "${(args?.query || '').slice(0, 40)}"`;
+  if (name === 'supersede_memory') return 'Updated a memory';
+  // mood
+  if (name === 'set_mood') return args?.mood_name ? `→ ${args.mood_name}` : '';
+  // relational state — show first meaningful key/value pair if present
+  if (name === 'update_relational_state') {
+    const entries = Object.entries(args || {}).filter(([, v]) => v !== null && v !== undefined);
+    return entries.length ? entries.slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(' · ') : 'Updated';
+  }
+  // web
+  if (name === 'web_search') return `"${(args?.query || '').slice(0, 45)}"`;
+  if (name === 'web_scrape') return (args?.url || '').slice(0, 50);
   if (name === 'get_time')   return 'current time';
-  return JSON.stringify(args).slice(0, 60);
+  // fallback — show args without JSON noise
+  const entries = Object.entries(args || {}).filter(([, v]) => typeof v === 'string' || typeof v === 'number');
+  return entries.length ? entries.slice(0, 2).map(([, v]) => String(v).slice(0, 30)).join(' · ') : '';
 }
