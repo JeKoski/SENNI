@@ -268,10 +268,14 @@ Instruction-tuned models read the soul file as context, not instructions. The be
 
 ---
 
-## Character Book (Lorebook)
+## Character Book (Library)
+
+*Called "Library" in the SENNI UI. "character_book" / "lorebook" in the V2 spec.*
 
 ### What it is
-A knowledge base of lore entries. Each entry has keywords; when a keyword appears in the conversation, the entry's content is injected into context. Used for world-building, detailed lore, faction info, location descriptions — things too specific to keep in the main identity but needed when referenced.
+A knowledge base of keyword-triggered entries. When a keyword appears in conversation, the entry's content is injected into context. Used for world facts, NPC profiles, location descriptions, recurring concepts — things too specific to always occupy context but needed when referenced.
+
+**The key distinction from ChromaDB:** ChromaDB = *what happened* (episodic, auto-generated). Library = *what is true* (permanent world facts, manually authored or companion-written).
 
 ### Structure
 ```json
@@ -297,11 +301,17 @@ Three tiers:
 **Tier 1 — Compile-time seed (immediate):**
 The "First things to know" textarea (Step 8) currently seeds ChromaDB. It should ALSO populate the `character_book` with a single `constant: true` entry so the data is in the portable card.
 
-**Tier 2 — Manual lorebook editor (future):**
-A tab in Companion Settings where users can add/edit/delete lorebook entries. Good for extensive world-building companions.
+**Tier 2 — Library tab editor (future):**
+The Library tab in Companion Settings. Add/edit/delete entries. Keyword tag chip input, content textarea, enable toggle, ordering. Stub until in-chat keyword scanning is built.
 
-**Tier 3 — ChromaDB ↔ lorebook bridge (future, complex):**
-Consolidated memory notes that have been confirmed important could optionally be promoted to lorebook entries. This turns episodic memory into permanent world-knowledge. Needs design.
+**Tier 3 — In-chat keyword scanning (future):**
+Scan last N turns before each `buildSystemPrompt()` call. Inject matched entries into memory context block. Token budget (e.g. 500 tokens max per turn).
+
+**Tier 4 — Companion-authored entries (future):**
+A `write_library_entry` tool lets the companion write their own permanent world facts — the same way `write_memory` writes episodic notes to ChromaDB. Companions can naturally graduate important recurring facts into permanent library entries.
+
+**Tier 5 — ChromaDB → Library promotion (far future):**
+UI in Memory Manager to promote confirmed important episodic notes to permanent library entries. Needs design.
 
 ### In-chat injection (future feature)
 SENNI currently doesn't scan conversation for lorebook keywords. When implemented:
@@ -326,9 +336,10 @@ Prioritized by impact and implementation complexity:
 | `first_mes` auto-generation at compile | Medium | Medium | ✅ Done 2026-04-21 — archetype × closeness band |
 | `alternate_greetings` UI | Low | Medium | Wizard Step 9 or companion settings |
 | `mes_example` generation | Low | Medium | Auto-generate from voice style + traits |
-| Lorebook editor UI | Medium | Medium | New companion settings tab |
-| Lorebook keyword scanning in chat | Medium | High | Per-turn scan, token budget |
-| ChromaDB → lorebook promotion | Low | High | Complex, needs separate design |
+| Library tab editor UI | Medium | Medium | Companion Settings > Library tab (stub until scanning built) |
+| In-chat keyword scanning | Medium | High | Per-turn scan, token budget — makes Library entries actually fire |
+| Companion `write_library_entry` tool | Medium | Low | Companion writes permanent world facts, same pattern as `write_memory` |
+| ChromaDB → Library promotion UI | Low | High | Memory Manager — promote episodic notes to permanent facts |
 
 ---
 

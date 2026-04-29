@@ -143,6 +143,50 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-04-29 (Settings redesign + Identity/Evolution system design)
+
+**Full Settings + Companion Settings tab structure locked. Identity evolution system designed. Library system named. Unbound transition specced. Design docs created.**
+
+### Decisions made
+
+**Settings panel — 6 tabs:** Model · Generation · Display · Features · Tools · About
+- TTS paths moved Server → Features. Display tab: markdown, pill visibility, "show technical details". Companions removed as tab — moves to sidebar.
+
+**Companion Settings — 7 tabs:** Identity & Memory · Generation · Heartbeat · Expression ✦ · Voice · Tools · Library (stub)
+- Identity & Memory: name, avatar (both slots), force-read, retrieval sliders, → Memory Manager link. File editor moves to Memory Manager.
+- Presence + Mood → Expression tab with segmented [Presence | Mood] toggle. "Lore" → Library.
+
+**Sidebar + orb:** Companions button replaces heartbeat. Orb clickable for manual heartbeat (hover: dim + icon + tooltip).
+
+**Memory Manager:** Separate floating window. Phase 1: file editor. Phase 2: ChromaDB browser.
+
+**Library system:** `character_book` in V2 spec. ChromaDB = *what happened*, Library = *what is true*. Four tiers. Companion-authored entries planned.
+
+**Identity evolution system** — see `design/IDENTITY.md`:
+- File renames: `companion_identity.md` → `soul.md`, `self_notes.md` → `soul_reflections.md`. Use `paths.py` constants before rename pass.
+- New tool suite: `soul_identity`, `soul_reflect`, `soul_user`, `note` — replaces generic `memory` tool for soul/mind files
+- Each tool: `action: "read" | "write"`. Full rewrite only. `note.py` unrestricted filenames + `list` action.
+- Evolution levels gate tool access (Settled/Reflective/Adaptive/Unbound). `write_library` + memory curation available at all levels (separate toggles).
+
+**Unbound transition:** Custom styled modal → orb color-shift starts → settings close → `unbound.md` created from template → one-shot heartbeat fires → orb settles. `unbound.md` always in context (lean directive, companion writes below separator). Unbound extras: `set_presence`, `create_mood`/`edit_mood` tools.
+
+**Chaos orb redesign:** `chaos` state → smooth color-shifting cycle (~8–12s, curated, not random). Used for Unbound transition + available as presence preset.
+
+### Bug fixed
+- Server restart overlay disconnected after UI redesign — rewired `showRestartOverlay()` + `watchBootLog()` in `restartServer()` and `spRestartServer()`. `spRestartServer` now closes settings before overlay.
+
+### Files created/updated
+- `design/IDENTITY.md` — created
+- `design/SETTINGS-REDESIGN.md` — tab layouts locked
+- `design/CHARA_CARD.md` — Library rename + tiers
+- `design/SYSTEMS.md` — chaos orb redesign noted
+- `BACKLOG.md` — multi-session tracks section added
+
+### Next session
+- Settings redesign implementation — visual pass first (token system, panel chrome, tab bar)
+
+---
+
 ## Session notes — 2026-04-29 (Context bar, tool pills, bubble gap, tab preview)
 
 **Context bar working. Tool pills config-driven with natural language labels. Bubble gap fixed. Tab preview persisted.**
@@ -328,6 +372,8 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 | `design/ORB_DESIGN.md`      | Orb positioning, layout modes, CSS variable documentation                                                                           |
 | `design/MOOD.md`            | Mood system — full design + implementation notes. Config schema, default moods, orb schema translation.                             |
 | `design/UI-REDESIGN.md`     | Main chat UI redesign — full spec: token system, sidebar, header, orb modes, bubbles, composer, tool call polish, impl order.       |
+| `design/SETTINGS-REDESIGN.md` | Settings + Companion Settings redesign — current state inventory, everything that needs a home, open design questions.            |
+| `design/IDENTITY.md`          | Identity evolution system — soul/mind file structure, tool suite, evolution levels, Unbound transition, chaos orb.                |
 | `design/SETUP_WIZARD.md`    | Setup wizard — step flow, GPU→binary mapping, animation principles, backend endpoints needed.                                       |
 | `design/WIZARD.md`          | Companion Creation Wizard — V2 character card format, Birth Certificate architecture, step flow, appearance sub-steps.              |
 | `design/CHARA_CARD.md`      | Chara card V2 field reference, SENNI alignment, soul file best practices, first_mes, system_prompt, character_book/lorebook design. |

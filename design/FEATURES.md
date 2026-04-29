@@ -79,9 +79,7 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 ## Settings & Tools
 
-- **Tool settings — global and per companion**
-  - Global Settings: toggle to completely disable/enable all tools (overrides companion settings); default settings per tool.
-  - Companion Settings: per-tool enable/disable toggles; per-tool per-companion settings (e.g. `get_time` format).
+See `design/SETTINGS-REDESIGN.md` for full inventory of planned Settings and Companion Settings changes.
 
 - **TTS — remaining work**
   - ~~Global enable/disable toggle~~ — **Done.** Under Settings > Server.
@@ -113,13 +111,7 @@ Items grouped by area. Items marked **(design needed)** have open questions that
 
 - Buttons (restart server, settings etc.) into pill shape with (icon Name)
 
-- **Memory viewer / editor** — a panel or tab for browsing, editing, creating, and deleting memory notes directly. Scope:
-  - **soul/ and mind/ markdown files** — read/edit/save via the existing `memory` tool backend
-  - **ChromaDB episodic notes** — list, read, edit content, delete individual entries
-  - **Duplicate detection + cleanup** — `POST /api/memory/dedup` endpoint already exists (exact-content dedup, used for session-id bug cleanup). UI should expose this as a button. Future: embedding-similarity pass for near-duplicates with human review.
-  - **Note breakdown by source** — `status` endpoint currently returns total count only. Add breakdown: how many are companion-written (`function_source` = T/S/N/F) vs system-ingested (`session_history`). Useful for understanding memory composition.
-  - **Note health indicators** — surfaced count, last retrieved, superseded status
-  - Could live in Companion Settings as a dedicated Memory tab, or as a sidebar panel. Needs design conversation before building.
+- **Memory viewer / editor** — see `design/SETTINGS-REDESIGN.md` for scope. Needs design conversation before building.
 
 ---
 

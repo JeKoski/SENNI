@@ -433,7 +433,7 @@ Performance mode toggle: Settings > Display (not yet built). When active, adds `
 
 ## 11. What's deferred
 
-- **Settings windows redesign** — adopt new tokens/elevation after main chat is done. Same design language, not a structural change.
+- **Settings windows redesign** — see `design/SETTINGS-REDESIGN.md`. Design phase in progress.
 - **Memory Manager panel** — stub (title + "coming soon") now; full implementation in a future design session.
 - **Wizard appearance sections** — blocked on layered avatar / new PC.
 
