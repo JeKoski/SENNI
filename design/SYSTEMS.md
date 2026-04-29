@@ -27,6 +27,14 @@ Legacy migration chain in `_migrateLegacyState()`:
 - Old `effectsColor`/`effectsAlpha` (intermediate format) → split into `glowColor`/`ringColor`
 - Old single-color presets → all fields derived from `dotColor`
 
+### Chaos state — color-shifting redesign (planned)
+
+The `chaos` orb state is being redesigned from random noise into a smooth **color-shifting** cycle. The orb passes slowly through a curated color sequence — expansive, not erratic. Full loop ~8–12s. Used in two contexts:
+1. **Unbound transition** — plays from the moment the user confirms Unbound, covers settings close + `unbound.md` creation + heartbeat fire, then settles as companion starts thinking
+2. **Chaos presence preset** — available as a selectable presence preset for any companion
+
+See `design/IDENTITY.md` → Chaos orb section for full spec.
+
 ### Animation registry (`orb.ANIMATIONS`)
 
 Lives in `orb.js`. Each entry: `{ id, label, target, states }`. Adding a new animation = one registry entry; UI generates automatically. Current animations: `glowEnabled`, `breathEnabled`, `ringEnabled`, `dotsEnabled`. Toggled via `data-no-*` attributes on `#companion-orb`, targeted by CSS attribute selectors in `orb.css`.

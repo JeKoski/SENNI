@@ -486,17 +486,19 @@ async function restartServer() {
   const btn = document.getElementById('restart-btn');
   btn.textContent = '… Restarting';
   btn.disabled = true;
+  showRestartOverlay();
   try {
-    const res  = await fetch('/api/boot', {
+    await fetch('/api/boot', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ force: true }),
     });
-    const data = await res.json();
-    if (data.ok) { btn.textContent = '↺ Restart'; btn.disabled = false; }
   } catch (e) {
     btn.textContent = '↺ Restart'; btn.disabled = false;
+    hideRestartOverlay();
+    return;
   }
+  watchBootLog(hideRestartOverlay);
 }
 
 async function spRunDiagnostics() {
@@ -539,12 +541,19 @@ async function spRunDiagnostics() {
 
 async function spRestartServer() {
   if (!confirm('Restart llama-server with current settings?')) return;
-  spShowSavedToast('Restarting…');
-  await fetch('/api/boot', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ force: true }),
-  });
+  closeSettings();
+  showRestartOverlay();
+  try {
+    await fetch('/api/boot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ force: true }),
+    });
+  } catch (e) {
+    hideRestartOverlay();
+    return;
+  }
+  watchBootLog(hideRestartOverlay);
 }
 
 async function spFactoryReset() {

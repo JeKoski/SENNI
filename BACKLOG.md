@@ -131,9 +131,10 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ## Bugs
 
+- **Server restart overlay disconnected** — `showRestartOverlay()` + `watchBootLog()` exist in `chat-session.js` but weren't being called from `restartServer()` or `spRestartServer()` after the UI redesign. ✅ Fixed 2026-04-29.
 - **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks; `stripGemma4Artifacts()` cleans trailing artifacts. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging in place — check browser console on next occurrence.
-- **Linux SYCL: downloads Windows asset on Linux** — `_find_binary_asset` matches the Windows SYCL zip when running on Linux. Needs investigation on a Linux machine — likely a platform-string mismatch in the asset filter. Archive extraction path structure also unknown.
-- **Tool pill behaviour needs further testing** — pills now wired and config-driven; need a live session to verify mood/memory write/relational pills all render and complete correctly. Some weirdness may remain from the earlier double-pill era.
+- **Linux SYCL: downloads Windows asset on Linux** — `_find_binary_asset` matches the Windows SYCL zip when running on Linux. Needs investigation on a Linux machine — likely a platform-string mismatch in the asset filter. Archive extraction path structure also unknown. *(Deferred — needs two-system workspace to diagnose.)*
+- **Tool pill behaviour** — verified working in live session (2026-04-29). Keep an eye out for regressions.
 
 
 ---
@@ -145,18 +146,14 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 - **Senni app icon** — design and add an icon for the binary (`.ico` for Windows PyInstaller spec), wizard header, and elsewhere in the UI. Needs design conversation for the visual; wiring into the spec is straightforward once an `.ico` exists.
 - **Setup: Manual path entry for features** — add optional path fields to the Features step for users who already have kokoro/chromadb installed globally or in a custom location. Entering a path should skip the local install and let setup boot TTS/memory cleanly. Also add a "skip, I'll configure later" option so setup can complete without installing.
 - **Settings: Features tab** — new tab in Settings consolidating all optional-feature paths and status. Should include: TTS enable/python path/espeak path/voice path (currently scattered), ChromaDB enable/packages path, per-feature reinstall/detect buttons. Goal: full post-wizard reconfiguration without re-running setup.
-- **Mood → TTS override UI** — speed/blend per mood in Companion Settings Mood tab. Schema already in config, just needs UI. See `design/TTS.md`.
-- **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`.
+- **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`. *(Deferred to post-Tauri.)*
 - **Mid-session gap detection** — long idle → re-inject updated timestamp into system prompt. Piggyback on consolidation idle timer. Low priority.
 - **Tool settings UI** — global enable/disable per tool + per-companion overrides. Settings > Tools tab. See `design/FEATURES.md`.
-- **Performance mode toggle** — setting that reduces CPU/GPU load for lower-end hardware. Disables orb animations (glow/particle effects become static), disables CSS transitions where possible, potentially reduces polling frequency. Toggle location TBD (Settings > Display, or quick-access in UI). Context: i5-7600K hits 20-30% CPU just from orb animation + TTS. Should be usable on modest hardware without a gaming rig.
+- **Performance mode toggle** — setting that reduces CPU/GPU load for lower-end hardware. Disables orb animations (glow/particle effects become static), disables CSS transitions where possible, potentially reduces polling frequency. Context: i5-7600K hits 20-30% CPU just from orb animation + TTS. CSS hooks (`body.perf-mode`) already in place. *(Deferred to post-Tauri.)*
 - **Tool call visual polish** — replace raw syntax in chat with end-user-friendly display. Hide mood/set_mood calls entirely. For memory writes: show a subtle confirmation ("Memory saved"). For memory recalls: show something about the retrieved content (exact design TBD — needs design thought). Add Settings toggle to show full technical details (current raw view) for power users; when enabled, also surface normally-hidden info like full memory save/recall payloads from the log.
 - **llama-server args drift** — launch args in `server.py` may have drifted from current llama.cpp API. Needs a pass against current docs.
 - **Import QA round-trip** — ongoing edge case testing as real use surfaces issues.
-- **Setup Wizard — model step downloaded state on load** — `_applyModelStatus` runs during system check, but if user navigates directly to model step without running check (e.g. back-nav from engine step), downloaded state won't be applied. Consider calling `_applyModelStatus` also on `goTo('model')` with a lightweight fetch, or caching last status.
-- **Setup Wizard — system check extras reporting** — extend the system check step to detect extras (same logic as `GET /api/setup/extras-status`). Show result inline only if found ("✓ Kokoro found at …"). Loading label "Checking for extras…" disappears silently if nothing found.
 - **Settings — show resolved paths for extras** — after wizard or detection, Settings should display `./features/packages/` path and espeak binary path so user can verify what's actually being used. Paths already stored in config; just needs Settings UI wiring.
-- **Setup Wizard — skip steps on rerun** — when wizard is launched a second time (not first-run), allow skipping steps where existing valid config is already detected. Each step should show a "Skip — already configured" option when the relevant asset is present.
 
 ---
 
@@ -164,6 +161,42 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Companion Mood activation** — Companions use moods inconsistently or not at all. How are we instructing mood tool usage? Something we should change?
 	- Adding a sentence to identity file helps with this ("You are expressive and change your active mood to reflect how you feel."), but it doesn't seem like the companion has knowledge of what their current active mood is? Perhaps we should inject the Mood description in another way? Also double check we are actually injecting it somewhere.
+
+---
+
+## Multi-session tracks
+
+*Larger bodies of work spanning multiple sessions. Each has a design doc.*
+
+### Settings & Companion Settings Redesign
+See `design/SETTINGS-REDESIGN.md`. Tab structure locked. Implementation order:
+1. Visual pass — token system on panel chrome, tab bar styling
+2. Settings panel: Model, Generation, Display, Features, Tools, About tabs
+3. Companion Settings: Identity & Memory, Expression ✦, Tools, Library tabs
+4. Memory Manager window (phase 1: file editor moved from Companion Settings)
+5. Sidebar changes: Companions button, orb heartbeat trigger
+
+### Identity & Evolution System Refactor
+See `design/IDENTITY.md`. Full rework of soul/mind tools and file naming.
+1. Add filename constants to `scripts/paths.py`
+2. Rename `companion_identity.md` → `soul.md`, `self_notes.md` → `soul_reflections.md` across codebase
+3. New tool files: `soul_identity.py`, `soul_reflect.py`, `soul_user.py`, `note.py`
+4. Tool availability gated by evolution level in tool discovery
+5. System prompt updated to describe new tool suite
+6. Unbound transition UX: custom modal, orb color-shift animation, one-shot heartbeat, `unbound.md` creation
+7. Chaos orb redesign: smooth color-shifting cycle (used for Unbound transition + as a presence preset)
+8. Presence autonomy tools: `set_presence`, `create_mood`, `edit_mood` (Unbound level)
+
+### Library System
+See `design/CHARA_CARD.md` → Library section. Tiers:
+1. Library tab stub in Companion Settings
+2. Library entry editor UI
+3. In-chat keyword scanning engine
+4. `write_library` companion tool
+5. ChromaDB → Library promotion UI (Memory Manager)
+
+### CHARA_CARD field improvements
+Several small-to-medium improvements documented in `design/CHARA_CARD.md` — `description`/`personality` field expansion, `mes_example` generation, alternate greetings UI, etc. Good for a focused session when the wizard is next touched.
 
 ---
 
@@ -188,7 +221,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 *Implementation-ready items specific to `static/companion-wizard.html` and `scripts/wizard_compile.py`.*
 
 - **`first_mes` / `system_prompt` / `post_history_instructions`** — see Quick Wins above, wizard is the compile source
-- **Lorebook editor UI** — new tab in Companion Settings. Medium complexity. See `design/CHARA_CARD.md` → Character Book section.
+- **Library tab** — stub tab in Companion Settings for keyword-triggered lore entry editor. Full feature (in-chat keyword scanning + companion `write_library_entry` tool) is multi-session. See `design/CHARA_CARD.md` → Library system and `design/SETTINGS-REDESIGN.md`.
 - **Alternate greetings UI** — Step 9 or Companion Settings picker. Low priority.
 - **`output_dir` refactor** in `wizard_compile.py` — prerequisite for standalone distribution.
 
