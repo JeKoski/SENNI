@@ -120,7 +120,6 @@ function spPopulateServer() {
   (cfg.server_args_custom || []).forEach(c => spAddCustomArg(c.flag, c.value, c.enabled !== false));
 
   spRenderOsPaths(spSettings.config);
-  spPopulateTts(spSettings.config?.tts || {});
 }
 
 function spToggleArg(key, tog) {
@@ -134,7 +133,7 @@ function spToggleArg(key, tog) {
 }
 
 function spMarkServerDirty() {
-  _spSetDirty('server');
+  _spSetDirty('model');
   document.getElementById('sp-restart-note').style.display = 'flex';
 }
 
@@ -279,152 +278,6 @@ function spClearBinary() {
   spMarkServerDirty();
 }
 
-// ── TTS path helpers ───────────────────────────────────────────────────────────
-
-function spPopulateTts(tts) {
-  const tog = document.getElementById('sp-tts-enabled');
-  if (tog) tog.classList.toggle('on', !!tts.enabled);
-
-  const _setDisp = (id, val, empty) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = val ? val.split(/[\\/]/).pop() : empty;
-    el.title       = val || '';
-    el.className   = 'sp-file-display' + (val ? ' set' : '');
-  };
-  _setDisp('sp-tts-python-display', tts.python_path || '', 'Auto-detect');
-  _setDisp('sp-tts-voices-display', tts.voices_path || '', 'Auto-detect');
-  _setDisp('sp-tts-espeak-display', tts.espeak_path || '', 'Auto-detect');
-}
-
-async function spBrowseTts(type) {
-  const dispId = type === 'python' ? 'sp-tts-python-display'
-               : type === 'voices' ? 'sp-tts-voices-display'
-               :                     'sp-tts-espeak-display';
-  const disp = document.getElementById(dispId);
-  if (!disp) return;
-
-  const original = { text: disp.textContent, cls: disp.className };
-  disp.textContent = '…';
-
-  // voices → folder picker; espeak → espeak binary picker; python → python picker
-  const isFolder = type === 'voices';
-  const titles   = { voices: 'Select Kokoro voices folder', python: 'Select Python executable', espeak: 'Select espeak-ng binary' };
-
-  try {
-    const browseType = isFolder ? 'folder' : type;
-    const res  = await fetch('/api/browse', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: browseType, title: titles[type] }) });
-    const data = await res.json();
-    if (data.ok && data.path) {
-      disp.textContent = data.path.split(/[\\/]/).pop();
-      disp.title       = data.path;
-      disp.className   = 'sp-file-display set';
-      spMarkServerDirty();
-      return;
-    } else {
-      disp.textContent = original.text; disp.className = original.cls;
-      return;
-    }
-  } catch {}
-
-  // Fallback: inline text input
-  disp.textContent = original.text; disp.className = original.cls;
-  _spShowTtsPathInput(type, dispId, disp.title);
-}
-
-function _spShowTtsPathInput(type, dispId, currentVal) {
-  const inputId = 'sp-tts-' + type + '-inp';
-  document.getElementById(inputId)?.remove();
-  const disp = document.getElementById(dispId);
-  if (!disp) return;
-
-  const placeholders = {
-    python: '/usr/bin/python3 or C:\\Python312\\python.exe',
-    voices: '/path/to/kokoro/voices',
-    espeak: '/usr/bin/espeak-ng',
-  };
-
-  const inp = document.createElement('input');
-  inp.type        = 'text';
-  inp.id          = inputId;
-  inp.placeholder = placeholders[type] || '/path/to/file';
-  inp.value       = currentVal || '';
-  inp.style.cssText = [
-    'width:100%', 'margin-top:6px',
-    'background:rgba(0,0,0,0.2)',
-    'border:1px solid rgba(129,140,248,0.3)',
-    'border-radius:9px', 'color:var(--text)',
-    'font-family:"DM Mono",monospace', 'font-size:12px',
-    'padding:9px 12px', 'outline:none', 'display:block',
-  ].join(';');
-  inp.addEventListener('input', () => {
-    const val = inp.value.trim();
-    disp.textContent = val ? val.split(/[\\/]/).pop() : 'Auto-detect';
-    disp.title       = val;
-    disp.className   = 'sp-file-display' + (val ? ' set' : '');
-    spMarkServerDirty();
-  });
-
-  const row = disp?.closest('.sp-file-row');
-  if (row) row.insertAdjacentElement('afterend', inp);
-  inp.focus();
-}
-
-function spClearTtsPath(type) {
-  const dispId  = type === 'python' ? 'sp-tts-python-display'
-                : type === 'voices' ? 'sp-tts-voices-display'
-                :                     'sp-tts-espeak-display';
-  const inputId = 'sp-tts-' + type + '-inp';
-  const disp = document.getElementById(dispId);
-  if (disp) { disp.textContent = 'Auto-detect'; disp.title = ''; disp.className = 'sp-file-display'; }
-  document.getElementById(inputId)?.remove();
-  spMarkServerDirty();
-}
-
-// ── TTS default path fill ──────────────────────────────────────────────────────
-async function spFillTtsDefault(type) {
-  const dispId = type === 'python' ? 'sp-tts-python-display'
-               : type === 'voices' ? 'sp-tts-voices-display'
-               :                     'sp-tts-espeak-display';
-  const disp = document.getElementById(dispId);
-  if (!disp) return;
-
-  const original = { text: disp.textContent, cls: disp.className };
-  disp.textContent = '…';
-
-  try {
-    const endpoint = type === 'python' ? '/api/tts/python-default' : '/api/tts/espeak-default';
-    const res  = await fetch(endpoint);
-    const data = await res.json();
-    if (data.ok && data.path) {
-      disp.textContent = data.path.split(/[\\/]/).pop();
-      disp.title       = data.path;
-      disp.className   = 'sp-file-display set';
-      spMarkServerDirty();
-      // Show the version string if we got one (python only)
-      if (data.version) {
-        const row = disp.closest('.sp-file-row');
-        let hint = row?.parentElement?.querySelector('.sp-tts-version-hint');
-        if (!hint) {
-          hint = document.createElement('div');
-          hint.className = 'sp-tts-version-hint';
-          hint.style.cssText = 'font-size:11px;color:rgba(221,225,240,0.3);margin-top:3px;font-family:"DM Mono",monospace';
-          row?.insertAdjacentElement('afterend', hint);
-        }
-        hint.textContent = data.version;
-      }
-    } else {
-      disp.textContent = original.text; disp.className = original.cls;
-      const row = disp.closest('.sp-file-row');
-      let hint = row?.parentElement?.querySelector('.sp-tts-version-hint');
-      if (hint) hint.textContent = 'Not found in default locations';
-    }
-  } catch {
-    disp.textContent = original.text; disp.className = original.cls;
-  }
-}
-
 // ── Save ──────────────────────────────────────────────────────────────────────
 async function spSaveServer(andClose = false) {
   const serverArgs = {};
@@ -461,21 +314,7 @@ async function spSaveServer(andClose = false) {
     }),
   });
 
-  // Save TTS settings (separate endpoint — manages its own process lifecycle)
-  await fetch('/api/settings/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      enabled:     document.getElementById('sp-tts-enabled')?.classList.contains('on') ?? false,
-      python_path: document.getElementById('sp-tts-python-display')?.title || '',
-      voices_path: document.getElementById('sp-tts-voices-display')?.title || '',
-      espeak_path: document.getElementById('sp-tts-espeak-display')?.title || '',
-    }),
-  });
-  // Reload TTS status in the browser so the Voice tab and playback reflect new state
-  if (typeof ttsReload === 'function') ttsReload();
-
-  _spClearDirty('server');
+  _spClearDirty('model');
   document.getElementById('sp-restart-note').style.display = 'none';
   spShowSavedToast('Server settings saved ✓ — restart required');
   if (andClose) closeSettings();

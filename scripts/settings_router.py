@@ -121,6 +121,37 @@ def create_settings_router(
                 kill_tts_server()
         return {"ok": True}
 
+    @router.post("/api/settings/display")
+    async def api_save_display_settings(request: Request):
+        body = await request.json()
+        config = load_config()
+        if "show_technical_details" in body:
+            config["show_technical_details"] = bool(body["show_technical_details"])
+        if "tool_pills" in body and isinstance(body["tool_pills"], dict):
+            config["tool_pills"] = {**DEFAULTS["tool_pills"], **body["tool_pills"]}
+        save_config(config)
+        return {"ok": True}
+
+    @router.post("/api/settings/features")
+    async def api_save_features_settings(request: Request):
+        body = await request.json()
+        config = load_config()
+        if "memory_enabled" in body:
+            mem = config.get("memory", {})
+            mem["enabled"] = bool(body["memory_enabled"])
+            config["memory"] = mem
+        save_config(config)
+        return {"ok": True}
+
+    @router.post("/api/settings/tools")
+    async def api_save_tools_settings(request: Request):
+        body = await request.json()
+        config = load_config()
+        if "tools_enabled" in body and isinstance(body["tools_enabled"], dict):
+            config["tools_enabled"] = {**DEFAULTS["tools_enabled"], **body["tools_enabled"]}
+        save_config(config)
+        return {"ok": True}
+
     @router.post("/api/settings/memory")
     async def api_save_memory_settings(request: Request):
         body = await request.json()

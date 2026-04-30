@@ -152,6 +152,22 @@ DEFAULTS = {
         "other":          True,   # any other tools
     },
 
+    # Show full raw tool call JSON in chat (power-user debug view)
+    "show_technical_details": False,
+
+    # Global tool enable/disable — each key matches the tool filename in tools/
+    "tools_enabled": {
+        "memory":                 True,
+        "write_memory":           True,
+        "retrieve_memory":        True,
+        "supersede_memory":       True,
+        "update_relational_state": True,
+        "set_mood":               True,
+        "web_search":             True,
+        "web_scrape":             True,
+        "get_time":               True,
+    },
+
     # Generation defaults (per-request, no restart needed)
     "generation": {
         "temperature":        1.0,
@@ -414,6 +430,10 @@ def load_config() -> dict:
         # Deep-merge memory so sub-keys added later (e.g. mid_convo_k) fill
         # in for existing installs that have an older memory block on disk.
         merged["memory"] = {**DEFAULTS["memory"], **saved.get("memory", {})}
+        # Deep-merge tool_pills so new keys (added in future) get defaults.
+        merged["tool_pills"] = {**DEFAULTS["tool_pills"], **saved.get("tool_pills", {})}
+        # Deep-merge tools_enabled so new tools get defaults.
+        merged["tools_enabled"] = {**DEFAULTS["tools_enabled"], **saved.get("tools_enabled", {})}
         return resolve_platform_paths(merged)
     except (json.JSONDecodeError, OSError):
         return dict(DEFAULTS)

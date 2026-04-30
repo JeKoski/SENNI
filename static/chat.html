@@ -623,15 +623,17 @@
     </div>
 
     <div class="sp-tabs">
-      <button class="sp-tab active" data-tab="server"     onclick="spSwitchTab('server')">Server</button>
+      <button class="sp-tab active" data-tab="model"      onclick="spSwitchTab('model')">Model</button>
       <button class="sp-tab"        data-tab="generation" onclick="spSwitchTab('generation')">Generation</button>
+      <button class="sp-tab"        data-tab="display"    onclick="spSwitchTab('display')">Display</button>
+      <button class="sp-tab"        data-tab="features"   onclick="spSwitchTab('features')">Features</button>
       <button class="sp-tab"        data-tab="companion"  onclick="spSwitchTab('companion')">Companion</button>
-      <button class="sp-tab"        data-tab="about"      onclick="spSwitchTab('about')">About</button>
       <button class="sp-tab"        data-tab="tools"      onclick="spSwitchTab('tools')">Tools</button>
+      <button class="sp-tab"        data-tab="about"      onclick="spSwitchTab('about')">About</button>
     </div>
 
-    <!-- Server tab -->
-    <div class="sp-body tab-body active" id="tab-server">
+    <!-- Model tab -->
+    <div class="sp-body tab-body active" id="tab-model">
       <div class="sp-section-label">Model</div>
       <div class="sp-file-row">
         <div class="sp-file-display" id="sp-model-display">—</div>
@@ -684,36 +686,6 @@
         ⚠ A server restart is needed to apply these changes
       </div>
 
-      <div class="sp-section-label" style="margin-top:22px">
-        Voice (Kokoro TTS)
-        <span style="font-size:10px;color:rgba(221,225,240,0.3);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px">optional — requires separate install</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        <div class="sp-tog" id="sp-tts-enabled" onclick="this.classList.toggle('on');spMarkServerDirty()"></div>
-        <span style="font-size:13px;color:rgba(221,225,240,0.6)">Enable Kokoro TTS</span>
-      </div>
-      <div id="sp-tts-paths">
-        <div class="sp-field-label">Python executable <span style="font-size:10.5px;color:rgba(221,225,240,0.25);font-weight:400">(with kokoro installed — blank = auto)</span></div>
-        <div class="sp-file-row" style="margin-bottom:10px">
-          <div class="sp-file-display" id="sp-tts-python-display">Auto-detect</div>
-          <button class="sp-btn-sm" onclick="spBrowseTts('python')">Browse</button>
-          <button class="sp-btn-sm sp-btn-ghost" onclick="spFillTtsDefault('python')">Default</button>
-          <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('python')">Clear</button>
-        </div>
-        <div class="sp-field-label">Voices directory <span style="font-size:10.5px;color:rgba(221,225,240,0.25);font-weight:400">(folder containing .pt files — blank = auto)</span></div>
-        <div class="sp-file-row" style="margin-bottom:10px">
-          <div class="sp-file-display" id="sp-tts-voices-display">Auto-detect</div>
-          <button class="sp-btn-sm" onclick="spBrowseTts('voices')">Browse</button>
-          <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('voices')">Clear</button>
-        </div>
-        <div class="sp-field-label">espeak-ng path <span style="font-size:10.5px;color:rgba(221,225,240,0.25);font-weight:400">(blank = use PATH)</span></div>
-        <div class="sp-file-row">
-          <div class="sp-file-display" id="sp-tts-espeak-display">Auto-detect</div>
-          <button class="sp-btn-sm" onclick="spBrowseTts('espeak')">Browse</button>
-          <button class="sp-btn-sm sp-btn-ghost" onclick="spFillTtsDefault('espeak')">Default</button>
-          <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('espeak')">Clear</button>
-        </div>
-      </div>
     </div>
 
     <!-- Generation tab -->
@@ -737,18 +709,6 @@
         <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">per message (1–20)</span>
       </div>
       <input type="number" class="sp-input" id="sp-max-tool-rounds" value="8" min="1" max="20" style="width:80px" oninput="spMarkGenerationDirty()"/>
-      <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
-        <div class="sp-tog" id="tog-controls-visible" onclick="spToggleControlsVisible(this)"></div>
-        <span class="sp-field-label" style="margin:0">Always show message controls</span>
-      </div>
-      <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
-        <div class="sp-tog" id="tog-markdown" onclick="spToggleMarkdown(this)"></div>
-        <span class="sp-field-label" style="margin:0">Render markdown in messages</span>
-      </div>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
-        <div class="sp-tog" id="tog-thinking-autoopen" onclick="spToggleThinkingAutoopen(this)"></div>
-        <span class="sp-field-label" style="margin:0">Auto-open thinking block while streaming</span>
-      </div>
       <div class="sp-field-label" style="margin-top:18px">Vision mode
         <span class="sp-note" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px">how images are handled across turns</span>
       </div>
@@ -756,6 +716,118 @@
         <label class="sp-radio"><input type="radio" name="vision-mode" value="always" checked onchange="spMarkGenerationDirty()"/> <span>Always re-encode</span> <span class="sp-note">full vision every turn — best with GPU</span></label>
         <label class="sp-radio"><input type="radio" name="vision-mode" value="once"         onchange="spMarkGenerationDirty()"/>   <span>Once per conversation</span> <span class="sp-note">faster on CPU, loses follow-up vision</span></label>
         <label class="sp-radio"><input type="radio" name="vision-mode" value="ask"          onchange="spMarkGenerationDirty()"/>    <span>Ask each time</span> <span class="sp-note">prompt appears when attaching an image</span></label>
+      </div>
+    </div>
+
+    <!-- Display tab -->
+    <div class="sp-body tab-body" id="tab-display">
+      <p class="sp-note">Visual and chat display settings — no restart needed.</p>
+      <div class="sp-section-label">Chat display</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="sp-tog" id="tog-controls-visible" onclick="spToggleControlsVisible(this)"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Always show message controls</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="sp-tog" id="tog-markdown" onclick="spToggleMarkdown(this)"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Render markdown in messages</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div class="sp-tog" id="tog-thinking-autoopen" onclick="spToggleThinkingAutoopen(this)"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Auto-open thinking block while streaming</span>
+      </div>
+      <div class="sp-section-label" style="margin-top:20px">Tool pills</div>
+      <p class="sp-note" style="margin-bottom:12px">Choose which tool activity is shown as pills in chat.</p>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="sp-tog" id="tog-pills-memory-writes" onclick="this.classList.toggle('on');spMarkDisplayDirty()"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Memory file writes</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="sp-tog" id="tog-pills-mood" onclick="this.classList.toggle('on');spMarkDisplayDirty()"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Mood changes</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="sp-tog" id="tog-pills-relational" onclick="this.classList.toggle('on');spMarkDisplayDirty()"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Relational state updates</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="sp-tog" id="tog-pills-episodic-write" onclick="this.classList.toggle('on');spMarkDisplayDirty()"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Episodic memory saves</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="sp-tog" id="tog-pills-episodic-read" onclick="this.classList.toggle('on');spMarkDisplayDirty()"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Episodic memory reads</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="sp-tog" id="tog-pills-web" onclick="this.classList.toggle('on');spMarkDisplayDirty()"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Web search / scrape</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div class="sp-tog" id="tog-pills-other" onclick="this.classList.toggle('on');spMarkDisplayDirty()"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Other tools</span>
+      </div>
+      <div class="sp-section-label" style="margin-top:20px">Developer</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div class="sp-tog" id="tog-technical-details" onclick="this.classList.toggle('on');spMarkDisplayDirty()"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Show technical details</span>
+      </div>
+      <p class="sp-note" style="margin-top:6px">Show full raw tool call JSON and hidden log data in chat.</p>
+    </div>
+
+    <!-- Features tab -->
+    <div class="sp-body tab-body" id="tab-features">
+      <p class="sp-note">Optional features that require separate installs. Paths are auto-detected if left blank.</p>
+
+      <div class="sp-accordion" id="acc-tts">
+        <div class="sp-accordion-head" onclick="spToggleAccordion('acc-tts')">
+          <span class="sp-accordion-title">
+            Voice (Kokoro TTS)
+            <span class="sp-feat-status inactive" id="feat-status-tts">not configured</span>
+          </span>
+          <span class="sp-accordion-arrow">▶</span>
+        </div>
+        <div class="sp-accordion-body">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <div class="sp-tog" id="sp-tts-enabled" onclick="this.classList.toggle('on');spMarkFeaturesDirty()"></div>
+            <span style="font-size:13px;color:var(--text-muted)">Enable Kokoro TTS</span>
+          </div>
+          <div class="sp-field-label">Python executable <span style="font-size:10.5px;color:var(--text-dim);font-weight:400">(with kokoro installed — blank = auto)</span></div>
+          <div class="sp-file-row" style="margin-bottom:10px">
+            <div class="sp-file-display" id="sp-tts-python-display">Auto-detect</div>
+            <button class="sp-btn-sm" onclick="spBrowseTts('python')">Browse</button>
+            <button class="sp-btn-sm sp-btn-ghost" onclick="spFillTtsDefault('python')">Default</button>
+            <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('python')">Clear</button>
+          </div>
+          <div class="sp-field-label">Voices directory <span style="font-size:10.5px;color:var(--text-dim);font-weight:400">(folder containing .pt files — blank = auto)</span></div>
+          <div class="sp-file-row" style="margin-bottom:10px">
+            <div class="sp-file-display" id="sp-tts-voices-display">Auto-detect</div>
+            <button class="sp-btn-sm" onclick="spBrowseTts('voices')">Browse</button>
+            <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('voices')">Clear</button>
+          </div>
+          <div class="sp-field-label">espeak-ng path <span style="font-size:10.5px;color:var(--text-dim);font-weight:400">(blank = use PATH)</span></div>
+          <div class="sp-file-row">
+            <div class="sp-file-display" id="sp-tts-espeak-display">Auto-detect</div>
+            <button class="sp-btn-sm" onclick="spBrowseTts('espeak')">Browse</button>
+            <button class="sp-btn-sm sp-btn-ghost" onclick="spFillTtsDefault('espeak')">Default</button>
+            <button class="sp-btn-sm sp-btn-ghost" onclick="spClearTtsPath('espeak')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sp-accordion" id="acc-chromadb">
+        <div class="sp-accordion-head" onclick="spToggleAccordion('acc-chromadb')">
+          <span class="sp-accordion-title">
+            Episodic Memory (ChromaDB)
+            <span class="sp-feat-status inactive" id="feat-status-chroma">not configured</span>
+          </span>
+          <span class="sp-accordion-arrow">▶</span>
+        </div>
+        <div class="sp-accordion-body">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div class="sp-tog" id="sp-chroma-enabled" onclick="this.classList.toggle('on');spMarkFeaturesDirty()"></div>
+            <span style="font-size:13px;color:var(--text-muted)">Enable episodic memory</span>
+          </div>
+          <p class="sp-note">ChromaDB stores conversation notes that surface as relevant context. Requires ChromaDB Python package.</p>
+        </div>
       </div>
     </div>
 
@@ -773,7 +845,7 @@
     </div>
 
     <!-- Sticky action footer - shown/hidden per active tab -->
-    <div class="sp-footer" id="sp-footer-server" style="display:none">
+    <div class="sp-footer" id="sp-footer-model" style="display:none">
       <button class="sp-btn-ghost" onclick="spRestartServer()">Restart server</button>
       <button class="sp-btn-ghost" onclick="spSaveServer()">Apply</button>
       <button class="sp-btn-primary" onclick="spSaveServer(true)">Save &amp; close</button>
@@ -783,9 +855,21 @@
       <button class="sp-btn-ghost" onclick="spSaveGeneration()">Apply</button>
       <button class="sp-btn-primary" onclick="spSaveGeneration(true)">Save &amp; close</button>
     </div>
+    <div class="sp-footer" id="sp-footer-display" style="display:none">
+      <button class="sp-btn-ghost" onclick="spSaveDisplay()">Apply</button>
+      <button class="sp-btn-primary" onclick="spSaveDisplay(true)">Save &amp; close</button>
+    </div>
+    <div class="sp-footer" id="sp-footer-features" style="display:none">
+      <button class="sp-btn-ghost" onclick="spSaveFeatures()">Apply</button>
+      <button class="sp-btn-primary" onclick="spSaveFeatures(true)">Save &amp; close</button>
+    </div>
     <div class="sp-footer" id="sp-footer-companion" style="display:none">
       <button class="sp-btn-ghost" onclick="spSaveCompanion()">Apply</button>
       <button class="sp-btn-primary" onclick="spSaveCompanion(true)">Save &amp; close</button>
+    </div>
+    <div class="sp-footer" id="sp-footer-tools" style="display:none">
+      <button class="sp-btn-ghost" onclick="spSaveTools()">Apply</button>
+      <button class="sp-btn-primary" onclick="spSaveTools(true)">Save &amp; close</button>
     </div>
 
     <!-- About tab -->
@@ -819,10 +903,53 @@
 
     <!-- Tools tab -->
     <div class="sp-body tab-body" id="tab-tools">
-      <div class="sp-section-label">Tools</div>
-      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-top:8px">
-        Global tool settings coming soon — enable/disable individual tools and set per-tool defaults here.
-      </p>
+      <p class="sp-note">Enable or disable tools globally. Companions inherit these defaults and can override per-tool in their own settings.</p>
+      <div class="sp-section-label">Available tools</div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">memory</span>
+        <span class="sp-tool-desc">Read and write soul and mind markdown files</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-write_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">write_memory</span>
+        <span class="sp-tool-desc">Save a note to episodic memory (ChromaDB)</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-retrieve_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">retrieve_memory</span>
+        <span class="sp-tool-desc">Query episodic memory for relevant notes</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-supersede_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">supersede_memory</span>
+        <span class="sp-tool-desc">Update or replace an existing episodic note</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-update_relational_state" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">update_relational_state</span>
+        <span class="sp-tool-desc">Update relational closeness and trust values</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-set_mood" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">set_mood</span>
+        <span class="sp-tool-desc">Set the companion's active mood</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-web_search" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">web_search</span>
+        <span class="sp-tool-desc">Search the web for information</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-web_scrape" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">web_scrape</span>
+        <span class="sp-tool-desc">Fetch and read the contents of a URL</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-get_time" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">get_time</span>
+        <span class="sp-tool-desc">Get the current date and time</span>
+      </div>
     </div>
 
   </div>
@@ -863,6 +990,9 @@
 <script src="/static/js/file-browser.js"></script>
 <script src="/static/js/settings-server.js"></script>
 <script src="/static/js/settings-generation.js"></script>
+<script src="/static/js/settings-display.js"></script>
+<script src="/static/js/settings-features.js"></script>
+<script src="/static/js/settings-tools.js"></script>
 <script src="/static/js/settings-companion.js"></script>
 <script src="/static/js/settings_os_paths.js"></script>
 <script>document.addEventListener('DOMContentLoaded', () => orb.init());</script>

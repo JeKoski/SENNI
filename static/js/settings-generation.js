@@ -20,47 +20,15 @@ function spPopulateGeneration() {
   if (mtr) mtr.value = gen.max_tool_rounds ?? 8;
   const vmode = gen.vision_mode || 'always';
   document.querySelectorAll('#sp-vision-mode input[name="vision-mode"]').forEach(r => { r.checked = r.value === vmode; });
-  const togMd = document.getElementById('tog-markdown');
-  const mdEnabled = gen.markdown_enabled !== false;
-  if (togMd) togMd.classList.toggle('on', mdEnabled);
-  // Keep the renderer in sync — without this, opening Settings would leave
-  // _markdownEnabled stale even though the toggle visually looks correct.
-  if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(mdEnabled);
-  const togThink = document.getElementById('tog-thinking-autoopen');
-  if (togThink) togThink.classList.toggle('on', gen.thinking_autoopen === true);
-  const togCtrl = document.getElementById('tog-controls-visible');
-  if (togCtrl) togCtrl.classList.toggle('on', localStorage.getItem('controls_always_visible') === 'true');
 }
 
 function spMarkGenerationDirty() { _spSetDirty('generation'); }
-
-function spToggleControlsVisible(tog) {
-  tog.classList.toggle('on');
-  const val = tog.classList.contains('on');
-  if (typeof setControlsAlwaysVisible === 'function') setControlsAlwaysVisible(val);
-  _spSetDirty('generation');
-}
 
 function spResetGeneration() {
   if (!confirm('Reset all generation settings to defaults?')) return;
   spSettings.config = spSettings.config || {};
   spSettings.config.generation = {};
   spPopulateGeneration();
-  _spSetDirty('generation');
-}
-
-function spToggleMarkdown(el) {
-  el.classList.toggle('on');
-  const enabled = el.classList.contains('on');
-  if (typeof setMarkdownEnabled === 'function') setMarkdownEnabled(enabled);
-  if (typeof config !== 'undefined' && config.generation) config.generation.markdown_enabled = enabled;
-  _spSetDirty('generation');
-}
-
-function spToggleThinkingAutoopen(el) {
-  el.classList.toggle('on');
-  const enabled = el.classList.contains('on');
-  if (typeof config !== 'undefined' && config.generation) config.generation.thinking_autoopen = enabled;
   _spSetDirty('generation');
 }
 
@@ -74,8 +42,6 @@ async function spSaveGeneration(andClose = false) {
     max_tokens:       parseInt(document.getElementById('sp-max-tokens')?.value)       ?? 1024,
     max_tool_rounds:  parseInt(document.getElementById('sp-max-tool-rounds')?.value)  ?? 8,
     vision_mode:      document.querySelector('#sp-vision-mode input[name="vision-mode"]:checked')?.value || 'always',
-    markdown_enabled:    document.getElementById('tog-markdown')?.classList.contains('on') ?? true,
-    thinking_autoopen:   document.getElementById('tog-thinking-autoopen')?.classList.contains('on') ?? false,
   };
   await fetch('/api/settings/generation', {
     method: 'POST',
