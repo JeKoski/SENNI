@@ -148,7 +148,7 @@ async function spRemoveOsEntry(os) {
 // ── Build the section DOM (one-time creation) ─────────────────────────────────
 
 function _createOsPathsSection() {
-  const tabServer = document.getElementById('tab-server');
+  const tabServer = document.getElementById('tab-model');
   if (!tabServer) return null;
 
   const section = document.createElement('div');

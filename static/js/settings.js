@@ -1,12 +1,16 @@
 // settings.js — Settings panel coordinator: shared state, open/close,
 //               tab switching, load, toast, dirty tracking.
-// Loaded before settings-server.js, settings-generation.js, settings-companion.js.
+// Loaded before settings-server.js, settings-generation.js, settings-display.js,
+//             settings-features.js, settings-tools.js, settings-companion.js.
 //
 // Tab logic lives in:
-//   settings-server.js     — Server tab
+//   settings-server.js     — Model tab
 //   settings-generation.js — Generation tab
+//   settings-display.js    — Display tab
+//   settings-features.js   — Features tab (TTS + ChromaDB)
+//   settings-tools.js      — Tools tab
 //   settings-companion.js  — Companion tab + About tab
-//   settings_os_paths.js   — Per-OS paths section (inside Server tab)
+//   settings_os_paths.js   — Per-OS paths section (inside Model tab)
 
 // ── Shared state (read by all tab modules) ────────────────────────────────────
 let spSettings        = null;
@@ -14,25 +18,41 @@ let spActiveFolder    = '';
 let spCurrentSoulFile = null;
 let spServerDirty     = false;
 let spGenerationDirty = false;
+let spDisplayDirty    = false;
+let spFeaturesDirty   = false;
+let spToolsDirty      = false;
 let spCompanionDirty  = false;
 
 // ── Dirty tracking — yellow buttons when unsaved changes exist ────────────────
 function _spSetDirty(tab) {
-  if (tab === 'server')     spServerDirty     = true;
+  if (tab === 'model')      spServerDirty     = true;
   if (tab === 'generation') spGenerationDirty = true;
+  if (tab === 'display')    spDisplayDirty    = true;
+  if (tab === 'features')   spFeaturesDirty   = true;
+  if (tab === 'tools')      spToolsDirty      = true;
   if (tab === 'companion')  spCompanionDirty  = true;
   _spUpdateFooterButtons();
 }
 
 function _spClearDirty(tab) {
-  if (tab === 'server')     spServerDirty     = false;
+  if (tab === 'model')      spServerDirty     = false;
   if (tab === 'generation') spGenerationDirty = false;
+  if (tab === 'display')    spDisplayDirty    = false;
+  if (tab === 'features')   spFeaturesDirty   = false;
+  if (tab === 'tools')      spToolsDirty      = false;
   if (tab === 'companion')  spCompanionDirty  = false;
   _spUpdateFooterButtons();
 }
 
 function _spUpdateFooterButtons() {
-  const map = { server: spServerDirty, generation: spGenerationDirty, companion: spCompanionDirty };
+  const map = {
+    model:      spServerDirty,
+    generation: spGenerationDirty,
+    display:    spDisplayDirty,
+    features:   spFeaturesDirty,
+    tools:      spToolsDirty,
+    companion:  spCompanionDirty,
+  };
   Object.entries(map).forEach(([tab, dirty]) => {
     const footer = document.getElementById('sp-footer-' + tab);
     if (!footer) return;
@@ -53,7 +73,7 @@ async function openSettings() {
   _spShowLoadingState(true);
   await spLoad();
   _spShowLoadingState(false);
-  spSwitchTab('server');
+  spSwitchTab('model');
 }
 
 function _spShowLoadingState(isLoading) {
@@ -88,11 +108,11 @@ function _spShowLoadingState(isLoading) {
 }
 
 function closeSettings() {
-  const anyDirty = spServerDirty || spGenerationDirty || spCompanionDirty;
+  const anyDirty = spServerDirty || spGenerationDirty || spDisplayDirty || spFeaturesDirty || spToolsDirty || spCompanionDirty;
   if (anyDirty) {
     if (!confirm('You have unsaved changes. Close anyway?')) return;
   }
-  spServerDirty = spGenerationDirty = spCompanionDirty = false;
+  spServerDirty = spGenerationDirty = spDisplayDirty = spFeaturesDirty = spToolsDirty = spCompanionDirty = false;
   document.getElementById('settings-overlay').classList.remove('open');
 }
 
@@ -105,7 +125,7 @@ function spSwitchTab(name) {
     t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-body').forEach(b =>
     b.classList.toggle('active', b.id === 'tab-' + name));
-  ['server','generation','companion'].forEach(tab => {
+  ['model','generation','display','features','companion','tools'].forEach(tab => {
     const f = document.getElementById('sp-footer-' + tab);
     if (f) f.style.display = (tab === name) ? 'flex' : 'none';
   });
@@ -153,9 +173,12 @@ async function spLoad() {
     _spNewAvatarData = null;
     spPopulateServer();
     spPopulateGeneration();
+    spPopulateDisplay();
+    spPopulateFeatures();
+    spPopulateTools();
     spPopulateCompanion();
     spPopulateAbout();
-    spServerDirty = spGenerationDirty = spCompanionDirty = false;
+    spServerDirty = spGenerationDirty = spDisplayDirty = spFeaturesDirty = spToolsDirty = spCompanionDirty = false;
     _spUpdateFooterButtons();
   } catch(e) {
     console.warn('Settings load failed:', e);

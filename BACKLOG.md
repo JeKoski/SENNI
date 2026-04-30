@@ -13,10 +13,11 @@ All 10 implementation steps done. See `design/UI-REDESIGN.md`. Branch: `claude/d
 
 **Remaining polish / follow-ups:**
 - Orb Mode B (full orb in header): CSS stub in place, needs real testing with a live companion — low priority
-- Settings windows redesign: adopt new tokens/elevation (after Settings Features tab is added)
+- Settings panel redesign: ✓ DONE (2026-04-30) — 6 tabs, new token/elevation system, Display/Features/Tools tabs live
+- Companion Settings redesign: still pending — see multi-session track below
 - Memory Manager panel: stub "coming soon" modal in place; full implementation is a future design session
 - Performance mode toggle in Settings: CSS hooks (`body.perf-mode`) in place, just need the Settings toggle UI
-- Tool call "Show technical details" Settings toggle: hide logic in place, toggle UI not yet built
+- Tool call "Show technical details" toggle: ✓ DONE — now in Settings > Display tab
 
 ---
 
@@ -145,12 +146,11 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Senni app icon** — design and add an icon for the binary (`.ico` for Windows PyInstaller spec), wizard header, and elsewhere in the UI. Needs design conversation for the visual; wiring into the spec is straightforward once an `.ico` exists.
 - **Setup: Manual path entry for features** — add optional path fields to the Features step for users who already have kokoro/chromadb installed globally or in a custom location. Entering a path should skip the local install and let setup boot TTS/memory cleanly. Also add a "skip, I'll configure later" option so setup can complete without installing.
-- **Settings: Features tab** — new tab in Settings consolidating all optional-feature paths and status. Should include: TTS enable/python path/espeak path/voice path (currently scattered), ChromaDB enable/packages path, per-feature reinstall/detect buttons. Goal: full post-wizard reconfiguration without re-running setup.
+- **Settings: Features tab reinstall buttons** — Features tab now live with TTS + ChromaDB accordions, but the reinstall/detect buttons for each feature are stubs. Wire them up to trigger the same pip flow as the wizard extras step.
 - **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`. *(Deferred to post-Tauri.)*
 - **Mid-session gap detection** — long idle → re-inject updated timestamp into system prompt. Piggyback on consolidation idle timer. Low priority.
-- **Tool settings UI** — global enable/disable per tool + per-companion overrides. Settings > Tools tab. See `design/FEATURES.md`.
+- **Tool settings UI — per-companion overrides** — global enable/disable is now live in Settings > Tools. Per-companion tool overrides (Companion Settings > Tools tab) still a stub.
 - **Performance mode toggle** — setting that reduces CPU/GPU load for lower-end hardware. Disables orb animations (glow/particle effects become static), disables CSS transitions where possible, potentially reduces polling frequency. Context: i5-7600K hits 20-30% CPU just from orb animation + TTS. CSS hooks (`body.perf-mode`) already in place. *(Deferred to post-Tauri.)*
-- **Tool call visual polish** — replace raw syntax in chat with end-user-friendly display. Hide mood/set_mood calls entirely. For memory writes: show a subtle confirmation ("Memory saved"). For memory recalls: show something about the retrieved content (exact design TBD — needs design thought). Add Settings toggle to show full technical details (current raw view) for power users; when enabled, also surface normally-hidden info like full memory save/recall payloads from the log.
 - **llama-server args drift** — launch args in `server.py` may have drifted from current llama.cpp API. Needs a pass against current docs.
 - **Import QA round-trip** — ongoing edge case testing as real use surfaces issues.
 - **Settings — show resolved paths for extras** — after wizard or detection, Settings should display `./features/packages/` path and espeak binary path so user can verify what's actually being used. Paths already stored in config; just needs Settings UI wiring.
@@ -170,8 +170,8 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ### Settings & Companion Settings Redesign
 See `design/SETTINGS-REDESIGN.md`. Tab structure locked. Implementation order:
-1. Visual pass — token system on panel chrome, tab bar styling
-2. Settings panel: Model, Generation, Display, Features, Tools, About tabs
+1. ✓ Visual pass — token system on panel chrome, tab bar styling (2026-04-30)
+2. ✓ Settings panel: Model, Generation, Display, Features, Tools, About tabs (2026-04-30)
 3. Companion Settings: Identity & Memory, Expression ✦, Tools, Library tabs
 4. Memory Manager window (phase 1: file editor moved from Companion Settings)
 5. Sidebar changes: Companions button, orb heartbeat trigger
