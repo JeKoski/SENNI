@@ -218,6 +218,10 @@ def create_settings_router(
             if key in body:
                 companion_cfg[key] = body[key]
 
+        # Per-companion tool overrides: store only explicit on/off, omit globals
+        if "companion_tools_enabled" in body and isinstance(body["companion_tools_enabled"], dict):
+            companion_cfg["tools_enabled"] = body["companion_tools_enabled"]
+
         for key in ("avatar_data", "orb_avatar_data", "sidebar_avatar_data"):
             companion_cfg.pop(key, None)
 

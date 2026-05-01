@@ -159,6 +159,32 @@ except ImportError:
 
 _tool_manifest: list[dict] = []
 
+
+def _get_enabled_tools() -> dict[str, bool]:
+    """Return {tool_name: bool} merging global config + active companion overrides.
+
+    Per-companion explicit True/False wins; absent keys inherit global default (True).
+    """
+    cfg = load_config()
+    global_enabled: dict = cfg.get("tools_enabled", {})
+
+    companion_folder = cfg.get("companion_folder", "default")
+    try:
+        comp_cfg = load_companion_config(companion_folder)
+        per_companion: dict = comp_cfg.get("tools_enabled", {})
+    except Exception:
+        per_companion = {}
+
+    merged: dict[str, bool] = {}
+    all_names = set(global_enabled) | set(per_companion)
+    for name in all_names:
+        if name in per_companion:
+            merged[name] = bool(per_companion[name])
+        else:
+            merged[name] = global_enabled.get(name, True)
+    return merged
+
+
 # Thread pool for synchronous work (tool handlers, tkinter file dialogs).
 # tkinter on Windows must not run on the asyncio event loop thread.
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="senni-worker")
@@ -743,7 +769,12 @@ async def mcp_handler(request: Request):
         }
 
     if method == "tools/list":
-        clean = [{k: v for k, v in t.items() if k != "handler"} for t in _tool_manifest]
+        allowed = _get_enabled_tools()
+        clean = [
+            {k: v for k, v in t.items() if k != "handler"}
+            for t in _tool_manifest
+            if allowed.get(t["name"], True)
+        ]
         return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": clean}}
 
     if method == "tools/call":
@@ -755,6 +786,13 @@ async def mcp_handler(request: Request):
                 args = json.loads(args)
             except Exception:
                 args = {}
+
+        if not _get_enabled_tools().get(tool_name, True):
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {"code": -32601, "message": f"Tool '{tool_name}' is disabled."},
+            }
 
         tool = get_tool(_tool_manifest, tool_name)
         if not tool:

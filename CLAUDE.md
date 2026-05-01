@@ -187,6 +187,73 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-05-01 (Companion Settings redesign)
+
+**Companion Settings: 8 tabs → 7. Identity & Memory merged. Expression ✦ merges Presence + Mood. Tools tab 3-state per-companion overrides. Library stub. Memory Manager modal. Tool enforcement wired in backend.**
+
+### What changed
+
+**`static/chat.html`:**
+- Tab strip: 8 → 7 tabs. Identity renamed "Identity & Memory", Memory tab removed, Presence + Mood merged into "Expression ✦", Library stub added
+- `cp-tab-identity`: added episodic memory enable toggle, K sliders, cognitive stack (moved from Memory tab), MM link button; soul file editor removed
+- `cp-tab-memory`: deleted entirely (content redistributed)
+- `cp-tab-expression` (was cp-tab-presence + cp-tab-mood): `[Presence | Mood]` segmented toggle at top; presence content unchanged; mood panel `cp-expr-mood` rendered by cpMoodInit()
+- `cp-tab-tools`: populated with 9 tool rows, each with 3-state chip group (Global / On / Off); rendered by cpToolsInit()
+- `cp-tab-library`: stub with "Coming soon" message
+- Memory Manager modal added (`#mm-overlay` + `.mm-panel`): soul file tabs + textarea + save, opens as floating overlay
+
+**`static/js/companion.js`:**
+- `cpSwitchTab`: removed 'memory'/'mood'/'presence' cases; added 'expression' (inits presence), 'tools' (calls cpToolsInit()), 'identity' (calls cpMemoryInit())
+- `cpExprSwitchPanel(panel)`: new function — toggles `.cp-expr-chip` + `.cp-expr-panel`, lazily inits mood/presence
+- `closeCompanionWindow()`: calls cpToolsReset()
+- `cpPopulate()`: removed cpLoadSoulFiles() call
+- `cpSave()`: includes `_cpGetToolsPayload()` when `_cpToolsInitDone`
+- Soul file functions (cpLoadSoulFiles, cpSaveSoulFile, cpNewSoulFile) removed — now live in memory-manager.js
+
+**`static/js/companion-mood.js`:**
+- `_cpMoodRender()`: render target changed from `cp-tab-mood` → `cp-expr-mood`
+
+**`static/js/companion-memory.js`:**
+- `_cpMemoryRefreshStatus()`: rewritten to target `cp-mem-status-badge` (compact badge in Identity tab header) instead of old detailed status row elements
+
+**`static/js/companion-tools.js`** (new):
+- `cpToolsInit()`: renders 9 tool rows with 3-state chips (Global / On / Off), reads global defaults + per-companion overrides from cpSettings
+- `cpToolsSetState(name, state)`: updates chip UI + marks dirty
+- `_cpGetToolsPayload()`: emits `{ companion_tools_enabled: { tool: true/false, ... } }` (only explicit overrides, omits Global)
+- `cpToolsReset()`: resets init flag on window close
+
+**`static/js/memory-manager.js`** (new):
+- `openMemoryManager()`: loads files from `/api/settings/soul/${cpFolder}`, renders tab bar, updates companion label
+- `closeMemoryManager()`: hides overlay, resets state
+- `mmSaveSoulFile()`: POSTs to `/api/settings/soul/${folder}`, hides save btn
+- `mmNewSoulFile()`: prompt + auto-selects new file in tab bar
+
+**`static/css/companion-panel.css`:**
+- Added: `.cp-mem-status-badge` (active/error states), `.cp-expr-toggle/.cp-expr-chip/.cp-expr-panel` (Expression segmented toggle), `.cp-tool-row/.cp-tool-name-cp/.cp-tool-desc-cp/.cp-tool-chips/.cp-tool-chip` (3-state tool chips), `.mm-overlay/.mm-panel/.mm-header/.mm-body/.mm-footer` (Memory Manager modal), `.cp-soul-tab` (moved from inline to CSS)
+
+**`scripts/settings_router.py`:**
+- Companion save endpoint: `companion_tools_enabled` dict added to accepted keys, saved as `tools_enabled` in companion config
+
+**`scripts/server.py`:**
+- `_get_enabled_tools()`: new helper — merges global `tools_enabled` + active companion `tools_enabled` (per-companion bool wins over global; absent = inherit global True default)
+- `tools/list`: filters manifest by `_get_enabled_tools()` — disabled tools not shown to LLM
+- `tools/call`: checks `_get_enabled_tools()` before running; returns error if disabled
+
+### Status
+- Identity & Memory tab: ✅ all content present, episodic toggle/K sliders saved via "Save memory settings" button, cognitive stack saves via Apply/Save
+- Expression ✦ tab: ✅ segmented toggle works, presence init on tab open, mood inits lazily on Mood chip
+- Tools tab: ✅ 3-state chips rendered, per-companion overrides save via companion save
+- Library tab: ✅ stub rendered
+- Memory Manager: ✅ soul file editor functional, opens from Identity & Memory link
+- Tool enforcement: ✅ backend now actually filters tools/list + guards tools/call
+
+### Next session
+- In-app check of Companion Settings redesign
+- Sidebar changes: Companions button (replaces heartbeat button), orb heartbeat trigger
+- Memory Manager Phase 2: ChromaDB note browser
+
+---
+
 ## Session notes — 2026-04-30 (Settings panel redesign implementation)
 
 **Settings panel fully redesigned. 5 tabs → 6. Token/elevation system applied throughout. Three new JS modules. Three new backend endpoints.**
@@ -257,59 +324,6 @@ Copying a companion folder between installs:
 - In-app check of Settings redesign — verify each tab loads and saves cleanly
 - Companion Settings redesign: Identity & Memory, Expression ✦, Tools, Library tabs
 - Sidebar Companions button + orb heartbeat trigger
-
----
-
-## Session notes — 2026-04-27 (New machine setup + file browser)
-
-**New machine running. CUDA setup wizard fixed. Server-side file browser built.**
-
-### What changed
-
-**`scripts/config.py` — GPU detection fix:**
-- Windows now checks NVIDIA before Intel — Core Ultra 7 has integrated UHD which was matching first
-- Added PowerShell `Get-WmiObject` as primary detection method (WMIC deprecated on Win11), WMIC kept as fallback
-
-**`scripts/setup_router.py` — CUDA download fixes:**
-- `_find_binary_asset` now skips `cudart-` prefixed assets — they were matching before `llama-b*-bin-win-cuda-*` alphabetically, causing the wrong zip to be downloaded as the main binary
-- `_find_cudart_asset` + cudart download block added — downloads matching `cudart-llama-bin-win-cuda-*.zip` alongside main binary and extracts DLLs (cublas64, cublasLt64, cudart64) to same dir
-
-**`build-embed.bat` — embed-based build pipeline:**
-- Installs core deps (fastapi, uvicorn, etc.) into python-embed before PyInstaller runs
-- Checks/installs PyInstaller into embed
-- No system Python required
-
-**`run-built.bat` — launch helper:**
-- Runs `dist\senni-backend\senni-backend.exe`, keeps terminal open on exit/crash, shows exit code
-
-**`scripts/server.py` — server-side file browser endpoint + dialog cleanup:**
-- `GET /api/fs/ls?path=...` — directory listing for file browser modal. Windows with empty path returns drive list. Dirs-first sort. Per-entry error handling for permission-denied items.
-- Replaced tkinter/ctypes/PowerShell native dialog attempts with `_win_file_dialog_ps` / `_win_folder_dialog_ps` (kept as dead code for now — superseded by client-side modal)
-
-**`static/js/file-browser.js` — new cross-platform file browser modal:**
-- `fileBrowser.open({title, mode, extensions, startPath})` → Promise
-- Navigates server filesystem via `/api/fs/ls`. Windows drive list at root. Breadcrumb nav. Dirs-first. Extension filtering (non-matching files dimmed). Double-click to confirm. Keyboard (Escape/Enter).
-
-**`static/css/file-browser.css` — modal styles using existing token system**
-
-**`static/js/wizard.js`, `static/js/settings-server.js` — all three browse call sites updated:**
-- `browseFile()` in wizard.js — uses `fileBrowser.open()`
-- `spBrowse()` in settings-server.js — uses `fileBrowser.open()`
-- TTS browse in settings-server.js — uses `fileBrowser.open()`
-
-**`static/wizard.html`, `static/chat.html` — load file-browser.js + file-browser.css**
-
-### Status on new machine
-- GPU auto-detection: ✅ NVIDIA found
-- llama-server CUDA download: ✅ (cudart DLLs + main binary)
-- File browser: built but not yet tested in built version (session ended before test)
-- Full setup end-to-end: not yet verified
-
-### Next session
-- Test file browser in built app
-- Verify llama-server boots with CUDA build
-- Complete setup end-to-end (model download, first boot)
-- Then: Settings Features tab or Gemma4 debugging
 
 ---
 

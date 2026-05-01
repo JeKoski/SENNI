@@ -23,60 +23,36 @@ function cpMemoryReset() {
 // ── Status fetch ──────────────────────────────────────────────────────────────
 
 async function _cpMemoryRefreshStatus() {
-  const statusEl  = document.getElementById('cp-mem-status-text');
-  const countEl   = document.getElementById('cp-mem-note-count');
-  const consEl    = document.getElementById('cp-mem-consolidated');
-  const pendingEl = document.getElementById('cp-mem-pending');
+  const badge = document.getElementById('cp-mem-status-badge');
 
   try {
     const res  = await fetch('/api/memory/status');
     const data = await res.json();
 
     if (!data.available) {
-      if (statusEl) {
-        const reason = data.reason === 'memory_disabled'   ? 'Disabled'
-                     : data.reason === 'memory_unavailable' ? 'ChromaDB not installed'
-                     : 'Not initialised';
-        statusEl.textContent = reason;
-        statusEl.style.color = data.reason === 'memory_disabled'
-          ? 'rgba(221,225,240,0.4)'
-          : 'var(--red, #f87171)';
+      if (badge) {
+        const reason = data.reason === 'memory_disabled'    ? 'Disabled'
+                     : data.reason === 'memory_unavailable' ? 'Not installed'
+                     : '—';
+        badge.textContent = reason;
+        badge.className   = 'cp-mem-status-badge' + (data.reason === 'memory_unavailable' ? ' error' : '');
       }
-      if (countEl)   countEl.textContent   = '—';
-      if (consEl)    consEl.textContent    = '—';
-      if (pendingEl) pendingEl.textContent = '';
       return;
     }
 
-    if (statusEl) {
-      statusEl.textContent = 'Active';
-      statusEl.style.color = 'var(--green, #86efac)';
-    }
-    if (countEl) countEl.textContent = data.note_count ?? 0;
-
-    if (consEl) {
-      if (data.last_consolidated_at) {
-        const d = new Date(data.last_consolidated_at);
-        consEl.textContent = d.toLocaleDateString(undefined, {
-          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-        });
-      } else {
-        consEl.textContent = 'Never';
-      }
-    }
-
-    if (pendingEl) {
-      const p = data.pending_llm_consolidation || 0;
-      pendingEl.textContent = p > 0 ? `${p} pending LLM pass` : '';
+    if (badge) {
+      const count = data.note_count ?? 0;
+      badge.textContent = `Active · ${count} note${count !== 1 ? 's' : ''}`;
+      badge.className   = 'cp-mem-status-badge active';
     }
 
     // Update stack initialised warning
     _cpMemoryUpdateStackWarning(data.stack_initialised);
 
   } catch {
-    if (statusEl) {
-      statusEl.textContent = 'Unavailable';
-      statusEl.style.color = 'rgba(221,225,240,0.4)';
+    if (badge) {
+      badge.textContent = 'Unavailable';
+      badge.className   = 'cp-mem-status-badge error';
     }
   }
 }

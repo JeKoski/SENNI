@@ -181,7 +181,7 @@ function _cpBuildDefaultMoods() {
 
 // ── Render ─────────────────────────────────────────────────────────────────────
 function _cpMoodRender() {
-  const tab = document.getElementById('cp-tab-mood');
+  const tab = document.getElementById('cp-expr-mood');
   if (!tab) return;
 
   tab.innerHTML = '';
