@@ -188,16 +188,15 @@
       <button class="companion-close-btn" onclick="closeCompanionWindow()">✕</button>
     </div>
     <div class="companion-tabs-strip">
-      <button class="cp-tab" data-tab="identity"   onclick="cpSwitchTab('identity')">Identity</button>
+      <button class="cp-tab" data-tab="identity"   onclick="cpSwitchTab('identity')">Identity &amp; Memory</button>
       <button class="cp-tab" data-tab="generation" onclick="cpSwitchTab('generation')">Generation</button>
-      <button class="cp-tab" data-tab="memory"     onclick="cpSwitchTab('memory')">Memory</button>
       <button class="cp-tab" data-tab="heartbeat"  onclick="cpSwitchTab('heartbeat')">Heartbeat</button>
-      <button class="cp-tab cp-tab-special" data-tab="presence"   onclick="cpSwitchTab('presence')">Presence ✦</button>
-      <button class="cp-tab" data-tab="mood"       onclick="cpSwitchTab('mood')">Mood</button>
+      <button class="cp-tab cp-tab-special" data-tab="expression" onclick="cpSwitchTab('expression')">Expression ✦</button>
       <button class="cp-tab" data-tab="voice"      onclick="cpSwitchTab('voice')">Voice</button>
-      <button class="cp-tab" data-tab="tools"     onclick="cpSwitchTab('tools')">Tools</button>
+      <button class="cp-tab" data-tab="tools"      onclick="cpSwitchTab('tools')">Tools</button>
+      <button class="cp-tab" data-tab="library"    onclick="cpSwitchTab('library')">Library</button>
     </div>
-    <!-- Identity -->
+    <!-- Identity & Memory -->
     <div class="cp-tab-body" id="cp-tab-identity">
       <div class="cp-section">Avatar</div>
       <!-- Two slot previews — click either to re-crop -->
@@ -218,8 +217,10 @@
         </div>
       </div>
       <input type="file" id="cp-avatar-file" accept="image/*" style="display:none" onchange="cpAvatarFile(this)"/>
-      <div class="cp-section" style="margin-top:16px">Name</div>
-      <input type="text" class="cp-input" id="cp-companion-name" placeholder="Companion name" style="margin-bottom:16px" oninput="cpMarkDirty()"/>
+
+      <div class="cp-section" style="margin-top:14px">Name</div>
+      <input type="text" class="cp-input" id="cp-companion-name" placeholder="Companion name" style="margin-bottom:14px" oninput="cpMarkDirty()"/>
+
       <div class="cp-section">Identity editing <span class="cp-note">what the companion can change about itself</span></div>
       <div id="cp-soul-edit-mode" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="locked" checked onchange="cpMarkDirty()"/> <span>Locked</span> <span class="cp-note">companion cannot edit its own identity</span></label>
@@ -227,96 +228,40 @@
         <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="agentic" onchange="cpMarkDirty()"/> <span>Fully agentic</span> <span class="cp-note">can rewrite companion_identity.md — auto-backed up</span></label>
         <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="chaos" onchange="cpMarkDirty()"/> <span>Chaos mode 🔥</span> <span class="cp-note">unrestricted across all folders</span></label>
       </div>
-      <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
         <div class="sp-tog on" id="cp-force-read" onclick="this.classList.toggle('on');cpMarkDirty()"></div>
         <span style="font-size:13px;color:rgba(221,225,240,0.6)">Require read before write <span class="cp-note" style="margin-left:4px">disable to reduce context burn</span></span>
       </div>
-    </div>
-    <!-- Generation -->
-    <div class="cp-tab-body" id="cp-tab-generation">
-      <div class="cp-section">Core <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400">blank = inherit global</span></div>
-      <div class="cp-row-2">
-        <div><div class="cp-field-label">Temperature</div><input type="number" class="cp-input" id="cp-g-temp" placeholder="global" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
-        <div><div class="cp-field-label">Top-P</div><input type="number" class="cp-input" id="cp-g-topp" placeholder="global" min="0" max="1" step="0.01" oninput="cpMarkDirty()"/></div>
-        <div><div class="cp-field-label">Top-K</div><input type="number" class="cp-input" id="cp-g-topk" placeholder="global" min="0" oninput="cpMarkDirty()"/></div>
-        <div><div class="cp-field-label">Min-P <span class="cp-badge cp-badge-new">new</span></div><input type="number" class="cp-input" id="cp-g-minp" placeholder="0.0 (off)" min="0" max="1" step="0.01" oninput="cpMarkDirty()"/></div>
-        <div><div class="cp-field-label">Repeat penalty</div><input type="number" class="cp-input" id="cp-g-rpen" placeholder="global" min="1" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
-        <div><div class="cp-field-label">Max response tokens</div><input type="number" class="cp-input" id="cp-g-maxt" placeholder="global" min="64" oninput="cpMarkDirty()"/></div>
-      </div>
-      <div class="cp-section" style="margin-top:14px">Repetition control</div>
-      <div class="cp-row-2">
-        <div><div class="cp-field-label">Presence penalty <span class="cp-badge cp-badge-rec">recommended</span></div><input type="number" class="cp-input" id="cp-g-pres" placeholder="0.0 (off)" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
-        <div><div class="cp-field-label">Frequency penalty</div><input type="number" class="cp-input" id="cp-g-freq" placeholder="0.0 (off)" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
-      </div>
-      <div class="cp-adv-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.cp-arr').textContent=this.nextElementSibling.classList.contains('open')?'▾':'▸'">
-        <span class="cp-arr">▸</span> <span>DRY sampler</span>
-        <span class="cp-badge cp-badge-adv">advanced</span>
-        <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400;margin-left:2px">prevents repeated sequences</span>
-      </div>
-      <div class="cp-adv-body">
-        <div class="cp-dry-info">DRY penalises repeated <em>sequences</em> of tokens — effective against looping patterns small models fall into.</div>
-        <div class="cp-row-3">
-          <div><div class="cp-field-label">Multiplier</div><input type="number" class="cp-input" id="cp-g-dry-m" placeholder="0.0 (off)" min="0" step="0.1" oninput="cpMarkDirty()"/></div>
-          <div><div class="cp-field-label">Base</div><input type="number" class="cp-input" id="cp-g-dry-b" placeholder="1.75" min="1" step="0.05" oninput="cpMarkDirty()"/></div>
-          <div><div class="cp-field-label">Allowed length</div><input type="number" class="cp-input" id="cp-g-dry-l" placeholder="2" min="1" oninput="cpMarkDirty()"/></div>
-        </div>
-      </div>
-      <div class="cp-section" style="margin-top:14px">Other</div>
-      <div class="cp-row-2">
-        <div><div class="cp-field-label">Max tool rounds</div><input type="number" class="cp-input" id="cp-g-rounds" placeholder="global" min="1" max="20" oninput="cpMarkDirty()"/></div>
-      </div>
-    </div>
-    <!-- Memory -->
-    <div class="cp-tab-body" id="cp-tab-memory">
 
-      <!-- ── Episodic memory ── -->
-      <div class="cp-section">Episodic memory</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div class="cp-section" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Episodic memory</span>
+        <span class="cp-mem-status-badge" id="cp-mem-status-badge">—</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <div class="sp-tog" id="cp-mem-enabled" onclick="this.classList.toggle('on');cpMarkDirty()"></div>
         <span style="font-size:13px;color:rgba(221,225,240,0.6)">Enable long-term memory (ChromaDB)</span>
       </div>
-
-      <!-- Status row -->
-      <div style="display:flex;gap:18px;margin-bottom:14px;font-size:12px;font-family:'DM Mono',monospace;color:rgba(221,225,240,0.45)">
-        <span>Status: <span id="cp-mem-status-text" style="color:rgba(221,225,240,0.4)">—</span></span>
-        <span>Notes: <span id="cp-mem-note-count">—</span></span>
-        <span>Last consolidated: <span id="cp-mem-consolidated">—</span></span>
-      </div>
-      <div id="cp-mem-pending" style="font-size:11px;color:rgba(221,225,240,0.35);margin-bottom:10px;font-family:'DM Mono',monospace"></div>
-
-      <!-- Retrieval knobs -->
-      <div style="display:flex;gap:14px;margin-bottom:6px">
+      <div style="display:flex;gap:14px;margin-bottom:8px">
         <div style="flex:1">
           <div class="cp-field-label">Session-start recall <span class="cp-note">notes surfaced on open</span></div>
           <input type="number" class="cp-input" id="cp-mem-session-k"
-            value="6" min="1" max="20" step="1" style="width:70px"
-            oninput="cpMarkDirty()"/>
+            value="6" min="1" max="20" step="1" style="width:70px"/>
         </div>
         <div style="flex:1">
           <div class="cp-field-label">Mid-convo recall <span class="cp-note">on retrieve_memory call</span></div>
           <input type="number" class="cp-input" id="cp-mem-mid-k"
-            value="4" min="1" max="20" step="1" style="width:70px"
-            oninput="cpMarkDirty()"/>
+            value="4" min="1" max="20" step="1" style="width:70px"/>
         </div>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-        <button class="sp-btn-ghost" onclick="cpMemorySaveGlobal()" style="font-size:12px;padding:6px 14px">Save memory settings</button>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+        <button class="sp-btn-ghost" onclick="cpMemorySaveGlobal()" style="font-size:12px;padding:5px 14px">Save memory settings</button>
       </div>
 
-      <!-- ── Cognitive stack ── -->
-      <div class="cp-section" style="margin-top:4px">Cognitive stack</div>
+      <div class="cp-section" style="margin-top:14px">Cognitive stack <span class="cp-note">shapes memory encoding &amp; retrieval</span></div>
       <div id="cp-stack-uninit-warn" style="display:none;font-size:12px;color:rgba(251,191,36,0.7);margin-bottom:10px;line-height:1.5">
         ⚠ Using neutral default stack (mT-fS-mN-fF). Set the stack below to reflect this companion's actual character.
       </div>
-      <div style="font-size:12px;color:rgba(221,225,240,0.4);margin-bottom:10px;line-height:1.5">
-        The stack shapes how memories are encoded and retrieved. Position 1 is dominant, 4 is inferior.
-        Charge: <strong style="color:rgba(221,225,240,0.6)">m</strong> = deliberate/assertive,
-        <strong style="color:rgba(221,225,240,0.6)">f</strong> = associative/receptive.
-        Function: T/S/N/F.
-      </div>
-
-      <!-- Stack slot rows -->
-      <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px">
+      <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:8px">
         <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(221,225,240,0.35);padding:0 2px">
           <span style="width:72px">Position</span>
           <span style="width:72px">Charge</span>
@@ -359,22 +304,48 @@
           </select>
         </div>
       </div>
-      <div style="font-size:12px;color:rgba(221,225,240,0.35);margin-bottom:16px;font-family:'DM Mono',monospace">
+      <div style="font-size:12px;color:rgba(221,225,240,0.35);margin-bottom:18px;font-family:'DM Mono',monospace">
         Stack: <span id="cp-stack-preview" style="color:rgba(221,225,240,0.55)">mT-fS-mN-fF</span>
-        <span class="cp-note" style="margin-left:6px">saved with Apply / Save</span>
       </div>
 
-      <!-- ── Soul files ── -->
-      <div class="cp-section" style="display:flex;justify-content:space-between;align-items:center">
-        Soul files
-        <button class="cp-add-btn" onclick="cpNewSoulFile()">+ New file</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid rgba(140,145,220,0.1);border-radius:10px">
+        <span style="font-size:13px;color:rgba(221,225,240,0.5)">Soul &amp; mind files</span>
+        <button class="sp-btn-ghost" onclick="openMemoryManager()" style="font-size:12px;padding:5px 14px">Open Memory Manager →</button>
       </div>
-      <div id="cp-soul-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
-      <textarea class="cp-textarea" id="cp-soul-content" placeholder="Select a file above to edit…" rows="10"></textarea>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
-        <button class="sp-btn-ghost" id="cp-soul-save-btn" onclick="cpSaveSoulFile()" style="display:none">Save file</button>
+    </div>
+    <!-- Generation -->
+    <div class="cp-tab-body" id="cp-tab-generation">
+      <div class="cp-section">Core <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400">blank = inherit global</span></div>
+      <div class="cp-row-2">
+        <div><div class="cp-field-label">Temperature</div><input type="number" class="cp-input" id="cp-g-temp" placeholder="global" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Top-P</div><input type="number" class="cp-input" id="cp-g-topp" placeholder="global" min="0" max="1" step="0.01" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Top-K</div><input type="number" class="cp-input" id="cp-g-topk" placeholder="global" min="0" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Min-P <span class="cp-badge cp-badge-new">new</span></div><input type="number" class="cp-input" id="cp-g-minp" placeholder="0.0 (off)" min="0" max="1" step="0.01" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Repeat penalty</div><input type="number" class="cp-input" id="cp-g-rpen" placeholder="global" min="1" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Max response tokens</div><input type="number" class="cp-input" id="cp-g-maxt" placeholder="global" min="64" oninput="cpMarkDirty()"/></div>
       </div>
-
+      <div class="cp-section" style="margin-top:14px">Repetition control</div>
+      <div class="cp-row-2">
+        <div><div class="cp-field-label">Presence penalty <span class="cp-badge cp-badge-rec">recommended</span></div><input type="number" class="cp-input" id="cp-g-pres" placeholder="0.0 (off)" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
+        <div><div class="cp-field-label">Frequency penalty</div><input type="number" class="cp-input" id="cp-g-freq" placeholder="0.0 (off)" min="0" max="2" step="0.05" oninput="cpMarkDirty()"/></div>
+      </div>
+      <div class="cp-adv-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.cp-arr').textContent=this.nextElementSibling.classList.contains('open')?'▾':'▸'">
+        <span class="cp-arr">▸</span> <span>DRY sampler</span>
+        <span class="cp-badge cp-badge-adv">advanced</span>
+        <span class="cp-note" style="text-transform:none;letter-spacing:0;font-weight:400;margin-left:2px">prevents repeated sequences</span>
+      </div>
+      <div class="cp-adv-body">
+        <div class="cp-dry-info">DRY penalises repeated <em>sequences</em> of tokens — effective against looping patterns small models fall into.</div>
+        <div class="cp-row-3">
+          <div><div class="cp-field-label">Multiplier</div><input type="number" class="cp-input" id="cp-g-dry-m" placeholder="0.0 (off)" min="0" step="0.1" oninput="cpMarkDirty()"/></div>
+          <div><div class="cp-field-label">Base</div><input type="number" class="cp-input" id="cp-g-dry-b" placeholder="1.75" min="1" step="0.05" oninput="cpMarkDirty()"/></div>
+          <div><div class="cp-field-label">Allowed length</div><input type="number" class="cp-input" id="cp-g-dry-l" placeholder="2" min="1" oninput="cpMarkDirty()"/></div>
+        </div>
+      </div>
+      <div class="cp-section" style="margin-top:14px">Other</div>
+      <div class="cp-row-2">
+        <div><div class="cp-field-label">Max tool rounds</div><input type="number" class="cp-input" id="cp-g-rounds" placeholder="global" min="1" max="20" oninput="cpMarkDirty()"/></div>
+      </div>
     </div>
     <!-- Heartbeat -->
     <div class="cp-tab-body" id="cp-tab-heartbeat">
@@ -400,111 +371,102 @@
         <div><div class="cp-field-label" style="font-size:11px;opacity:.6;margin-bottom:2px">Manual trigger</div><textarea class="cp-textarea" id="cp-hb-instr-manual" rows="2" placeholder="(uses default if blank)" oninput="cpMarkDirty()"></textarea></div>
       </div>
     </div>
-    <!-- Presence -->
-    <div class="cp-tab-body" id="cp-tab-presence">
+    <!-- Expression ✦ (Presence + Mood merged) -->
+    <div class="cp-tab-body" id="cp-tab-expression">
 
-      <!-- Layout toggle -->
-      <div class="cp-section">Layout</div>
-      <div class="cp-layout-toggle">
-        <button class="cp-layout-btn" data-mode="strip" onclick="cpSetOrbLayout('strip')">Orb only</button>
-        <button class="cp-layout-btn active" data-mode="inline" onclick="cpSetOrbLayout('inline')">Orb + message</button>
+      <!-- Segmented toggle -->
+      <div class="cp-expr-toggle">
+        <button class="cp-expr-chip active" data-panel="presence" onclick="cpExprSwitchPanel('presence')">Presence</button>
+        <button class="cp-expr-chip special" data-panel="mood" onclick="cpExprSwitchPanel('mood')">Mood ✦</button>
       </div>
 
-      <!-- Live orb preview — rounded top, no bottom border, flush with preset block -->
-      <div class="cp-presence-preview-box">
-        <div class="cpp-orb-wrap">
-          <div class="cpp-dots" id="cpp-dots"><span></span><span></span><span></span></div>
-          <div class="cpp-orb" id="cpp-orb">
-            <div class="cpp-ring"></div>
-            <div class="cpp-icon" id="cpp-icon">✦</div>
-          </div>
-          <div class="cpp-state-label" id="cpp-state-label">thinking</div>
-        </div>
-      </div>
+      <!-- Presence panel -->
+      <div class="cp-expr-panel active" id="cp-expr-presence">
 
-      <!-- Preset + state — flush below preview -->
-      <div class="cp-preset-state-block">
-        <div class="cp-ps-row">
-          <span class="cp-ps-label">Preset</span>
-          <div class="cp-ps-chips" id="cp-preset-bar"></div>
+        <!-- Layout toggle -->
+        <div class="cp-section">Layout</div>
+        <div class="cp-layout-toggle">
+          <button class="cp-layout-btn" data-mode="strip" onclick="cpSetOrbLayout('strip')">Orb only</button>
+          <button class="cp-layout-btn active" data-mode="inline" onclick="cpSetOrbLayout('inline')">Orb + message</button>
         </div>
-        <div class="cp-ps-row">
-          <span class="cp-ps-label">State</span>
-          <div class="cp-ps-chips">
-            <div class="cp-state-chip active" onclick="cpPresenceSwitchState('thinking',this)">Thinking</div>
-            <div class="cp-state-chip" onclick="cpPresenceSwitchState('streaming',this)">Streaming</div>
-            <div class="cp-state-chip" onclick="cpPresenceSwitchState('heartbeat',this)">Heartbeat</div>
-            <div class="cp-state-chip" onclick="cpPresenceSwitchState('idle',this)">Idle</div>
-            <div class="cp-state-chip chaos" onclick="cpPresenceSwitchState('chaos',this)">Chaos &#x1F525;</div>
+
+        <!-- Live orb preview -->
+        <div class="cp-presence-preview-box">
+          <div class="cpp-orb-wrap">
+            <div class="cpp-dots" id="cpp-dots"><span></span><span></span><span></span></div>
+            <div class="cpp-orb" id="cpp-orb">
+              <div class="cpp-ring"></div>
+              <div class="cpp-icon" id="cpp-icon">✦</div>
+            </div>
+            <div class="cpp-state-label" id="cpp-state-label">thinking</div>
           </div>
         </div>
-      </div>
 
-      <!-- Element accordion -->
-      <div class="cp-section" style="padding-top:4px">Appearance</div>
-      <div class="cp-elements">
-
-        <!-- ORB — no group toggle (Orb is properties, not an animation) -->
-        <div class="cp-elem open" id="cp-elem-orb">
-          <div class="cp-elem-header" onclick="cpPresenceToggleElement('orb')">
-            <div class="cp-elem-header-left">
-              <span class="cp-elem-name">Orb</span>
-            </div>
-            <div class="cp-elem-header-right">
-              <div class="cp-elem-chevron">▶</div>
+        <!-- Preset + state -->
+        <div class="cp-preset-state-block">
+          <div class="cp-ps-row">
+            <span class="cp-ps-label">Preset</span>
+            <div class="cp-ps-chips" id="cp-preset-bar"></div>
+          </div>
+          <div class="cp-ps-row">
+            <span class="cp-ps-label">State</span>
+            <div class="cp-ps-chips">
+              <div class="cp-state-chip active" onclick="cpPresenceSwitchState('thinking',this)">Thinking</div>
+              <div class="cp-state-chip" onclick="cpPresenceSwitchState('streaming',this)">Streaming</div>
+              <div class="cp-state-chip" onclick="cpPresenceSwitchState('heartbeat',this)">Heartbeat</div>
+              <div class="cp-state-chip" onclick="cpPresenceSwitchState('idle',this)">Idle</div>
+              <div class="cp-state-chip chaos" onclick="cpPresenceSwitchState('chaos',this)">Chaos &#x1F525;</div>
             </div>
           </div>
-          <div class="cp-elem-body" id="cp-elem-body-orb"></div>
         </div>
 
-        <!-- DOTS — group toggle controls dots animation -->
-        <div class="cp-elem" id="cp-elem-dots">
-          <div class="cp-elem-header" onclick="cpPresenceToggleElement('dots')">
-            <div class="cp-elem-header-left">
-              <span class="cp-elem-name" id="cp-elem-name-dots">Dots</span>
+        <!-- Element accordion -->
+        <div class="cp-section" style="padding-top:4px">Appearance</div>
+        <div class="cp-elements">
+          <div class="cp-elem open" id="cp-elem-orb">
+            <div class="cp-elem-header" onclick="cpPresenceToggleElement('orb')">
+              <div class="cp-elem-header-left"><span class="cp-elem-name">Orb</span></div>
+              <div class="cp-elem-header-right"><div class="cp-elem-chevron">▶</div></div>
             </div>
-            <div class="cp-elem-header-right">
-              <div class="cp-elem-tog on" id="cp-elem-tog-dots" onclick="event.stopPropagation();cpPresenceToggleAnim('dots')"></div>
-              <div class="cp-elem-chevron">▶</div>
-            </div>
+            <div class="cp-elem-body" id="cp-elem-body-orb"></div>
           </div>
-          <div class="cp-elem-body" id="cp-elem-body-dots"></div>
-        </div>
-
-        <!-- GLOW — group toggle controls glow animation -->
-        <div class="cp-elem" id="cp-elem-glow">
-          <div class="cp-elem-header" onclick="cpPresenceToggleElement('glow')">
-            <div class="cp-elem-header-left">
-              <span class="cp-elem-name" id="cp-elem-name-glow">Glow</span>
+          <div class="cp-elem" id="cp-elem-dots">
+            <div class="cp-elem-header" onclick="cpPresenceToggleElement('dots')">
+              <div class="cp-elem-header-left"><span class="cp-elem-name" id="cp-elem-name-dots">Dots</span></div>
+              <div class="cp-elem-header-right">
+                <div class="cp-elem-tog on" id="cp-elem-tog-dots" onclick="event.stopPropagation();cpPresenceToggleAnim('dots')"></div>
+                <div class="cp-elem-chevron">▶</div>
+              </div>
             </div>
-            <div class="cp-elem-header-right">
-              <div class="cp-elem-tog on" id="cp-elem-tog-glow" onclick="event.stopPropagation();cpPresenceToggleAnim('glow')"></div>
-              <div class="cp-elem-chevron">▶</div>
-            </div>
+            <div class="cp-elem-body" id="cp-elem-body-dots"></div>
           </div>
-          <div class="cp-elem-body" id="cp-elem-body-glow"></div>
-        </div>
-
-        <!-- RING — group toggle controls ring animation -->
-        <div class="cp-elem" id="cp-elem-ring">
-          <div class="cp-elem-header" onclick="cpPresenceToggleElement('ring')">
-            <div class="cp-elem-header-left">
-              <span class="cp-elem-name" id="cp-elem-name-ring">Ring</span>
+          <div class="cp-elem" id="cp-elem-glow">
+            <div class="cp-elem-header" onclick="cpPresenceToggleElement('glow')">
+              <div class="cp-elem-header-left"><span class="cp-elem-name" id="cp-elem-name-glow">Glow</span></div>
+              <div class="cp-elem-header-right">
+                <div class="cp-elem-tog on" id="cp-elem-tog-glow" onclick="event.stopPropagation();cpPresenceToggleAnim('glow')"></div>
+                <div class="cp-elem-chevron">▶</div>
+              </div>
             </div>
-            <div class="cp-elem-header-right">
-              <div class="cp-elem-tog on" id="cp-elem-tog-ring" onclick="event.stopPropagation();cpPresenceToggleAnim('ring')"></div>
-              <div class="cp-elem-chevron">▶</div>
-            </div>
+            <div class="cp-elem-body" id="cp-elem-body-glow"></div>
           </div>
-          <div class="cp-elem-body" id="cp-elem-body-ring"></div>
+          <div class="cp-elem" id="cp-elem-ring">
+            <div class="cp-elem-header" onclick="cpPresenceToggleElement('ring')">
+              <div class="cp-elem-header-left"><span class="cp-elem-name" id="cp-elem-name-ring">Ring</span></div>
+              <div class="cp-elem-header-right">
+                <div class="cp-elem-tog on" id="cp-elem-tog-ring" onclick="event.stopPropagation();cpPresenceToggleAnim('ring')"></div>
+                <div class="cp-elem-chevron">▶</div>
+              </div>
+            </div>
+            <div class="cp-elem-body" id="cp-elem-body-ring"></div>
+          </div>
         </div>
 
-      </div>
+      </div><!-- /cp-expr-presence -->
 
-    </div>
-        <!-- Mood -->
-    <div class="cp-tab-body" id="cp-tab-mood">
-      <!-- Rendered by cpMoodInit() in companion-mood.js -->
+      <!-- Mood panel — rendered by cpMoodInit() -->
+      <div class="cp-expr-panel" id="cp-expr-mood"></div>
+
     </div>
         <!-- Voice (TTS) -->
     <div class="cp-tab-body" id="cp-tab-voice">
@@ -551,12 +513,24 @@
       </div>
     </div>
 
-    <!-- Tools tab -->
+    <!-- Tools tab — per-companion overrides -->
     <div class="cp-tab-body" id="cp-tab-tools">
-      <div class="cp-section">Tools</div>
-      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-top:8px">
-        Per-companion tool toggles coming soon — enable or disable individual tools for this companion here.
+      <p class="cp-note" style="font-size:12px;color:rgba(221,225,240,0.35);margin-bottom:14px;line-height:1.6">
+        Override global tool settings for this companion. <strong style="color:rgba(221,225,240,0.5)">Global</strong> inherits the setting from Settings → Tools.
       </p>
+      <div id="cp-tools-list"><!-- rendered by cpToolsInit() --></div>
+    </div>
+
+    <!-- Library tab — stub -->
+    <div class="cp-tab-body" id="cp-tab-library">
+      <div class="cp-section">Library <span class="cp-note">keyword-triggered lore</span></div>
+      <div style="margin-top:12px;padding:18px;background:rgba(255,255,255,0.02);border:1px dashed rgba(140,145,220,0.15);border-radius:12px;text-align:center">
+        <div style="font-size:22px;margin-bottom:8px;opacity:0.4">📚</div>
+        <div style="font-size:13px;color:rgba(221,225,240,0.4);line-height:1.7">
+          Library entries inject relevant lore into context when keywords appear in conversation.<br>
+          <span style="font-size:11.5px;color:rgba(221,225,240,0.25)">Coming in a future update — in-chat keyword scanning engine is under development.</span>
+        </div>
+      </div>
     </div>
 
         <!-- Footer -->
@@ -584,6 +558,7 @@
   </div>
 
   <!-- Avatar crop modal — overlays the companion panel -->
+
   <div id="cp-avatar-modal" style="display:none">
     <div class="cp-av-backdrop" onclick="cpAvatarDone()"></div>
     <div class="cp-av-box">
@@ -844,6 +819,57 @@
 
     </div>
 
+    <!-- Tools tab -->
+    <div class="sp-body tab-body" id="tab-tools">
+      <p class="sp-note">Enable or disable tools globally. Companions inherit these defaults and can override per-tool in their own settings.</p>
+      <div class="sp-section-label">Available tools</div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">memory</span>
+        <span class="sp-tool-desc">Read and write soul and mind markdown files</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-write_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">write_memory</span>
+        <span class="sp-tool-desc">Save a note to episodic memory (ChromaDB)</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-retrieve_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">retrieve_memory</span>
+        <span class="sp-tool-desc">Query episodic memory for relevant notes</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-supersede_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">supersede_memory</span>
+        <span class="sp-tool-desc">Update or replace an existing episodic note</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-update_relational_state" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">update_relational_state</span>
+        <span class="sp-tool-desc">Update relational closeness and trust values</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-set_mood" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">set_mood</span>
+        <span class="sp-tool-desc">Set the companion's active mood</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-web_search" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">web_search</span>
+        <span class="sp-tool-desc">Search the web for information</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-web_scrape" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">web_scrape</span>
+        <span class="sp-tool-desc">Fetch and read the contents of a URL</span>
+      </div>
+      <div class="sp-tool-row">
+        <div class="sp-tog" id="tool-tog-get_time" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
+        <span class="sp-tool-name">get_time</span>
+        <span class="sp-tool-desc">Get the current date and time</span>
+      </div>
+    </div>
+
     <!-- Sticky action footer - shown/hidden per active tab -->
     <div class="sp-footer" id="sp-footer-model" style="display:none">
       <button class="sp-btn-ghost" onclick="spRestartServer()">Restart server</button>
@@ -901,57 +927,35 @@
       </div>
     </div>
 
-    <!-- Tools tab -->
-    <div class="sp-body tab-body" id="tab-tools">
-      <p class="sp-note">Enable or disable tools globally. Companions inherit these defaults and can override per-tool in their own settings.</p>
-      <div class="sp-section-label">Available tools</div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">memory</span>
-        <span class="sp-tool-desc">Read and write soul and mind markdown files</span>
-      </div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-write_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">write_memory</span>
-        <span class="sp-tool-desc">Save a note to episodic memory (ChromaDB)</span>
-      </div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-retrieve_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">retrieve_memory</span>
-        <span class="sp-tool-desc">Query episodic memory for relevant notes</span>
-      </div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-supersede_memory" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">supersede_memory</span>
-        <span class="sp-tool-desc">Update or replace an existing episodic note</span>
-      </div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-update_relational_state" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">update_relational_state</span>
-        <span class="sp-tool-desc">Update relational closeness and trust values</span>
-      </div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-set_mood" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">set_mood</span>
-        <span class="sp-tool-desc">Set the companion's active mood</span>
-      </div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-web_search" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">web_search</span>
-        <span class="sp-tool-desc">Search the web for information</span>
-      </div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-web_scrape" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">web_scrape</span>
-        <span class="sp-tool-desc">Fetch and read the contents of a URL</span>
-      </div>
-      <div class="sp-tool-row">
-        <div class="sp-tog" id="tool-tog-get_time" onclick="this.classList.toggle('on');spMarkToolsDirty()"></div>
-        <span class="sp-tool-name">get_time</span>
-        <span class="sp-tool-desc">Get the current date and time</span>
-      </div>
-    </div>
+  </div>
+</div>
 
+<!-- Memory Manager modal -->
+<div id="mm-overlay" class="mm-overlay" onclick="event.target===this&&closeMemoryManager()">
+  <div class="mm-panel">
+    <div class="mm-header">
+      <div>
+        <div class="mm-title">Memory Manager</div>
+        <div class="mm-subtitle" id="mm-companion-label">—</div>
+      </div>
+      <button class="mm-close" onclick="closeMemoryManager()">✕</button>
+    </div>
+    <div class="mm-body">
+      <div class="cp-section" style="display:flex;justify-content:space-between;align-items:center;padding-top:0">
+        Soul files
+        <button class="cp-add-btn" onclick="mmNewSoulFile()">+ New file</button>
+      </div>
+      <div class="mm-file-tabs" id="mm-soul-tabs"></div>
+      <textarea class="cp-textarea" id="mm-soul-content"
+        placeholder="Select a file above to edit…"
+        style="flex:1;min-height:200px;resize:vertical"
+        oninput="document.getElementById('mm-save-btn').style.display='inline-flex'"></textarea>
+    </div>
+    <div class="mm-footer">
+      <span class="mm-companion-label" id="mm-footer-label"></span>
+      <button class="sp-btn-ghost" id="mm-save-btn" onclick="mmSaveSoulFile()" style="display:none">Save file</button>
+      <button class="sp-btn-ghost" onclick="closeMemoryManager()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -986,6 +990,8 @@
 <script src="/static/js/companion-mood.js"></script>
 <script src="/static/js/companion-tts.js"></script>
 <script src="/static/js/companion-memory.js"></script>
+<script src="/static/js/companion-tools.js"></script>
+<script src="/static/js/memory-manager.js"></script>
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/file-browser.js"></script>
 <script src="/static/js/settings-server.js"></script>

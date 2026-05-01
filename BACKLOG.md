@@ -149,7 +149,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 - **Settings: Features tab reinstall buttons** — Features tab now live with TTS + ChromaDB accordions, but the reinstall/detect buttons for each feature are stubs. Wire them up to trigger the same pip flow as the wizard extras step.
 - **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`. *(Deferred to post-Tauri.)*
 - **Mid-session gap detection** — long idle → re-inject updated timestamp into system prompt. Piggyback on consolidation idle timer. Low priority.
-- **Tool settings UI — per-companion overrides** — global enable/disable is now live in Settings > Tools. Per-companion tool overrides (Companion Settings > Tools tab) still a stub.
+- **Tool settings UI — per-companion overrides** — ✓ DONE (2026-05-01). 3-state Global/On/Off chips in Companion Settings > Tools. Backend enforcement also wired (`tools/list` + `tools/call` now filter by global + per-companion overrides).
 - **Performance mode toggle** — setting that reduces CPU/GPU load for lower-end hardware. Disables orb animations (glow/particle effects become static), disables CSS transitions where possible, potentially reduces polling frequency. Context: i5-7600K hits 20-30% CPU just from orb animation + TTS. CSS hooks (`body.perf-mode`) already in place. *(Deferred to post-Tauri.)*
 - **llama-server args drift** — launch args in `server.py` may have drifted from current llama.cpp API. Needs a pass against current docs.
 - **Import QA round-trip** — ongoing edge case testing as real use surfaces issues.
@@ -172,8 +172,8 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 See `design/SETTINGS-REDESIGN.md`. Tab structure locked. Implementation order:
 1. ✓ Visual pass — token system on panel chrome, tab bar styling (2026-04-30)
 2. ✓ Settings panel: Model, Generation, Display, Features, Tools, About tabs (2026-04-30)
-3. Companion Settings: Identity & Memory, Expression ✦, Tools, Library tabs
-4. Memory Manager window (phase 1: file editor moved from Companion Settings)
+3. ✓ Companion Settings: Identity & Memory, Expression ✦, Tools (3-state), Library stub (2026-05-01)
+4. ✓ Memory Manager window phase 1: soul file editor, floating modal (2026-05-01)
 5. Sidebar changes: Companions button, orb heartbeat trigger
 
 ### Identity & Evolution System Refactor

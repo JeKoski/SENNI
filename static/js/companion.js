@@ -9,7 +9,6 @@
 // ── State ─────────────────────────────────────────────────────────────────────
 let cpSettings       = null;   // loaded from /api/settings
 let cpFolder         = '';     // active companion folder
-let cpSoulFile       = null;   // currently selected soul file name
 let cpDirty          = false;  // unsaved changes flag
 let _cpAvatarChanged = false;  // true if user picked/reset avatar this session
 let _cpNewAvatarData = null;   // data URL (new avatar) or '' (reset), null = no change
@@ -45,6 +44,7 @@ async function openCompanionWindow() {
   _cpShowLoadingState(false);
   cpSwitchTab('identity');
 }
+
 
 function _cpShowLoadingState(isLoading) {
   const panel = document.querySelector('.companion-panel');
@@ -84,6 +84,7 @@ function closeCompanionWindow() {
   if (typeof cpMoodReset    === 'function') cpMoodReset();
   if (typeof cpTtsReset     === 'function') cpTtsReset();
   if (typeof cpMemoryReset  === 'function') cpMemoryReset();
+  if (typeof cpToolsReset   === 'function') cpToolsReset();
   cpClearDirty();
   document.getElementById('companion-overlay').classList.remove('open');
 }
@@ -168,8 +169,7 @@ function cpPopulate() {
   setGen('cp-g-dry-b',  'dry_base');
   setGen('cp-g-dry-l',  'dry_allowed_length');
 
-  // ── Memory (soul files + ChromaDB settings) ──
-  cpLoadSoulFiles();
+  // ── Memory (ChromaDB settings) ──
   if (typeof cpMemoryPopulate === 'function') cpMemoryPopulate();
 
   // ── Presence ──
@@ -206,25 +206,39 @@ function cpPopulate() {
 function cpSwitchTab(tab) {
   document.querySelectorAll('.cp-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.cp-tab-body').forEach(b => b.classList.toggle('active', b.id === `cp-tab-${tab}`));
-  if (tab === 'memory') {
-    cpLoadSoulFiles();
+  if (tab === 'identity') {
     if (typeof cpMemoryInit === 'function') cpMemoryInit();
   }
-  if (tab === 'presence') {
-    // Only do a full init if presence data hasn't been loaded yet this session.
-    // If already loaded (user made edits), just re-render so changes are preserved.
+  if (tab === 'expression') {
+    // Init presence if not yet done; re-render if already loaded
     if (!_cpPresenceInitDone) {
       cpPresenceInit();
     } else {
       cpPresenceRenderPresets();
       cpPresenceRenderState(_cpEditingState);
     }
+    // Mood inits lazily when user clicks the Mood chip
   }
   if (tab === 'voice') {
     if (typeof cpTtsInit === 'function') cpTtsInit();
   }
-  if (tab === 'mood') {
-    if (typeof cpMoodInit === 'function') cpMoodInit();
+  if (tab === 'tools') {
+    if (typeof cpToolsInit === 'function') cpToolsInit();
+  }
+}
+
+// ── Expression ✦ panel switcher ───────────────────────────────────────────────
+function cpExprSwitchPanel(panel) {
+  document.querySelectorAll('.cp-expr-chip').forEach(c => c.classList.toggle('active', c.dataset.panel === panel));
+  document.querySelectorAll('.cp-expr-panel').forEach(p => p.classList.toggle('active', p.id === `cp-expr-${panel}`));
+  if (panel === 'mood' && typeof cpMoodInit === 'function') cpMoodInit();
+  if (panel === 'presence') {
+    if (!_cpPresenceInitDone) {
+      cpPresenceInit();
+    } else {
+      cpPresenceRenderPresets();
+      cpPresenceRenderState(_cpEditingState);
+    }
   }
 }
 
@@ -254,72 +268,6 @@ function cpAvatarReset() {
 
 function cpAvatarFile(input) {
   if (input.files[0]) cpAvatarModalOpen(input.files[0]);
-}
-
-// ── Soul files ────────────────────────────────────────────────────────────────
-async function cpLoadSoulFiles() {
-  try {
-    const res   = await fetch(`/api/settings/soul/${cpFolder}`);
-    const data  = await res.json();
-    const files = data.files || {};
-    const tabsEl = document.getElementById('cp-soul-tabs');
-    if (!tabsEl) return;
-    tabsEl.innerHTML = '';
-    cpSoulFile = null;
-    const contentEl = document.getElementById('cp-soul-content');
-    const saveBtn   = document.getElementById('cp-soul-save-btn');
-    if (contentEl) contentEl.value = '';
-    if (saveBtn)   saveBtn.style.display = 'none';
-
-    Object.keys(files).forEach(fname => {
-      const tab = document.createElement('button');
-      tab.className = 'cp-soul-tab';
-      tab.textContent = fname;
-      tab.onclick = () => {
-        document.querySelectorAll('.cp-soul-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        cpSoulFile = fname;
-        if (contentEl) contentEl.value = files[fname];
-        if (saveBtn)   saveBtn.style.display = 'inline-flex';
-      };
-      tabsEl.appendChild(tab);
-    });
-  } catch(e) { console.warn('cpLoadSoulFiles failed:', e); }
-}
-
-async function cpSaveSoulFile() {
-  if (!cpSoulFile) return;
-  const content = document.getElementById('cp-soul-content')?.value || '';
-  await fetch(`/api/settings/soul/${cpFolder}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename: cpSoulFile, content }),
-  });
-  cpShowToast('Soul file saved ✓');
-}
-
-function cpNewSoulFile() {
-  const name = prompt('File name (e.g. identity.md):');
-  if (!name) return;
-  const fname = name.endsWith('.md') || name.endsWith('.txt') ? name : name + '.md';
-  const tabsEl    = document.getElementById('cp-soul-tabs');
-  const contentEl = document.getElementById('cp-soul-content');
-  const saveBtn   = document.getElementById('cp-soul-save-btn');
-  const tab = document.createElement('button');
-  tab.className = 'cp-soul-tab active';
-  tab.textContent = fname;
-  tab.onclick = () => {
-    document.querySelectorAll('.cp-soul-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    cpSoulFile = fname;
-    if (contentEl) contentEl.value = '';
-    if (saveBtn)   saveBtn.style.display = 'inline-flex';
-  };
-  tabsEl?.appendChild(tab);
-  cpSoulFile = fname;
-  if (contentEl) contentEl.value = '';
-  if (saveBtn)   saveBtn.style.display = 'inline-flex';
-  document.querySelectorAll('.cp-soul-tab').forEach(t => t.classList.remove('active'));
-  tab.classList.add('active');
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────────
@@ -390,9 +338,10 @@ async function cpSave(andClose = false) {
       // Only include TTS payload if slots have been populated — guards against
       // overwriting saved TTS config when the Voice tab was never opened.
       ...(typeof _cpGetTtsPayload === 'function' && _cpTtsSlots.length > 0 ? _cpGetTtsPayload() : {}),
-      // Only include mood payload if the Moods tab was opened this session — guards against
-      // overwriting saved moods with empty state when the tab was never visited.
+      // Only include mood payload if the Moods panel was opened this session
       ...(typeof _cpGetMoodPayload === 'function' && _cpMoodInitDone ? _cpGetMoodPayload() : {}),
+      // Only include per-companion tool overrides if Tools tab was visited
+      ...(typeof _cpGetToolsPayload === 'function' && _cpToolsInitDone ? _cpGetToolsPayload() : {}),
     };
 
     const res = await fetch('/api/settings/companion', {
