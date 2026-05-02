@@ -174,18 +174,20 @@ See `design/SETTINGS-REDESIGN.md`. Tab structure locked. Implementation order:
 2. ✓ Settings panel: Model, Generation, Display, Features, Tools, About tabs (2026-04-30)
 3. ✓ Companion Settings: Identity & Memory, Expression ✦, Tools (3-state), Library stub (2026-05-01)
 4. ✓ Memory Manager window phase 1: soul file editor, floating modal (2026-05-01)
-5. Sidebar changes: Companions button, orb heartbeat trigger
+5. ✓ Companion panel token migration: pill-chip tabs, gradient chrome, --focus-ring on inputs, full token pass (2026-05-02)
+6. Sidebar changes: Companions button, orb heartbeat trigger
 
 ### Identity & Evolution System Refactor
 See `design/IDENTITY.md`. Full rework of soul/mind tools and file naming.
-1. Add filename constants to `scripts/paths.py`
-2. Rename `companion_identity.md` → `soul.md`, `self_notes.md` → `soul_reflections.md` across codebase
-3. New tool files: `soul_identity.py`, `soul_reflect.py`, `soul_user.py`, `note.py`
-4. Tool availability gated by evolution level in tool discovery
-5. System prompt updated to describe new tool suite
-6. Unbound transition UX: custom modal, orb color-shift animation, one-shot heartbeat, `unbound.md` creation
-7. Chaos orb redesign: smooth color-shifting cycle (used for Unbound transition + as a presence preset)
-8. Presence autonomy tools: `set_presence`, `create_mood`, `edit_mood` (Unbound level)
+1. ✓ Evolution level UI: 4-level card selector (Settled/Reflective/Adaptive/Unbound) replaces old radio buttons (2026-05-02)
+2. ✓ Unbound transition modal + `unbound.md` creation from template (2026-05-02)
+3. Add filename constants to `scripts/paths.py`
+4. Rename `companion_identity.md` → `soul.md`, `self_notes.md` → `soul_reflections.md` across codebase (requires step 3 first)
+5. New tool files: `soul_identity.py`, `soul_reflect.py`, `soul_user.py`, `note.py`
+6. Tool availability gated by `evolution_level` in tool discovery + system prompt updated
+7. Chaos orb redesign: smooth color-shifting cycle (used for Unbound transition + as presence preset)
+8. One-shot Unbound heartbeat: custom prompt parameter in server heartbeat endpoint
+9. Presence autonomy tools: `set_presence`, `create_mood`, `edit_mood` (Unbound level)
 
 ### Library System
 See `design/CHARA_CARD.md` → Library section. Tiers:

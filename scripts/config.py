@@ -544,8 +544,7 @@ def load_companion_config(companion_folder: str) -> dict:
         "avatar_path":    "",
         "avatar_data":    "",
         "generation":     dict(DEFAULTS["generation"]),
-        "soul_edit_mode":            "locked",
-        "force_read_before_write":   True,
+        "evolution_level":           "settled",
         "heartbeat": {
             "silent_enabled":            False,
             "message_enabled":           False,

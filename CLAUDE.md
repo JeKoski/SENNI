@@ -143,50 +143,6 @@ Copying a companion folder between installs:
 
 ---
 
-## Session notes — 2026-04-29 (Settings redesign + Identity/Evolution system design)
-
-**Full Settings + Companion Settings tab structure locked. Identity evolution system designed. Library system named. Unbound transition specced. Design docs created.**
-
-### Decisions made
-
-**Settings panel — 6 tabs:** Model · Generation · Display · Features · Tools · About
-- TTS paths moved Server → Features. Display tab: markdown, pill visibility, "show technical details". Companions removed as tab — moves to sidebar.
-
-**Companion Settings — 7 tabs:** Identity & Memory · Generation · Heartbeat · Expression ✦ · Voice · Tools · Library (stub)
-- Identity & Memory: name, avatar (both slots), force-read, retrieval sliders, → Memory Manager link. File editor moves to Memory Manager.
-- Presence + Mood → Expression tab with segmented [Presence | Mood] toggle. "Lore" → Library.
-
-**Sidebar + orb:** Companions button replaces heartbeat. Orb clickable for manual heartbeat (hover: dim + icon + tooltip).
-
-**Memory Manager:** Separate floating window. Phase 1: file editor. Phase 2: ChromaDB browser.
-
-**Library system:** `character_book` in V2 spec. ChromaDB = *what happened*, Library = *what is true*. Four tiers. Companion-authored entries planned.
-
-**Identity evolution system** — see `design/IDENTITY.md`:
-- File renames: `companion_identity.md` → `soul.md`, `self_notes.md` → `soul_reflections.md`. Use `paths.py` constants before rename pass.
-- New tool suite: `soul_identity`, `soul_reflect`, `soul_user`, `note` — replaces generic `memory` tool for soul/mind files
-- Each tool: `action: "read" | "write"`. Full rewrite only. `note.py` unrestricted filenames + `list` action.
-- Evolution levels gate tool access (Settled/Reflective/Adaptive/Unbound). `write_library` + memory curation available at all levels (separate toggles).
-
-**Unbound transition:** Custom styled modal → orb color-shift starts → settings close → `unbound.md` created from template → one-shot heartbeat fires → orb settles. `unbound.md` always in context (lean directive, companion writes below separator). Unbound extras: `set_presence`, `create_mood`/`edit_mood` tools.
-
-**Chaos orb redesign:** `chaos` state → smooth color-shifting cycle (~8–12s, curated, not random). Used for Unbound transition + available as presence preset.
-
-### Bug fixed
-- Server restart overlay disconnected after UI redesign — rewired `showRestartOverlay()` + `watchBootLog()` in `restartServer()` and `spRestartServer()`. `spRestartServer` now closes settings before overlay.
-
-### Files created/updated
-- `design/IDENTITY.md` — created
-- `design/SETTINGS-REDESIGN.md` — tab layouts locked
-- `design/CHARA_CARD.md` — Library rename + tiers
-- `design/SYSTEMS.md` — chaos orb redesign noted
-- `BACKLOG.md` — multi-session tracks section added
-
-### Next session
-- Settings panel implementation — done ✓ (2026-04-30)
-
----
-
 ## Session notes — 2026-05-01 (Companion Settings redesign)
 
 **Companion Settings: 8 tabs → 7. Identity & Memory merged. Expression ✦ merges Presence + Mood. Tools tab 3-state per-companion overrides. Library stub. Memory Manager modal. Tool enforcement wired in backend.**
@@ -254,76 +210,45 @@ Copying a companion folder between installs:
 
 ---
 
-## Session notes — 2026-04-30 (Settings panel redesign implementation)
+## Session notes — 2026-05-02 (Companion panel token migration + Identity Evolution UI)
 
-**Settings panel fully redesigned. 5 tabs → 6. Token/elevation system applied throughout. Three new JS modules. Three new backend endpoints.**
+**`companion-panel.css` fully migrated to token/elevation system. Identity editing section replaced with 4-level evolution selector. Unbound transition modal implemented.**
 
 ### What changed
 
-**`static/css/settings.css` — full visual pass:**
-- Panel chrome: gradient dark bg + `--elev-3` shadow + `--border-default`
-- Tab bar: pill-chip container (`--surface-sunken`) with filled active chip (`--surface-raised` + `--elev-1`) — replaces old underline style
-- All form inputs/selects/textareas: `--surface-sunken` bg + `--focus-ring` on `:focus`
-- Arg rows, companion items: `--surface-raised` bg + `--border-subtle`
-- Buttons: `--elev-1` on primary, `--surface-raised` on ghost; all transitions use `var(--dur-fast)`
-- Section labels: `--border-subtle` bottom border for visual grouping
-- New utility classes: `.sp-accordion`, `.sp-feat-status`, `.sp-tool-row`
+**`static/css/companion-panel.css` — full rewrite:**
+- Tab bar: underline style → pill-chip bar matching `settings.css` (`--surface-sunken` container, `--surface-raised` + `--elev-1` active chip)
+- Panel chrome: flat `#21232e` → gradient + `var(--elev-3)` shadow
+- Footer: `--surface-floating` + `--border-subtle`
+- All inputs: `--surface-sunken` bg + `--border-default` + `var(--focus-ring)` on focus (was missing)
+- All hard-coded RGBA values → `--surface-*`, `--border-*`, `--text-*`, `--elev-*` tokens throughout
+- Memory Manager modal: `--elev-4` shadow
+- New classes added: `.cp-evo-cards`, `.cp-evo-card`, `.cp-evo-dot`, `.cp-evo-name`, `.cp-evo-desc`, `.cp-unbound-modal-overlay`, `.cp-unbound-modal`, `.cp-unbound-title`, `.cp-unbound-body`, `.cp-unbound-actions`
+- Kept hard-coded: orb/presence CSS vars (`--cpp-*`), amber/red/green semantic tints, swatch/canvas colors
 
-**`static/chat.html` — tab restructure:**
-- "Server" renamed → "Model"; `#tab-server` → `#tab-model` throughout
-- TTS section removed from Model tab
-- Display toggles (markdown, controls, thinking auto-open) removed from Generation tab
-- **Display tab** (new): chat display toggles + 7 tool pill toggles + "show technical details"
-- **Features tab** (new): TTS accordion + ChromaDB accordion with status badges
-- **Tools tab** (populated): 9 tool rows with enable/disable toggles
-- Footers: `sp-footer-server` → `sp-footer-model`; new footers for display/features/tools
+**`static/chat.html` — Identity & Memory tab:**
+- Removed: `#cp-soul-edit-mode` radio group (`locked/self_notes/agentic/chaos`) + force-read toggle
+- Added: `#cp-evo-cards` — 4 evolution level cards (Settled / Reflective / Adaptive / Unbound) with descriptions
+- Added: `#cp-unbound-overlay` — Unbound transition modal ("Release [Name] to the Unbound?")
 
-**`static/js/settings.js`:**
-- Added `spDisplayDirty`, `spFeaturesDirty`, `spToolsDirty` dirty flags
-- `_spSetDirty`/`_spClearDirty`/`_spUpdateFooterButtons` updated for all 6 tabs
-- `spSwitchTab` footer list updated: `['model','generation','display','features','companion','tools']`
-- `openSettings()` now opens Model tab; `spLoad()` calls all new populate functions
-
-**`static/js/settings-server.js`:**
-- Removed all TTS functions (moved to settings-features.js)
-- Removed TTS save block from `spSaveServer`; dirty marker updated to `_spSetDirty('model')`
-
-**`static/js/settings-generation.js`:**
-- Removed display toggle population from `spPopulateGeneration`
-- Removed `spToggleMarkdown`, `spToggleThinkingAutoopen`, `spToggleControlsVisible`
-- Removed `markdown_enabled`/`thinking_autoopen` from save payload
-
-**`static/js/settings-display.js`** (new): Display tab — populate/save markdown + controls + thinking + tool pills + show_technical_details. Saves to `/api/settings/generation` (gen keys) + `/api/settings/display` (pills + tech details).
-
-**`static/js/settings-features.js`** (new): Features tab — TTS accordion + ChromaDB accordion. All TTS browse/clear/fill-default helpers moved here with dirty calls updated to `spMarkFeaturesDirty`. Saves to `/api/settings/tts` + `/api/settings/features`.
-
-**`static/js/settings-tools.js`** (new): Tools tab — 9 tool toggles. Saves to `/api/settings/tools`.
-
-**`static/js/settings_os_paths.js`:** `getElementById('tab-server')` → `getElementById('tab-model')`.
-
-**`scripts/config.py` DEFAULTS:**
-- Added `show_technical_details: False`
-- Added `tools_enabled` dict (all tools True by default)
-- `load_config()` now deep-merges `tool_pills` and `tools_enabled`
+**`static/js/companion.js`:**
+- `cpPopulate()`: replaced soul_edit_mode radio loading with `evolution_level` card activation
+- `cpSave()`: replaced `soul_edit_mode` + `force_read_before_write` payload keys with `evolution_level`
+- `cpSettings` cache update: tracks `evolution_level` instead of old fields
+- New functions: `_cpEvoSelect()`, `_cpShowUnboundModal()`, `_cpCancelUnbound()`, `_cpConfirmUnbound()`
+- `_cpConfirmUnbound()`: calls `POST /api/settings/unbound/<folder>` to create `unbound.md`, then marks dirty
 
 **`scripts/settings_router.py`:**
-- `POST /api/settings/display` — saves `show_technical_details` + `tool_pills`
-- `POST /api/settings/features` — saves `memory.enabled` (ChromaDB toggle)
-- `POST /api/settings/tools` — saves `tools_enabled` dict
+- Companion save: replaced `soul_edit_mode` + `force_read_before_write` keys with `evolution_level`
+- New endpoint: `POST /api/settings/unbound/{companion_folder}` — creates `unbound.md` from template in `soul/` (idempotent)
 
-### Status
-- Settings panel visual: ✅ token system applied, pill tabs, elevation
-- Model tab: ✅ (was Server — no content changes, just visual)
-- Generation tab: ✅ (display toggles removed, sampling params only)
-- Display tab: ✅ all toggles functional, saves/loads correctly
-- Features tab: ✅ TTS fully functional, ChromaDB toggle wired — reinstall buttons still stub
-- Tools tab: ✅ all 9 tools render + save
-- About tab: ✅ untouched, just visually consistent
+**`scripts/config.py`:**
+- `load_companion_config()`: replaced `soul_edit_mode: "locked"` + `force_read_before_write: True` defaults with `evolution_level: "settled"`
 
-### Next session
-- In-app check of Settings redesign — verify each tab loads and saves cleanly
-- Companion Settings redesign: Identity & Memory, Expression ✦, Tools, Library tabs
-- Sidebar Companions button + orb heartbeat trigger
+### Still pending from this track
+- Sidebar: Companions button, orb heartbeat trigger
+- Identity & Evolution: file renames (`companion_identity.md` → `soul.md` etc.), new tool files, tool gating by level, chaos orb animation, one-shot Unbound heartbeat, presence autonomy tools
+- Memory Manager Phase 2: ChromaDB note browser
 
 ---
 
