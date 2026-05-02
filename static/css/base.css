@@ -296,12 +296,15 @@ body::before {
 }
 
 /* ── Sidebar footer ───────────────────────────────────────────────────────── */
-.sidebar-footer {
+.sidebar-footer-area {
   margin-top: auto;
+  position: relative;
+}
+.sidebar-footer {
   padding: var(--sp-3) var(--sp-3) 0;
   border-top: 1px solid var(--border-subtle);
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;
 }
 .footer-pill {
@@ -327,11 +330,82 @@ body::before {
   color: var(--text);
 }
 
+/* ── Orb heartbeat hover ─────────────────────────────────────────────────── */
+.orb-hb-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.38);
+  color: rgba(255,255,255,0.85);
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s;
+  z-index: 2;
+}
+#companion-orb { cursor: pointer; }
+#companion-orb:hover:not(.hb-busy) .orb-hb-overlay { opacity: 1; }
+#companion-orb:hover:not(.hb-busy) .orb-body { filter: brightness(0.72); }
+#companion-orb.hb-busy { cursor: default; }
+
+/* ── Companion switcher popover ──────────────────────────────────────────── */
+.companions-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0; right: 0;
+  background: var(--surface-floating);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-md);
+  box-shadow: var(--elev-3);
+  padding: var(--sp-1);
+  z-index: 200;
+  display: none;
+}
+.companions-popover.open { display: block; animation: pageIn var(--dur-base) var(--ease-out-soft) both; }
+.companions-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-out-soft);
+}
+.companions-popover-row:hover { background: var(--surface-raised); }
+.companions-popover-row.active { background: var(--tint-indigo); cursor: default; }
+.companions-popover-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.companions-popover-badge {
+  font-size: 10px;
+  color: var(--indigo-hi);
+  background: var(--tint-indigo-on);
+  border: 1px solid rgba(129,140,248,0.2);
+  border-radius: var(--r-pill);
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.companions-popover-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
 /* ── Chats section ⋯ menu ────────────────────────────────────────────────── */
 .chats-menu {
   position: absolute;
   right: var(--sp-3); top: calc(100% + 4px);
-  background: var(--surface-floating);
+  background: linear-gradient(160deg, rgba(34,36,50,0.97) 0%, rgba(28,30,40,0.97) 100%);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-default);
   border-radius: var(--r-md);
   box-shadow: var(--elev-3);
@@ -451,7 +525,8 @@ body::before {
 .chat-header-menu {
   position: absolute;
   top: calc(100% + 6px); right: var(--sp-4);
-  background: var(--surface-floating);
+  background: linear-gradient(160deg, rgba(34,36,50,0.97) 0%, rgba(28,30,40,0.97) 100%);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-default);
   border-radius: var(--r-md);
   box-shadow: var(--elev-3);

@@ -66,10 +66,15 @@
 
     <div style="flex:1"></div>
 
-    <div class="sidebar-footer">
-      <button class="footer-pill" onclick="openSettings()">⚙ Settings</button>
-      <button class="footer-pill" onclick="restartServer()" id="restart-btn">↺ Restart</button>
-      <button class="footer-pill" id="hb-manual-btn" onclick="heartbeatManual()" style="display:none;grid-column:1/-1">✦ Heartbeat</button>
+    <div class="sidebar-footer-area">
+      <div id="companions-popover" class="companions-popover">
+        <div id="companions-popover-list"></div>
+      </div>
+      <div class="sidebar-footer">
+        <button class="footer-pill" onclick="openSettings()">⚙ Settings</button>
+        <button class="footer-pill" onclick="openCompanionSwitcher(event)" id="companions-btn">⇄ Companions</button>
+        <button class="footer-pill" onclick="restartServer()" id="restart-btn">↺ Restart</button>
+      </div>
     </div>
   </aside>
 
@@ -112,6 +117,7 @@
           <div class="orb-body" id="orb-body">
             <div class="orb-ring"></div>
             <div class="orb-icon" id="orb-icon">✦</div>
+            <div class="orb-hb-overlay" id="orb-hb-overlay">✦</div>
           </div>
         </div>
         <!-- Mood pill — sits to the right of the orb, bottom-aligned via orb-home flex -->
@@ -1019,6 +1025,7 @@
 <script src="/static/js/companion-memory.js"></script>
 <script src="/static/js/companion-tools.js"></script>
 <script src="/static/js/memory-manager.js"></script>
+<script src="/static/js/companion-switcher.js"></script>
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/file-browser.js"></script>
 <script src="/static/js/settings-server.js"></script>

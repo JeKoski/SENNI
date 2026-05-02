@@ -32,10 +32,6 @@ function _hbInstructions(trigger) {
 function heartbeatInit() {
   heartbeatStop();
 
-  // Show or hide manual trigger button based on enabled state
-  const manBtn = document.getElementById('hb-manual-btn');
-  if (manBtn) manBtn.style.display = _hbEnabled() ? '' : 'none';
-
   if (!_hbEnabled()) return;
 
   const c = _hbCfg();
@@ -145,6 +141,7 @@ async function heartbeatFire(trigger) {
   }
 
   _hbRunning = true;
+  _orbHbUpdate();
   console.log('[heartbeat] firing, trigger:', trigger);
 
   // Insert a purple event pill so the user knows a heartbeat turn is starting
@@ -226,6 +223,7 @@ async function heartbeatFire(trigger) {
   if (typeof setPresenceState === 'function') setPresenceState('idle');
   if (typeof hideStopButton === 'function') hideStopButton();
   _hbRunning = false;
+  _orbHbUpdate();
 }
 
 // ── System prompt for heartbeat ───────────────────────────────────────────────
@@ -347,3 +345,22 @@ function heartbeatReload() {
   }
   heartbeatInit();
 }
+
+// ── Orb click → manual heartbeat ─────────────────────────────────────────────
+function _orbHbUpdate() {
+  const orb = document.getElementById('companion-orb');
+  if (!orb) return;
+  orb.classList.toggle('hb-busy', !!(_hbRunning || isSending));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const orb = document.getElementById('companion-orb');
+  if (!orb) return;
+  // Re-evaluate busy state on every hover so isSending is always current
+  orb.addEventListener('mouseenter', () => _orbHbUpdate());
+  orb.addEventListener('click', () => {
+    if (_hbRunning || isSending) return;
+    heartbeatManual();
+  });
+  orb.title = 'Click to send a heartbeat';
+});

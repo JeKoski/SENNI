@@ -1,6 +1,6 @@
 # Settings Windows Redesign
 
-**Status:** Largely implemented. Settings panel fully done. Companion Settings fully done (token system + all tabs). Sidebar changes still pending.
+**Status:** ✅ Complete. Settings panel fully done. Companion Settings fully done (token system + all tabs). Sidebar changes done.
 **Scope:** Both the global Settings panel and the Companion Settings window.
 **Goal:** Adopt the new token/elevation system from the main chat redesign. Consolidate scattered settings. Add missing tabs (Features, Tools). Cleaner visual hierarchy throughout.
 
@@ -101,9 +101,11 @@ Soul/mind markdown file editor. Accessible from Identity & Memory tab → link. 
 
 Both `settings.css` and `companion-panel.css` fully migrated: pill-chip tab bars, gradient panel chrome, `--elev-3` panel shadow, `--surface-*`/`--border-*`/`--text-*` tokens throughout, `--focus-ring` on all inputs.
 
-### Still pending
+### Sidebar + orb changes ✅ COMPLETE
 
-- **Sidebar changes** — Companions button (replaces heartbeat button), orb click → manual heartbeat trigger
+- **Sidebar footer** — 3-column grid (Settings | Companions | Restart). `.sidebar-footer-area` wrapper with `position: relative` for popover anchoring.
+- **Companions popover** — `companion-switcher.js` fetches `/api/settings` on open, renders companion list, `_csSwitchTo()` reloads page after switch.
+- **Orb heartbeat trigger** — `#orb-hb-overlay` inside `.orb-body`; hover shows ✦ icon + dims orb; click calls `heartbeatManual()`; `.hb-busy` disables during generation.
 
 ---
 
