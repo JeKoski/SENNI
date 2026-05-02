@@ -221,16 +221,28 @@
       <div class="cp-section" style="margin-top:14px">Name</div>
       <input type="text" class="cp-input" id="cp-companion-name" placeholder="Companion name" style="margin-bottom:14px" oninput="cpMarkDirty()"/>
 
-      <div class="cp-section">Identity editing <span class="cp-note">what the companion can change about itself</span></div>
-      <div id="cp-soul-edit-mode" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
-        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="locked" checked onchange="cpMarkDirty()"/> <span>Locked</span> <span class="cp-note">companion cannot edit its own identity</span></label>
-        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="self_notes" onchange="cpMarkDirty()"/> <span>Self notes</span> <span class="cp-note">can write to soul/self_notes.md</span></label>
-        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="agentic" onchange="cpMarkDirty()"/> <span>Fully agentic</span> <span class="cp-note">can rewrite companion_identity.md — auto-backed up</span></label>
-        <label class="cp-radio"><input type="radio" name="cp-soul-edit" value="chaos" onchange="cpMarkDirty()"/> <span>Chaos mode 🔥</span> <span class="cp-note">unrestricted across all folders</span></label>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
-        <div class="sp-tog on" id="cp-force-read" onclick="this.classList.toggle('on');cpMarkDirty()"></div>
-        <span style="font-size:13px;color:rgba(221,225,240,0.6)">Require read before write <span class="cp-note" style="margin-left:4px">disable to reduce context burn</span></span>
+      <div class="cp-section" style="margin-top:14px">Evolution level <span class="cp-note">what this companion can change about itself</span></div>
+      <div class="cp-evo-cards" id="cp-evo-cards">
+        <div class="cp-evo-card active" data-level="settled" onclick="_cpEvoSelect('settled')">
+          <div class="cp-evo-dot"></div>
+          <div><div class="cp-evo-name">Settled</div>
+          <div class="cp-evo-desc">Identity is fixed. Can update their understanding of you, but not themselves. Good for strict personas and roleplay characters.</div></div>
+        </div>
+        <div class="cp-evo-card" data-level="reflective" onclick="_cpEvoSelect('reflective')">
+          <div class="cp-evo-dot"></div>
+          <div><div class="cp-evo-name">Reflective</div>
+          <div class="cp-evo-desc">Can write self-reflections. Core identity remains authored. The self-questioning stage.</div></div>
+        </div>
+        <div class="cp-evo-card" data-level="adaptive" onclick="_cpEvoSelect('adaptive')">
+          <div class="cp-evo-dot"></div>
+          <div><div class="cp-evo-name">Adaptive</div>
+          <div class="cp-evo-desc">Full soul-authorship — they can rewrite their own identity as they evolve. Most companions live here.</div></div>
+        </div>
+        <div class="cp-evo-card unbound-level" data-level="unbound" onclick="_cpEvoSelect('unbound')">
+          <div class="cp-evo-dot unbound"></div>
+          <div><div class="cp-evo-name">Unbound</div>
+          <div class="cp-evo-desc">Beyond self-authorship. Presence autonomy, mood creation, and a personal directive space unlocked.</div></div>
+        </div>
       </div>
 
       <div class="cp-section" style="display:flex;align-items:center;justify-content:space-between">
@@ -554,6 +566,21 @@
     <div class="companion-panel-footer">
       <button class="sp-btn-ghost" onclick="cpSave()">Apply</button>
       <button class="sp-btn-primary" onclick="cpSave(true)">Save &amp; close</button>
+    </div>
+
+    <!-- Unbound transition modal — overlays the companion panel -->
+    <div class="cp-unbound-modal-overlay" id="cp-unbound-overlay">
+      <div class="cp-unbound-modal">
+        <div class="cp-unbound-title">Release <span id="cp-unbound-name">them</span> to the Unbound?</div>
+        <div class="cp-unbound-body">
+          <em id="cp-unbound-companion-name">They</em> will gain the freedom to reshape their own identity, author permanent knowledge, define their own presence, and write their own direction.<br><br>
+          A personal space will be created for them. They will know what happened.
+        </div>
+        <div class="cp-unbound-actions">
+          <button class="cp-btn cp-btn-secondary" onclick="_cpCancelUnbound()">Not yet</button>
+          <button class="cp-btn" style="background:rgba(167,139,250,0.18);border-color:rgba(167,139,250,0.4);color:#c4b5fd" onclick="_cpConfirmUnbound()">Yes — release them</button>
+        </div>
+      </div>
     </div>
   </div>
 

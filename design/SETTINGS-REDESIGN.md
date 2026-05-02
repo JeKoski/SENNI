@@ -1,6 +1,6 @@
 # Settings Windows Redesign
 
-**Status:** Design phase — tab structure locked. No implementation started.
+**Status:** Largely implemented. Settings panel fully done. Companion Settings fully done (token system + all tabs). Sidebar changes still pending.
 **Scope:** Both the global Settings panel and the Companion Settings window.
 **Goal:** Adopt the new token/elevation system from the main chat redesign. Consolidate scattered settings. Add missing tabs (Features, Tools). Cleaner visual hierarchy throughout.
 
@@ -25,7 +25,7 @@
 
 | Tab | Contents |
 |-----|----------|
-| **Identity & Memory** | Name, avatar (orb slot + sidebar slot with crop tool), force-read toggle, mid_convo_k, session_start_k, → Memory Manager link. |
+| **Identity & Memory** | Name, avatar (orb slot + sidebar slot with crop tool), evolution level selector (Settled/Reflective/Adaptive/Unbound), mid_convo_k, session_start_k, → Memory Manager link. |
 | **Generation** | Per-companion overrides: temp, top-p, top-k, repeat penalty, max tokens, max tool rounds, thinking auto-open. |
 | **Heartbeat** | Enable, interval, prompt, timing — no changes from current. |
 | **Expression ✦** | Segmented `[Presence | Mood]` toggle at top. Full Presence UI or full Mood UI depending on selection. Both panels include reset-to-default buttons. Mood panel includes TTS override UI (speed/blend per mood). |
@@ -68,30 +68,42 @@ The Library tab surfaces the V2 character card `character_book` — a keyword-tr
 
 ---
 
-## Current state — what exists
+## Current state — what exists ✅
 
-### Settings panel (global) — 5 tabs
+### Settings panel (global) — 6 tabs ✅ COMPLETE
 
-| Tab | Contents |
-|-----|----------|
-| **Server** | Model file, mmproj, binary, GPU, ports, built-in args, custom args, Voice/TTS section (enable + 3 path fields) |
-| **Generation** | Temp, top-p, top-k, repeat penalty, max tokens, max tool rounds, markdown toggle, thinking auto-open toggle, message controls visibility toggle, vision mode |
-| **Companion** | Companion list + "Open companion settings" button only — no editable fields |
-| **Tools** | Stub — "coming soon" |
-| **About** | Version, model, GPU, ports, paths, diagnostics, re-run wizard, factory reset |
+| Tab | Status | Contents |
+|-----|--------|----------|
+| **Model** | ✅ | Model file, mmproj, binary, GPU, ports, built-in + custom args |
+| **Generation** | ✅ | Sampling params only (temp, top-p, top-k, repeat penalty, max tokens, max tool rounds, DRY settings, vision mode) |
+| **Display** | ✅ | Markdown, controls visibility, thinking auto-open, tool pill toggles, show technical details |
+| **Features** | ✅ | TTS accordion + ChromaDB accordion — reinstall buttons still stub |
+| **Tools** | ✅ | Global per-tool enable/disable (9 tools) |
+| **About** | ✅ | Version, model, GPU, ports, paths, diagnostics, re-run wizard, factory reset |
 
-### Companion Settings window — 8 tabs
+### Companion Settings window — 7 tabs ✅ COMPLETE
 
-| Tab | Contents |
-|-----|----------|
-| **Identity** | Name, soul/mind file editor (radios + textarea), force-read toggle |
-| **Generation** | Per-companion overrides: temp, top-p, top-k, repeat penalty, max tokens, max tool rounds, thinking auto-open |
-| **Memory** | `mid_convo_k`, `session_start_k` |
-| **Heartbeat** | Enable/interval/prompt/timing settings |
-| **Presence ✦** | Orb presence presets — full accordion UI |
-| **Mood** | Mood definitions, active mood, pill visibility |
-| **Voice** | Voice blend slots (up to 5), speed, pitch, preview |
-| **Tools** | Stub (no content yet) |
+| Tab | Status | Contents |
+|-----|--------|----------|
+| **Identity & Memory** | ✅ | Name, avatar (both slots + crop), evolution level cards (Settled/Reflective/Adaptive/Unbound), episodic memory toggle, K sliders, cognitive stack, → Memory Manager link |
+| **Generation** | ✅ | Per-companion overrides: temp, top-p, top-k, min-p, repeat penalty, max tokens, max tool rounds, DRY settings |
+| **Heartbeat** | ✅ | Enable/interval, silent/message/idle triggers, timing instructions |
+| **Expression ✦** | ✅ | Segmented [Presence \| Mood] toggle. Full presence preset + state UI. Full mood card list + active mood + pill visibility |
+| **Voice** | ✅ | Voice blend slots (up to 5), speed, pitch, preview |
+| **Tools** | ✅ | 3-state per-companion overrides: Global / On / Off per tool |
+| **Library** | ⏳ stub | Keyword-triggered lore entries — waiting on in-chat keyword scanning engine |
+
+### Memory Manager window — Phase 1 ✅ COMPLETE
+
+Soul/mind markdown file editor. Accessible from Identity & Memory tab → link. Phase 2 (ChromaDB browser) is a future session.
+
+### Token/elevation system — ✅ COMPLETE on both panels
+
+Both `settings.css` and `companion-panel.css` fully migrated: pill-chip tab bars, gradient panel chrome, `--elev-3` panel shadow, `--surface-*`/`--border-*`/`--text-*` tokens throughout, `--focus-ring` on all inputs.
+
+### Still pending
+
+- **Sidebar changes** — Companions button (replaces heartbeat button), orb click → manual heartbeat trigger
 
 ---
 
@@ -154,15 +166,19 @@ Companion Settings is a full-height side panel. Same surface + elevation treatme
 
 **Settings panel:**
 - `settings.js` — coordinator: open/close, tab switching, load, dirty tracking
-- `settings-server.js` — Server tab
+- `settings-server.js` → `settings-model.js` (tab renamed; file still `settings-server.js`)
 - `settings-generation.js` — Generation tab
+- `settings-display.js` — Display tab (markdown, controls, thinking, tool pills, show_technical_details)
+- `settings-features.js` — Features tab (TTS + ChromaDB accordions)
+- `settings-tools.js` — Tools tab (global per-tool enable/disable)
 - `settings-companion.js` — Companion tab + About tab
-- `settings_os_paths.js` — per-OS path resolution (inside Server tab)
+- `settings_os_paths.js` — per-OS path resolution (inside Model tab)
 
 **Companion Settings:**
-- `companion.js` — coordinator: open/close, load, tab switching, avatar, soul files, heartbeat, generation, save, toast, dirty tracking
-- `companion-presence.js` — Presence tab
-- `companion-mood.js` — Mood tab
+- `companion.js` — coordinator: open/close, load, tab switching, avatar, generation, heartbeat, save, toast, dirty tracking, evolution level logic (`_cpEvoSelect`, Unbound modal functions)
+- `companion-memory.js` — memory status badge, K sliders, cognitive stack (Identity & Memory tab)
+- `companion-presence.js` — Presence panel (inside Expression ✦ tab)
+- `companion-mood.js` — Mood panel (inside Expression ✦ tab)
 - `companion-tts.js` — Voice tab
-
-New tabs (Features, Tools, etc.) should each get their own module file. Coordinators stay thin.
+- `companion-tools.js` — Tools tab (3-state per-companion overrides)
+- `memory-manager.js` — Memory Manager floating modal (soul/mind file editor)

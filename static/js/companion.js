@@ -13,6 +13,37 @@ let cpDirty          = false;  // unsaved changes flag
 let _cpAvatarChanged = false;  // true if user picked/reset avatar this session
 let _cpNewAvatarData = null;   // data URL (new avatar) or '' (reset), null = no change
 
+// ── Evolution level ───────────────────────────────────────────────────────────
+function _cpEvoSelect(level) {
+  if (level === 'unbound') {
+    const current = document.querySelector('#cp-evo-cards .cp-evo-card.active')?.dataset.level;
+    if (current !== 'unbound') { _cpShowUnboundModal(); return; }
+    return;
+  }
+  document.querySelectorAll('#cp-evo-cards .cp-evo-card').forEach(c =>
+    c.classList.toggle('active', c.dataset.level === level));
+  cpMarkDirty();
+}
+
+function _cpShowUnboundModal() {
+  const name = document.getElementById('cp-companion-name')?.value || 'them';
+  document.getElementById('cp-unbound-name').textContent = name;
+  document.getElementById('cp-unbound-companion-name').textContent = name;
+  document.getElementById('cp-unbound-overlay').classList.add('open');
+}
+
+function _cpCancelUnbound() {
+  document.getElementById('cp-unbound-overlay').classList.remove('open');
+}
+
+async function _cpConfirmUnbound() {
+  document.getElementById('cp-unbound-overlay').classList.remove('open');
+  document.querySelectorAll('#cp-evo-cards .cp-evo-card').forEach(c =>
+    c.classList.toggle('active', c.dataset.level === 'unbound'));
+  await fetch(`/api/settings/unbound/${encodeURIComponent(cpFolder)}`, { method: 'POST' });
+  cpMarkDirty();
+}
+
 // ── Dirty tracking ────────────────────────────────────────────────────────────
 function cpMarkDirty() {
   cpDirty = true;
@@ -143,13 +174,10 @@ function cpPopulate() {
   const resetWrap = document.getElementById('cp-avatar-reset-wrap');
   if (resetWrap) resetWrap.style.display = (orbUrl || sbUrl) ? 'inline' : 'none';
 
-  const soulMode = c.soul_edit_mode || 'locked';
-  document.querySelectorAll('#cp-soul-edit-mode input[name="cp-soul-edit"]').forEach(r => {
-    r.checked = r.value === soulMode;
+  const evoLevel = c.evolution_level || 'settled';
+  document.querySelectorAll('#cp-evo-cards .cp-evo-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.level === evoLevel);
   });
-
-  const frEl = document.getElementById('cp-force-read');
-  if (frEl) frEl.classList.toggle('on', c.force_read_before_write !== false);
 
   // ── Generation ── (blank = inherit global)
   const setGen = (id, key) => {
@@ -328,8 +356,7 @@ async function cpSave(andClose = false) {
         };
       })(),
       generation:              g,
-      soul_edit_mode:          document.querySelector('#cp-soul-edit-mode input[name="cp-soul-edit"]:checked')?.value || 'locked',
-      force_read_before_write: document.getElementById('cp-force-read')?.classList.contains('on') ?? true,
+      evolution_level:         document.querySelector('#cp-evo-cards .cp-evo-card.active')?.dataset.level || 'settled',
       heartbeat:               hb,
       // Only include presence payload if the Presence tab was opened this session.
       ...(_cpPresenceInitDone ? _cpGetPresencePayload() : {}),
@@ -359,8 +386,7 @@ async function cpSave(andClose = false) {
         cpSettings.active_companion.avatar_url  = _cpNewAvatarData ? `/api/companion/${cpFolder}/avatar` : '';
       }
       cpSettings.active_companion.generation              = body.generation;
-      cpSettings.active_companion.soul_edit_mode          = body.soul_edit_mode;
-      cpSettings.active_companion.force_read_before_write = body.force_read_before_write;
+      cpSettings.active_companion.evolution_level         = body.evolution_level;
       cpSettings.active_companion.heartbeat               = body.heartbeat;
       cpSettings.active_companion.active_presence_preset  = body.active_presence_preset;
       cpSettings.presence_presets                         = body.presence_presets;
