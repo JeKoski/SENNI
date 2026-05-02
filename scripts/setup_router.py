@@ -534,7 +534,10 @@ def _get_pip_python() -> str:
 # ── Extras: package labels, pip names, install modes ──────────────────────────
 _EXTRAS_ORDER = ("tts", "memory")
 _EXTRAS_META  = {
-    "tts":    (["kokoro", "soundfile"], "Voice (Kokoro TTS)"),
+    # numpy>=2.0 is listed first to ensure a Python 3.13-compatible wheel is
+    # resolved before kokoro's transitive deps pull in numpy<2 (which has no
+    # Python 3.13 wheel and would otherwise trigger a source build + MSVC).
+    "tts":    (["numpy>=2.0", "kokoro", "soundfile"], "Voice (Kokoro TTS)"),
     "memory": (["chromadb"],            "Memory (ChromaDB)"),
 }
 
@@ -562,22 +565,24 @@ def _detect_extra(key: str) -> dict:
     Check if an extra is installed, looking in the right location per install mode.
     Uses the first package in the list as the primary indicator.
     """
-    import sys
+    import sys, re
     primary = _EXTRAS_META[key][0][0]  # first package in the list
     mode    = _EXTRAS_INSTALL_MODE[key]
+    # Strip version specifiers so "numpy>=2.0" → "numpy" for import/path checks
+    primary_mod = re.split(r'[><=!~]', primary)[0].strip()
 
     if getattr(sys, "frozen", False) and mode == "embed":
         from scripts.paths import PYTHON_EMBED_DIR
-        embed_sp = PYTHON_EMBED_DIR / "Lib" / "site-packages" / primary
+        embed_sp = PYTHON_EMBED_DIR / "Lib" / "site-packages" / primary_mod
         if embed_sp.is_dir():
             return {"installed": True, "path": str(embed_sp.parent), "source": "local"}
         return {"installed": False, "path": "", "source": ""}
 
-    if (FEATURES_PACKAGES_DIR / primary).is_dir():
+    if (FEATURES_PACKAGES_DIR / primary_mod).is_dir():
         return {"installed": True, "path": str(FEATURES_PACKAGES_DIR), "source": "local"}
 
     import importlib.util
-    spec = importlib.util.find_spec(primary)
+    spec = importlib.util.find_spec(primary_mod)
     if spec and spec.origin:
         return {"installed": True, "path": str(Path(spec.origin).parent.parent), "source": "system"}
 
@@ -653,7 +658,8 @@ async def setup_install_extras(request: Request):
                         push({"type": "log", "line": line})
 
                 py  = _get_pip_python()
-                cmd = [py, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "--no-warn-script-location"]
+                cmd = [py, "-m", "pip", "install", "--upgrade", "--no-cache-dir",
+                       "--no-warn-script-location", "--prefer-binary"]
                 if mode == "target":
                     cmd += ["--target", str(FEATURES_PACKAGES_DIR)]
                 cmd.extend(pkgs)

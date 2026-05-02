@@ -610,6 +610,10 @@ def load_companion_config(companion_folder: str) -> dict:
         # on disk, the user set it intentionally (stack_initialised will be True).
         if "cognitive_stack" in saved:
             base["cognitive_stack"] = saved["cognitive_stack"]
+        # Migrate soul_edit_mode → evolution_level for companions created before 2026-05-02
+        if "evolution_level" not in saved and "soul_edit_mode" in saved:
+            _level_map = {"locked": "settled", "self_notes": "reflective", "agentic": "adaptive", "chaos": "unbound"}
+            saved["evolution_level"] = _level_map.get(saved["soul_edit_mode"], "settled")
         skip = {"generation", "heartbeat", "moods", "tts", "cognitive_stack"}
         return {**base, **{k: v for k, v in saved.items() if k not in skip}}
     except Exception:
@@ -635,6 +639,12 @@ def write_avatar_file(companion_folder: str, data_url: str, slot: str = 'orb') -
         header, b64 = data_url.split(',', 1)
         raw    = base64.b64decode(b64)
         prefix = 'avatar' if slot == 'orb' else 'sidebar_avatar'
+        # Remove stale files for this slot so the old extension isn't served instead
+        for _ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+            _old = COMPANIONS_DIR / companion_folder / f"{prefix}{_ext}"
+            if _old.exists():
+                try: _old.unlink()
+                except Exception: pass
         dest   = COMPANIONS_DIR / companion_folder / f"{prefix}.png"
         try:
             import io as _io

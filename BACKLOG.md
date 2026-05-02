@@ -132,6 +132,8 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ## Bugs
 
+- **Kokoro TTS install on Python 3.13** — `numpy>=2.0` added to install list and `--prefer-binary` flag added, but install still fails. The dep chain (kokoro → misaki or similar) pulls in something that tries to compile from source on Python 3.13. Needs: check exact error trace in a fresh session, identify which transitive dep is the culprit, pin or pre-install it. Workaround for now: install kokoro manually in a venv with Python 3.11/3.12.
+
 - **Server restart overlay disconnected** — `showRestartOverlay()` + `watchBootLog()` exist in `chat-session.js` but weren't being called from `restartServer()` or `spRestartServer()` after the UI redesign. ✅ Fixed 2026-04-29.
 - **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks; `stripGemma4Artifacts()` cleans trailing artifacts. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging in place — check browser console on next occurrence.
 - **Linux SYCL: downloads Windows asset on Linux** — `_find_binary_asset` matches the Windows SYCL zip when running on Linux. Needs investigation on a Linux machine — likely a platform-string mismatch in the asset filter. Archive extraction path structure also unknown. *(Deferred — needs two-system workspace to diagnose.)*
@@ -175,7 +177,7 @@ See `design/SETTINGS-REDESIGN.md`. Tab structure locked. Implementation order:
 3. ✓ Companion Settings: Identity & Memory, Expression ✦, Tools (3-state), Library stub (2026-05-01)
 4. ✓ Memory Manager window phase 1: soul file editor, floating modal (2026-05-01)
 5. ✓ Companion panel token migration: pill-chip tabs, gradient chrome, --focus-ring on inputs, full token pass (2026-05-02)
-6. Sidebar changes: Companions button, orb heartbeat trigger
+6. ✓ Sidebar changes: Companions button (3-col footer), orb heartbeat trigger (2026-05-02)
 
 ### Identity & Evolution System Refactor
 See `design/IDENTITY.md`. Full rework of soul/mind tools and file naming.

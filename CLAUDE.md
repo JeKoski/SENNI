@@ -210,9 +210,9 @@ Copying a companion folder between installs:
 
 ---
 
-## Session notes — 2026-05-02 (Companion panel token migration + Identity Evolution UI)
+## Session notes — 2026-05-02 (Companion panel token migration + Identity Evolution UI + Sidebar changes)
 
-**`companion-panel.css` fully migrated to token/elevation system. Identity editing section replaced with 4-level evolution selector. Unbound transition modal implemented.**
+**`companion-panel.css` fully migrated to token/elevation system. Identity editing section replaced with 4-level evolution selector. Unbound transition modal implemented. Sidebar footer: 3-column (Settings | Companions | Restart). Orb click → manual heartbeat.**
 
 ### What changed
 
@@ -223,32 +223,71 @@ Copying a companion folder between installs:
 - All inputs: `--surface-sunken` bg + `--border-default` + `var(--focus-ring)` on focus (was missing)
 - All hard-coded RGBA values → `--surface-*`, `--border-*`, `--text-*`, `--elev-*` tokens throughout
 - Memory Manager modal: `--elev-4` shadow
-- New classes added: `.cp-evo-cards`, `.cp-evo-card`, `.cp-evo-dot`, `.cp-evo-name`, `.cp-evo-desc`, `.cp-unbound-modal-overlay`, `.cp-unbound-modal`, `.cp-unbound-title`, `.cp-unbound-body`, `.cp-unbound-actions`
+- New classes: `.cp-evo-cards`, `.cp-evo-card`, `.cp-evo-dot`, `.cp-evo-name`, `.cp-evo-desc`, `.cp-unbound-modal-overlay`, `.cp-unbound-modal`, `.cp-unbound-title`, `.cp-unbound-body`, `.cp-unbound-actions`
 - Kept hard-coded: orb/presence CSS vars (`--cpp-*`), amber/red/green semantic tints, swatch/canvas colors
 
-**`static/chat.html` — Identity & Memory tab:**
-- Removed: `#cp-soul-edit-mode` radio group (`locked/self_notes/agentic/chaos`) + force-read toggle
-- Added: `#cp-evo-cards` — 4 evolution level cards (Settled / Reflective / Adaptive / Unbound) with descriptions
-- Added: `#cp-unbound-overlay` — Unbound transition modal ("Release [Name] to the Unbound?")
+**`static/chat.html`:**
+- Identity & Memory tab: removed `#cp-soul-edit-mode` radio group + force-read toggle; added `#cp-evo-cards` (4 level cards) + `#cp-unbound-overlay` (Unbound modal)
+- Sidebar footer: `#hb-manual-btn` removed; wrapped in `.sidebar-footer-area`; added ⇄ Companions button (`#companions-btn`); `#companions-popover` (3-column footer layout)
+- Orb: added `#orb-hb-overlay` inside `.orb-body` (shows ✦ icon on hover)
+- Script: `companion-switcher.js` added to load order
 
 **`static/js/companion.js`:**
 - `cpPopulate()`: replaced soul_edit_mode radio loading with `evolution_level` card activation
-- `cpSave()`: replaced `soul_edit_mode` + `force_read_before_write` payload keys with `evolution_level`
-- `cpSettings` cache update: tracks `evolution_level` instead of old fields
+- `cpSave()`: replaced `soul_edit_mode` + `force_read_before_write` keys with `evolution_level`
 - New functions: `_cpEvoSelect()`, `_cpShowUnboundModal()`, `_cpCancelUnbound()`, `_cpConfirmUnbound()`
-- `_cpConfirmUnbound()`: calls `POST /api/settings/unbound/<folder>` to create `unbound.md`, then marks dirty
+
+**`static/js/heartbeat.js`:**
+- Removed `hb-manual-btn` show/hide from `heartbeatInit()`
+- Added `_orbHbUpdate()`: toggles `.hb-busy` on `#companion-orb` when `_hbRunning || isSending`
+- `_orbHbUpdate()` called on `_hbRunning` set/clear + on mouseenter (catches `isSending` state)
+- DOMContentLoaded: wires click → `heartbeatManual()` + title tooltip
+
+**`static/js/companion-switcher.js`** (new):
+- `openCompanionSwitcher(e)`: fetches `/api/settings`, renders list, opens popover; toggles if already open
+- `closeCompanionSwitcher()`: closes + removes outside-click listener
+- `_csSwitchTo(folder)`: POSTs to `/api/settings/companion` with `set_active: true`, then reloads
+
+**`static/css/base.css`:**
+- `.sidebar-footer-area`: new wrapper with `margin-top: auto; position: relative`
+- `.sidebar-footer`: removed `margin-top: auto`, `grid-template-columns: 1fr 1fr 1fr` (3 cols)
+- New: `.orb-hb-overlay`, `#companion-orb` cursor/hover rules, `.hb-busy` state, `.companions-popover` + child classes
 
 **`scripts/settings_router.py`:**
-- Companion save: replaced `soul_edit_mode` + `force_read_before_write` keys with `evolution_level`
-- New endpoint: `POST /api/settings/unbound/{companion_folder}` — creates `unbound.md` from template in `soul/` (idempotent)
+- Companion save: `soul_edit_mode` + `force_read_before_write` → `evolution_level`
+- New endpoint: `POST /api/settings/unbound/{companion_folder}` — creates `unbound.md` from template (idempotent)
 
 **`scripts/config.py`:**
-- `load_companion_config()`: replaced `soul_edit_mode: "locked"` + `force_read_before_write: True` defaults with `evolution_level: "settled"`
+- `load_companion_config()` defaults: `soul_edit_mode: "locked"` + `force_read_before_write: True` → `evolution_level: "settled"`
 
-### Still pending from this track
-- Sidebar: Companions button, orb heartbeat trigger
+### Still pending
 - Identity & Evolution: file renames (`companion_identity.md` → `soul.md` etc.), new tool files, tool gating by level, chaos orb animation, one-shot Unbound heartbeat, presence autonomy tools
 - Memory Manager Phase 2: ChromaDB note browser
+- Kokoro TTS install: still erroring after `--prefer-binary` + `numpy>=2.0` + version-spec stripping in `_detect_extra`. Needs fresh investigation — see BACKLOG.
+
+---
+
+## Session notes — 2026-05-02 QA pass
+
+**Three bugs fixed, one (Kokoro install) still open.**
+
+### What changed
+
+**`scripts/config.py`:**
+- `write_avatar_file()`: deletes all existing slot files before writing new one — fixes stale `.jpg` being served when Pillow saves `.png`
+- `load_companion_config()`: migrates old `soul_edit_mode` values → `evolution_level` on load (`locked→settled`, `self_notes→reflective`, `agentic→adaptive`, `chaos→unbound`)
+
+**`static/css/base.css`:**
+- `.chat-header-menu` + `.chats-menu`: background changed from `var(--surface-floating)` (nearly transparent) to `linear-gradient(...0.97)` + `backdrop-filter: blur(12px)` — fixes transparent dropdown menus
+
+**`scripts/setup_router.py`:**
+- Pip install command: added `--prefer-binary` (avoids source builds where wheels exist)
+- `_EXTRAS_META` TTS packages: prepended `"numpy>=2.0"` (Python 3.13 has no numpy 1.x wheel)
+- `_detect_extra()`: strips version specifiers (`numpy>=2.0` → `numpy`) before `find_spec`/path checks
+- Still failing: kokoro install on Python 3.13 — needs deeper investigation
+
+### Still open
+- Kokoro TTS install on Python 3.13: error trace changes each attempt but ultimately a dep chain issue. See BACKLOG.
 
 ---
 
