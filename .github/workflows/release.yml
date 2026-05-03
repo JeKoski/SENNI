@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare python-embed
+        run: python scripts/build_prep.py
+
+      - name: Install runtime deps into python-embed
+        run: >
+          .\python-embed\python.exe -m pip install --no-warn-script-location
+          fastapi "uvicorn[standard]" python-multipart ddgs httpx beautifulsoup4 Pillow
+
+      - name: Install PyInstaller into python-embed
+        run: .\python-embed\python.exe -m pip install --no-warn-script-location pyinstaller
+
+      - name: Build with PyInstaller
+        run: .\python-embed\python.exe -m PyInstaller senni-backend.spec
+
+      - name: Zip output
+        run: Compress-Archive -Path dist\senni-backend\* -DestinationPath senni-backend-windows-x64.zip
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: senni-backend-windows-x64.zip
