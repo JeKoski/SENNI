@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 
 from scripts.boot_service import get_boot_status, kill_llama_server
 from scripts.boot_service import router as boot_router
-from scripts.paths import FEATURES_PACKAGES_DIR, LOGS_DIR, STATIC_DIR
+from scripts.paths import FEATURES_PACKAGES_DIR, FEATURES_VENV_DIR, LOGS_DIR, STATIC_DIR, venv_site_packages
 from scripts.config import (
     PROJECT_ROOT,
     CONFIG_FILE,
@@ -98,6 +98,15 @@ import importlib as _importlib
 _fp = str(FEATURES_PACKAGES_DIR)
 if _fp not in _sys.path:
     _sys.path.insert(0, _fp)
+
+# Dev mode: inject features/venv site-packages so chromadb and other in-process
+# extras are importable without polluting system Python.
+if not getattr(_sys, "frozen", False):
+    _vsp = venv_site_packages(FEATURES_VENV_DIR)
+    if _vsp:
+        _vsps = str(_vsp)
+        if _vsps not in _sys.path:
+            _sys.path.insert(0, _vsps)
 
 if getattr(_sys, "frozen", False):
     from scripts.paths import PYTHON_EMBED_DIR
@@ -365,8 +374,90 @@ def _win_file_dialog_ctypes(title: str, filetypes: list, initialdir: str | None 
     return buf.value if ok else None
 
 
+def _win_folder_dialog_ifiledialog(title: str) -> str | None:
+    """
+    Modern folder picker via IFileOpenDialog COM interface (Vista+ Windows Explorer style).
+    Must be called on an STA thread. Falls back to None on any COM failure so the
+    caller can try SHBrowseForFolderW instead.
+    """
+    import ctypes
+    from ctypes import HRESULT, c_void_p, c_wchar_p, c_uint32, c_ulong, byref, POINTER, cast
+
+    ole32  = ctypes.windll.ole32
+    hwnd   = _win_owner_hwnd()
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("Data1", c_uint32), ("Data2", ctypes.c_uint16),
+                    ("Data3", ctypes.c_uint16), ("Data4", ctypes.c_uint8 * 8)]
+
+    def _guid(d1, d2, d3, *d4):
+        g = GUID()
+        g.Data1, g.Data2, g.Data3 = d1, d2, d3
+        for i, v in enumerate(d4): g.Data4[i] = v
+        return g
+
+    # CLSID_FileOpenDialog / IID_IFileOpenDialog / IID_IShellItem
+    CLSID = _guid(0xDC1C5A9C, 0xE88A, 0x4DDE, 0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7)
+    IID   = _guid(0xD57C7288, 0xD4AD, 0x4768, 0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60)
+    IID_SI= _guid(0x43826D1E, 0xE718, 0x42EE, 0xBC, 0x55, 0xA1, 0xE2, 0x61, 0xC3, 0x7B, 0xFE)
+
+    ptr = c_void_p()
+    # CLSCTX_INPROC_SERVER = 1
+    hr = ole32.CoCreateInstance(byref(CLSID), None, 1, byref(IID), byref(ptr))
+    if hr != 0 or not ptr:
+        if hwnd: ctypes.windll.user32.DestroyWindow(hwnd)
+        return None
+
+    try:
+        vtbl = cast(ptr, POINTER(POINTER(c_void_p))).contents
+
+        # VTable offsets (IUnknown:0-2, IModalWindow:3, IFileDialog:4-26, IFileOpenDialog:27-28)
+        # SetOptions = 9, SetTitle = 17, Show = 3, GetResult = 20
+        FOS_PICKFOLDERS      = 0x20
+        FOS_FORCEFILESYSTEM  = 0x40
+
+        SetOptions = ctypes.WINFUNCTYPE(HRESULT, c_void_p, c_uint32)(vtbl[9])
+        SetOptions(ptr, FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM)
+
+        SetTitle = ctypes.WINFUNCTYPE(HRESULT, c_void_p, c_wchar_p)(vtbl[17])
+        SetTitle(ptr, title)
+
+        # Show returns 0x800704C7 (HRESULT_FROM_WIN32 ERROR_CANCELLED) when user cancels
+        Show = ctypes.WINFUNCTYPE(HRESULT, c_void_p, c_void_p)(vtbl[3])
+        hr = Show(ptr, hwnd or None)
+        if hr != 0:
+            return None  # cancelled or error
+
+        item = c_void_p()
+        GetResult = ctypes.WINFUNCTYPE(HRESULT, c_void_p, POINTER(c_void_p))(vtbl[20])
+        if GetResult(ptr, byref(item)) != 0 or not item:
+            return None
+
+        try:
+            iv = cast(item, POINTER(POINTER(c_void_p))).contents
+            # IShellItem.GetDisplayName offset 5; SIGDN_FILESYSPATH = 0x80058000
+            name_ptr = c_wchar_p()
+            GetDisplayName = ctypes.WINFUNCTYPE(HRESULT, c_void_p, c_uint32, POINTER(c_wchar_p))(iv[5])
+            if GetDisplayName(item, 0x80058000, byref(name_ptr)) != 0:
+                return None
+            result = name_ptr.value
+            if name_ptr: ole32.CoTaskMemFree(name_ptr)
+            return result
+        finally:
+            Release_item = ctypes.WINFUNCTYPE(c_ulong, c_void_p)(iv[2])
+            Release_item(item)
+    except Exception as e:
+        log.warning("IFileDialog error: %s", e)
+        return None
+    finally:
+        vtbl2 = cast(ptr, POINTER(POINTER(c_void_p))).contents
+        Release = ctypes.WINFUNCTYPE(c_ulong, c_void_p)(vtbl2[2])
+        Release(ptr)
+        if hwnd: ctypes.windll.user32.DestroyWindow(hwnd)
+
+
 def _win_folder_dialog_ctypes(title: str) -> str | None:
-    """Folder picker via SHBrowseForFolderW. Called on an STA thread by _win_dialog_thread."""
+    """Folder picker via SHBrowseForFolderW (fallback). Called on an STA thread by _win_dialog_thread."""
     import ctypes
     from ctypes import wintypes, create_unicode_buffer, byref, c_void_p, c_wchar_p
 
@@ -473,10 +564,13 @@ def _run_file_dialog(title: str, filetypes: list, initialdir: str | None = None)
 def _run_folder_dialog(title: str) -> str | None:
     """
     Open a native OS folder-picker dialog.
-    Windows: uses ctypes SHBrowseForFolderW on a dedicated STA thread.
+    Windows: tries IFileOpenDialog (modern Explorer style) then falls back to SHBrowseForFolderW.
     Linux/Mac: uses tkinter.
     """
     if IS_WIN:
+        path = _win_dialog_thread(_win_folder_dialog_ifiledialog, title)
+        if path is not None:
+            return path
         return _win_dialog_thread(_win_folder_dialog_ctypes, title)
 
     # Linux / Mac — tkinter

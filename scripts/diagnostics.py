@@ -62,32 +62,28 @@ def _fail(name: str, detail: str = "") -> dict:
 def _check_extra(key: str, label: str) -> dict:
     """
     Check whether an optional extra is installed in the correct location.
-    Uses path-based detection (mirrors setup_router._detect_extra) so it works
-    correctly in frozen mode where the main process can't import embed-mode packages.
+    Mirrors setup_router._detect_extra so wizard status and diagnostics agree.
+    Frozen: checks python-embed site-packages.
+    Dev:    checks features/venv site-packages (avoids system-Python false positives).
     """
     import sys
-    from scripts.paths import FEATURES_PACKAGES_DIR, PYTHON_EMBED_DIR
+    from scripts.paths import PYTHON_EMBED_DIR, FEATURES_VENV_DIR, venv_site_packages
 
-    _INSTALL_MODES = {"tts": "embed", "memory": "target"}
-    _PRIMARY_PKG   = {"tts": "kokoro", "memory": "chromadb"}
-
-    mode    = _INSTALL_MODES.get(key, "target")
+    _PRIMARY_PKG = {"tts": "kokoro", "memory": "chromadb"}
     primary = _PRIMARY_PKG.get(key, key)
 
-    if getattr(sys, "frozen", False) and mode == "embed":
-        found = (PYTHON_EMBED_DIR / "Lib" / "site-packages" / primary).is_dir()
-    elif mode == "target":
-        found = (FEATURES_PACKAGES_DIR / primary).is_dir()
+    if getattr(sys, "frozen", False):
+        pkg_path = PYTHON_EMBED_DIR / "Lib" / "site-packages" / primary
+        found    = pkg_path.is_dir()
     else:
-        try:
-            __import__(primary)
-            found = True
-        except ImportError:
-            found = False
+        sp       = venv_site_packages(FEATURES_VENV_DIR)
+        pkg_path = (sp / primary) if sp else None
+        found    = bool(pkg_path and pkg_path.is_dir())
 
     if found:
-        return _pass(f"{label} installed")
-    return _fail(f"{label} installed", "install via Setup Wizard > Features")
+        return _pass(f"{label} installed", str(pkg_path))
+    checked = str(pkg_path) if pkg_path else str(FEATURES_VENV_DIR)
+    return _fail(f"{label} installed", f"not found at {checked} — install via Setup Wizard > Features")
 
 
 # ── Startup checks (fast, every boot) ─────────────────────────────────────────

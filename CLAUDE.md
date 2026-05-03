@@ -143,151 +143,74 @@ Copying a companion folder between installs:
 
 ---
 
-## Session notes — 2026-05-01 (Companion Settings redesign)
+## Session notes — 2026-05-03 (Voice download + Identity Evolution fix)
 
-**Companion Settings: 8 tabs → 7. Identity & Memory merged. Expression ✦ merges Presence + Mood. Tools tab 3-state per-companion overrides. Library stub. Memory Manager modal. Tool enforcement wired in backend.**
-
-### What changed
-
-**`static/chat.html`:**
-- Tab strip: 8 → 7 tabs. Identity renamed "Identity & Memory", Memory tab removed, Presence + Mood merged into "Expression ✦", Library stub added
-- `cp-tab-identity`: added episodic memory enable toggle, K sliders, cognitive stack (moved from Memory tab), MM link button; soul file editor removed
-- `cp-tab-memory`: deleted entirely (content redistributed)
-- `cp-tab-expression` (was cp-tab-presence + cp-tab-mood): `[Presence | Mood]` segmented toggle at top; presence content unchanged; mood panel `cp-expr-mood` rendered by cpMoodInit()
-- `cp-tab-tools`: populated with 9 tool rows, each with 3-state chip group (Global / On / Off); rendered by cpToolsInit()
-- `cp-tab-library`: stub with "Coming soon" message
-- Memory Manager modal added (`#mm-overlay` + `.mm-panel`): soul file tabs + textarea + save, opens as floating overlay
-
-**`static/js/companion.js`:**
-- `cpSwitchTab`: removed 'memory'/'mood'/'presence' cases; added 'expression' (inits presence), 'tools' (calls cpToolsInit()), 'identity' (calls cpMemoryInit())
-- `cpExprSwitchPanel(panel)`: new function — toggles `.cp-expr-chip` + `.cp-expr-panel`, lazily inits mood/presence
-- `closeCompanionWindow()`: calls cpToolsReset()
-- `cpPopulate()`: removed cpLoadSoulFiles() call
-- `cpSave()`: includes `_cpGetToolsPayload()` when `_cpToolsInitDone`
-- Soul file functions (cpLoadSoulFiles, cpSaveSoulFile, cpNewSoulFile) removed — now live in memory-manager.js
-
-**`static/js/companion-mood.js`:**
-- `_cpMoodRender()`: render target changed from `cp-tab-mood` → `cp-expr-mood`
-
-**`static/js/companion-memory.js`:**
-- `_cpMemoryRefreshStatus()`: rewritten to target `cp-mem-status-badge` (compact badge in Identity tab header) instead of old detailed status row elements
-
-**`static/js/companion-tools.js`** (new):
-- `cpToolsInit()`: renders 9 tool rows with 3-state chips (Global / On / Off), reads global defaults + per-companion overrides from cpSettings
-- `cpToolsSetState(name, state)`: updates chip UI + marks dirty
-- `_cpGetToolsPayload()`: emits `{ companion_tools_enabled: { tool: true/false, ... } }` (only explicit overrides, omits Global)
-- `cpToolsReset()`: resets init flag on window close
-
-**`static/js/memory-manager.js`** (new):
-- `openMemoryManager()`: loads files from `/api/settings/soul/${cpFolder}`, renders tab bar, updates companion label
-- `closeMemoryManager()`: hides overlay, resets state
-- `mmSaveSoulFile()`: POSTs to `/api/settings/soul/${folder}`, hides save btn
-- `mmNewSoulFile()`: prompt + auto-selects new file in tab bar
-
-**`static/css/companion-panel.css`:**
-- Added: `.cp-mem-status-badge` (active/error states), `.cp-expr-toggle/.cp-expr-chip/.cp-expr-panel` (Expression segmented toggle), `.cp-tool-row/.cp-tool-name-cp/.cp-tool-desc-cp/.cp-tool-chips/.cp-tool-chip` (3-state tool chips), `.mm-overlay/.mm-panel/.mm-header/.mm-body/.mm-footer` (Memory Manager modal), `.cp-soul-tab` (moved from inline to CSS)
-
-**`scripts/settings_router.py`:**
-- Companion save endpoint: `companion_tools_enabled` dict added to accepted keys, saved as `tools_enabled` in companion config
-
-**`scripts/server.py`:**
-- `_get_enabled_tools()`: new helper — merges global `tools_enabled` + active companion `tools_enabled` (per-companion bool wins over global; absent = inherit global True default)
-- `tools/list`: filters manifest by `_get_enabled_tools()` — disabled tools not shown to LLM
-- `tools/call`: checks `_get_enabled_tools()` before running; returns error if disabled
-
-### Status
-- Identity & Memory tab: ✅ all content present, episodic toggle/K sliders saved via "Save memory settings" button, cognitive stack saves via Apply/Save
-- Expression ✦ tab: ✅ segmented toggle works, presence init on tab open, mood inits lazily on Mood chip
-- Tools tab: ✅ 3-state chips rendered, per-companion overrides save via companion save
-- Library tab: ✅ stub rendered
-- Memory Manager: ✅ soul file editor functional, opens from Identity & Memory link
-- Tool enforcement: ✅ backend now actually filters tools/list + guards tools/call
-
-### Next session
-- In-app check of Companion Settings redesign
-- Sidebar changes: Companions button (replaces heartbeat button), orb heartbeat trigger
-- Memory Manager Phase 2: ChromaDB note browser
-
----
-
-## Session notes — 2026-05-02 (Companion panel token migration + Identity Evolution UI + Sidebar changes)
-
-**`companion-panel.css` fully migrated to token/elevation system. Identity editing section replaced with 4-level evolution selector. Unbound transition modal implemented. Sidebar footer: 3-column (Settings | Companions | Restart). Orb click → manual heartbeat.**
+**Kokoro voices now auto-download from HuggingFace on first TTS boot. Identity Evolution write permissions fixed in `memory.py`.**
 
 ### What changed
 
-**`static/css/companion-panel.css` — full rewrite:**
-- Tab bar: underline style → pill-chip bar matching `settings.css` (`--surface-sunken` container, `--surface-raised` + `--elev-1` active chip)
-- Panel chrome: flat `#21232e` → gradient + `var(--elev-3)` shadow
-- Footer: `--surface-floating` + `--border-subtle`
-- All inputs: `--surface-sunken` bg + `--border-default` + `var(--focus-ring)` on focus (was missing)
-- All hard-coded RGBA values → `--surface-*`, `--border-*`, `--text-*`, `--elev-*` tokens throughout
-- Memory Manager modal: `--elev-4` shadow
-- New classes: `.cp-evo-cards`, `.cp-evo-card`, `.cp-evo-dot`, `.cp-evo-name`, `.cp-evo-desc`, `.cp-unbound-modal-overlay`, `.cp-unbound-modal`, `.cp-unbound-title`, `.cp-unbound-body`, `.cp-unbound-actions`
-- Kept hard-coded: orb/presence CSS vars (`--cpp-*`), amber/red/green semantic tints, swatch/canvas colors
+**`scripts/tts.py`:**
+- `_list_kokoro_voices()` now uses `huggingface_hub.snapshot_download` to pre-download all voices (~28 MB) from `hexgrad/Kokoro-82M` on first boot. Subsequent boots are instant (HF cache hit). Falls back to scanning the kokoro package dir. `huggingface_hub` is already a kokoro dependency so no new deps needed.
 
-**`static/chat.html`:**
-- Identity & Memory tab: removed `#cp-soul-edit-mode` radio group + force-read toggle; added `#cp-evo-cards` (4 level cards) + `#cp-unbound-overlay` (Unbound modal)
-- Sidebar footer: `#hb-manual-btn` removed; wrapped in `.sidebar-footer-area`; added ⇄ Companions button (`#companions-btn`); `#companions-popover` (3-column footer layout)
-- Orb: added `#orb-hb-overlay` inside `.orb-body` (shows ✦ icon on hover)
-- Script: `companion-switcher.js` added to load order
-
-**`static/js/companion.js`:**
-- `cpPopulate()`: replaced soul_edit_mode radio loading with `evolution_level` card activation
-- `cpSave()`: replaced `soul_edit_mode` + `force_read_before_write` keys with `evolution_level`
-- New functions: `_cpEvoSelect()`, `_cpShowUnboundModal()`, `_cpCancelUnbound()`, `_cpConfirmUnbound()`
-
-**`static/js/heartbeat.js`:**
-- Removed `hb-manual-btn` show/hide from `heartbeatInit()`
-- Added `_orbHbUpdate()`: toggles `.hb-busy` on `#companion-orb` when `_hbRunning || isSending`
-- `_orbHbUpdate()` called on `_hbRunning` set/clear + on mouseenter (catches `isSending` state)
-- DOMContentLoaded: wires click → `heartbeatManual()` + title tooltip
-
-**`static/js/companion-switcher.js`** (new):
-- `openCompanionSwitcher(e)`: fetches `/api/settings`, renders list, opens popover; toggles if already open
-- `closeCompanionSwitcher()`: closes + removes outside-click listener
-- `_csSwitchTo(folder)`: POSTs to `/api/settings/companion` with `set_active: true`, then reloads
-
-**`static/css/base.css`:**
-- `.sidebar-footer-area`: new wrapper with `margin-top: auto; position: relative`
-- `.sidebar-footer`: removed `margin-top: auto`, `grid-template-columns: 1fr 1fr 1fr` (3 cols)
-- New: `.orb-hb-overlay`, `#companion-orb` cursor/hover rules, `.hb-busy` state, `.companions-popover` + child classes
-
-**`scripts/settings_router.py`:**
-- Companion save: `soul_edit_mode` + `force_read_before_write` → `evolution_level`
-- New endpoint: `POST /api/settings/unbound/{companion_folder}` — creates `unbound.md` from template (idempotent)
-
-**`scripts/config.py`:**
-- `load_companion_config()` defaults: `soul_edit_mode: "locked"` + `force_read_before_write: True` → `evolution_level: "settled"`
-
-### Still pending
-- Identity & Evolution: file renames (`companion_identity.md` → `soul.md` etc.), new tool files, tool gating by level, chaos orb animation, one-shot Unbound heartbeat, presence autonomy tools
-- Memory Manager Phase 2: ChromaDB note browser
-- Kokoro TTS install: still erroring after `--prefer-binary` + `numpy>=2.0` + version-spec stripping in `_detect_extra`. Needs fresh investigation — see BACKLOG.
-
----
-
-## Session notes — 2026-05-02 QA pass
-
-**Three bugs fixed, one (Kokoro install) still open.**
-
-### What changed
-
-**`scripts/config.py`:**
-- `write_avatar_file()`: deletes all existing slot files before writing new one — fixes stale `.jpg` being served when Pillow saves `.png`
-- `load_companion_config()`: migrates old `soul_edit_mode` values → `evolution_level` on load (`locked→settled`, `self_notes→reflective`, `agentic→adaptive`, `chaos→unbound`)
-
-**`static/css/base.css`:**
-- `.chat-header-menu` + `.chats-menu`: background changed from `var(--surface-floating)` (nearly transparent) to `linear-gradient(...0.97)` + `backdrop-filter: blur(12px)` — fixes transparent dropdown menus
-
-**`scripts/setup_router.py`:**
-- Pip install command: added `--prefer-binary` (avoids source builds where wheels exist)
-- `_EXTRAS_META` TTS packages: prepended `"numpy>=2.0"` (Python 3.13 has no numpy 1.x wheel)
-- `_detect_extra()`: strips version specifiers (`numpy>=2.0` → `numpy`) before `find_spec`/path checks
-- Still failing: kokoro install on Python 3.13 — needs deeper investigation
+**`tools/memory.py`:**
+- `run()` was reading `soul_edit_mode` via raw JSON (`_load_companion_cfg` bypasses `config.py` migration). Fixed: now reads `evolution_level` with a backward-compat fallback that maps old values (`locked→settled`, `self_notes→reflective`, `agentic→adaptive`, `chaos→unbound`).
+- All string comparisons updated to new names (`settled`/`reflective`/`adaptive`/`unbound`).
+- Error messages updated to reference new level names and "Unbound mode" instead of "chaos mode".
 
 ### Still open
-- Kokoro TTS install on Python 3.13: error trace changes each attempt but ultimately a dep chain issue. See BACKLOG.
+- TTS voices not fetching on restart on an existing installation — `snapshot_download` may not be running as expected. Needs fresh-install test to isolate whether it's a cache/path issue or something else. See BACKLOG.
+
+---
+
+## Session notes — 2026-05-03 (Kokoro TTS boot + folder picker + venv local install)
+
+**Kokoro TTS now boots reliably. Modern IFileOpenDialog folder picker replaces old SHBrowseForFolderW. Dev-mode local install now uses a `features/venv/` with Python 3.12 (not 3.13). Voice list populated from subprocess via `importlib`. Diagnostics show where packages are found.**
+
+### What changed
+
+**`scripts/server.py`:**
+- Added `_win_folder_dialog_ifiledialog()` using IFileOpenDialog COM vtable (CoCreateInstance, SetOptions FOS_PICKFOLDERS|FOS_FORCEFILESYSTEM, SetTitle, Show, GetResult→IShellItem.GetDisplayName SIGDN_FILESYSPATH). Proper CoTaskMemFree + Release.
+- `_run_folder_dialog()` tries IFileDialog first, falls back to old `_win_folder_dialog_ctypes` on failure.
+- Dev-mode venv sys.path injection at startup: inserts `features/venv/Lib/site-packages` into `sys.path` so kokoro/chromadb can be found without modifying the system Python.
+
+**`scripts/tts.py`:**
+- Moved `import numpy as np` to after `_fatal()` is defined; wrapped in `try/except Exception`.
+- All three dep imports (numpy, soundfile, kokoro) now catch `Exception` (not just `ImportError`) so DLL load errors surface correctly.
+- Added `_list_kokoro_voices()`: uses `importlib.util.find_spec("kokoro")` to find the package directory, then globs `voices/**/*.pt`. Called in `main()` and included in the `__ready__` JSON message.
+
+**`scripts/tts_server.py`:**
+- Added `_tts_voices: list = []` global; populated from `__ready__` message on subprocess boot.
+- `api_tts_status()` and `api_tts_voices()` use `_tts_voices` when populated, fall back to `discover_voices()`.
+- `discover_voices()` glob changed from `*.pt` → `**/*.pt` (recursive).
+- Added `reset_tts_unavailable()`: clears `_tts_unavailable`, `_tts_error_msg`, `_tts_voices`.
+- `_resolve_python()`: prefers venv Python (`features/venv/Scripts/python.exe`) in dev mode.
+
+**`scripts/settings_router.py`:**
+- `api_save_tts_settings()`: calls `reset_tts_unavailable()` before `_ensure_tts_running()` so saving settings always retries boot without a full server restart.
+
+**`static/chat.html` + `static/js/settings-features.js`:**
+- Added `#sp-tts-error-hint` element below the TTS enable toggle.
+- `spPopulateFeatures()` fetches `/api/tts/status`; if `reason === 'tts_unavailable'` and `data.error` is set, shows the error string in the hint + flips badge to `error` class.
+
+**`scripts/setup_router.py`:**
+- Added `_EXTRAS_DETECT = {"tts": "kokoro", "memory": "chromadb"}` — wizard now checks the right primary package (was checking numpy, causing false positives).
+- Added `_find_preferred_python()`: tries `py -3.12`, `py -3.11`, then `python3.12`, `python3.11`, `python3` — avoids Python 3.13 compatibility issues.
+- `_get_pip_python()`: creates `features/venv/` via `subprocess.run([base_py, "-m", "venv", ...])` using preferred Python. Returns venv Python path.
+- After successful TTS install: updates `config["tts"]["python_path"]` so tts_server uses the venv Python on next boot.
+- `_detect_extra()` updated to check venv in dev mode (mirrors diagnostics.py).
+
+**`scripts/paths.py`:**
+- Added `FEATURES_VENV_DIR = DATA_ROOT / "features" / "venv"`.
+- Added `venv_site_packages(venv_dir)`: cross-platform helper returning the site-packages dir (Windows: `Lib/site-packages`, Linux: `lib/python3.x/site-packages`).
+
+**`scripts/diagnostics.py`:**
+- `_check_extra()`: checks `features/venv/` in dev mode (was checking `FEATURES_PACKAGES_DIR` which is always empty). Shows the resolved path in the result detail.
+
+### Still open
+- **Double memory-server shutdown message** — cosmetic, logged twice on exit. Not investigated.
+- **"default" companion folder created on restart** — shouldn't happen; `server.py` copies `templates/companions/senni` only if it's missing, not "default". Needs investigation.
+- **Voice list** — voices now populated from subprocess `__ready__` via `importlib`; needs confirmation in-app after venv install.
+- **`features/venv/` in `.gitignore`** — should be added if not already present.
 
 ---
 

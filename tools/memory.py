@@ -5,7 +5,7 @@ Read, write, archive and move files across the companion's memory folders.
 - soul/   — identity, personality, self-notes
 - mind/   — current session notes, active tasks
 - memory/ — long-term archived notes
-- chaos mode: all restrictions lifted, files can move freely between folders
+- unbound mode: all restrictions lifted, files can move freely between folders
 """
 
 import json
@@ -94,8 +94,11 @@ def run(args: dict) -> str:
 
     companion_root, companion_folder = _companion_base()
     cfg       = _load_companion_cfg(companion_folder)
-    soul_mode = cfg.get("soul_edit_mode", "locked")
-    chaos     = soul_mode == "chaos"
+    # evolution_level is the current key; fall back to migrating soul_edit_mode for
+    # any companion config that hasn't been re-saved through the UI yet.
+    _legacy = {"locked": "settled", "self_notes": "reflective", "agentic": "adaptive", "chaos": "unbound"}
+    soul_mode = cfg.get("evolution_level") or _legacy.get(cfg.get("soul_edit_mode", "locked"), "settled")
+    chaos     = soul_mode == "unbound"
 
     base = companion_root / folder
     base.mkdir(parents=True, exist_ok=True)
@@ -117,7 +120,7 @@ def run(args: dict) -> str:
     # ── move ──────────────────────────────────────────────────────────────────
     if action == "move":
         if not chaos:
-            return "Error: 'move' is only available in chaos mode. Enable it in Settings → Companion."
+            return "Error: 'move' is only available in Unbound mode. Enable it in Settings → Companion."
         if not filename or not dest_folder:
             return "Error: filename and dest_folder required for move."
         src = companion_root / folder / filename
@@ -161,28 +164,28 @@ def run(args: dict) -> str:
                 pass  # always writable — stores info about the user, not the companion's identity
 
             elif filename == "companion_identity.md":
-                if soul_mode == "locked":
-                    return "Error: companion_identity.md is read-only (locked). The user edits this in Settings."
-                if soul_mode == "self_notes":
-                    return "Error: in self_notes mode, write to soul/self_notes.md instead."
-                # agentic: allowed, backup already done above
+                if soul_mode == "settled":
+                    return "Error: companion_identity.md is read-only (Settled). The user edits this in Settings."
+                if soul_mode == "reflective":
+                    return "Error: in Reflective mode, write to soul/self_notes.md instead."
+                # adaptive / unbound: allowed, backup already done above
 
             elif filename == "self_notes.md":
-                if soul_mode == "locked":
-                    return "Error: soul/self_notes.md is disabled. Enable self_notes or agentic mode in Settings."
-                # self_notes and agentic: allowed
+                if soul_mode == "settled":
+                    return "Error: soul/self_notes.md is disabled. Enable Reflective or higher mode in Settings."
+                # reflective, adaptive, unbound: allowed
 
             else:
                 # Any other soul/ file
-                if soul_mode == "locked":
-                    return f"Error: soul/{filename} is read-only. Enable agentic mode to write custom soul files."
+                if soul_mode in ("settled", "reflective"):
+                    return f"Error: soul/{filename} is read-only. Enable Adaptive or higher mode in Settings."
                 # self_notes or agentic: allowed
 
             target.write_text(content, encoding="utf-8")
             return f"Saved: {folder}/{filename}"
 
         if folder == "memory" and not chaos:
-            return "Error: memory/ is an archive. Use action='archive' to move files there, or enable chaos mode."
+            return "Error: memory/ is an archive. Use action='archive' to move files there, or enable Unbound mode."
 
         target = base / filename
         target.write_text(content, encoding="utf-8")
@@ -193,7 +196,7 @@ def run(args: dict) -> str:
         if not filename:
             return "Error: filename required for archive."
         if folder != "mind" and not chaos:
-            return "Error: can only archive from mind/. Use chaos mode to archive from other folders."
+            return "Error: can only archive from mind/. Enable Unbound mode to archive from other folders."
         src = base / filename
         if not src.exists():
             return f"Not found: {folder}/{filename}"

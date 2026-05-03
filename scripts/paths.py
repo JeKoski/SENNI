@@ -41,6 +41,23 @@ BINARY_DIR            = DATA_ROOT / "llama"
 MODELS_DIR            = DATA_ROOT / "models"
 FEATURES_DIR          = DATA_ROOT / "features"
 FEATURES_PACKAGES_DIR = DATA_ROOT / "features" / "packages"
+FEATURES_VENV_DIR     = DATA_ROOT / "features" / "venv"
+
+def venv_site_packages(venv_dir: Path) -> Path | None:
+    """Return the site-packages directory inside a venv, or None if not found."""
+    # Windows: venv/Lib/site-packages
+    win_sp = venv_dir / "Lib" / "site-packages"
+    if win_sp.is_dir():
+        return win_sp
+    # Linux/Mac: venv/lib/python3.x/site-packages
+    lib = venv_dir / "lib"
+    if lib.is_dir():
+        for pydir in lib.iterdir():
+            sp = pydir / "site-packages"
+            if sp.is_dir():
+                return sp
+    return None
+
 
 # Embedded Python runtime — bundled for pip installs, lives in RESOURCE_ROOT.
 # Populated by scripts/build_prep.py before running PyInstaller.

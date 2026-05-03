@@ -18,7 +18,7 @@ function spPopulateFeatures() {
   const ttsTog = document.getElementById('sp-tts-enabled');
   if (ttsTog) ttsTog.classList.toggle('on', !!tts.enabled);
 
-  // TTS status badge
+  // TTS status badge (config-based; runtime check below)
   const ttsStatus = document.getElementById('feat-status-tts');
   if (ttsStatus) {
     if (tts.enabled) {
@@ -28,6 +28,27 @@ function spPopulateFeatures() {
       ttsStatus.textContent = 'disabled';
       ttsStatus.className = 'sp-feat-status inactive';
     }
+  }
+
+  // Fetch live TTS runtime status to surface error messages
+  if (tts.enabled) {
+    fetch('/api/tts/status').then(r => r.json()).then(data => {
+      const hint = document.getElementById('sp-tts-error-hint');
+      if (!hint) return;
+      if (!data.available && data.reason === 'tts_unavailable' && data.error) {
+        hint.textContent = '⚠ ' + data.error;
+        hint.style.display = 'block';
+        if (ttsStatus) { ttsStatus.textContent = 'error'; ttsStatus.className = 'sp-feat-status error'; }
+      } else if (data.available) {
+        hint.style.display = 'none';
+        if (ttsStatus) { ttsStatus.textContent = 'running'; ttsStatus.className = 'sp-feat-status active'; }
+      } else {
+        hint.style.display = 'none';
+      }
+    }).catch(() => {});
+  } else {
+    const hint = document.getElementById('sp-tts-error-hint');
+    if (hint) hint.style.display = 'none';
   }
 
   // ChromaDB
