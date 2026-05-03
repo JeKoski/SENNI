@@ -39,3 +39,5 @@ dist/
 python-embed/
 
 static/style-rulebook/
+
+.dev/
