@@ -141,7 +141,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Double memory-server shutdown message** — cosmetic: memory server shutdown log line appears twice on exit. Not investigated. Likely a duplicate handler or two shutdown calls.
 
-- **"default" companion folder created on restart** — unexpected: a `companions/default/` folder with an empty `soul/` subfolder is created on server restart. Should not happen — `server.py` only copies `templates/companions/senni`. Needs investigation.
+- **"default" companion folder created on restart** ✅ FIXED (2026-05-03) — Root cause: old config.json had `companion_folder: "default"` from a previous DEFAULTS value. Boot-time migration in `on_startup()` now detects a stale folder name (no companion config.json on disk + real default exists) and rewrites config.json. All `"default"` companion_folder fallbacks in Python and JS changed to `DEFAULTS["companion_folder"]` ("senni").
 
 - **Server restart overlay disconnected** — `showRestartOverlay()` + `watchBootLog()` exist in `chat-session.js` but weren't being called from `restartServer()` or `spRestartServer()` after the UI redesign. ✅ Fixed 2026-04-29.
 - **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks; `stripGemma4Artifacts()` cleans trailing artifacts. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging in place — check browser console on next occurrence.
@@ -157,7 +157,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Senni app icon** — design and add an icon for the binary (`.ico` for Windows PyInstaller spec), wizard header, and elsewhere in the UI. Needs design conversation for the visual; wiring into the spec is straightforward once an `.ico` exists.
 - **Setup: Manual path entry for features** — add optional path fields to the Features step for users who already have kokoro/chromadb installed globally or in a custom location. Entering a path should skip the local install and let setup boot TTS/memory cleanly. Also add a "skip, I'll configure later" option so setup can complete without installing.
-- **Settings: Features tab reinstall buttons** — Features tab now live with TTS + ChromaDB accordions, but the reinstall/detect buttons for each feature are stubs. Wire them up to trigger the same pip flow as the wizard extras step.
+- **Settings: Features tab reinstall buttons** ✅ DONE (2026-05-03) — TTS and ChromaDB reinstall buttons wired to `POST /api/setup/reinstall-extra` with SSE progress. llama.cpp reinstall button wired to `POST /api/setup/reinstall-llama`. Download size validation added to `_download_to_queue()`.
 - **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`. *(Deferred to post-Tauri.)*
 - **Mid-session gap detection** — long idle → re-inject updated timestamp into system prompt. Piggyback on consolidation idle timer. Low priority.
 - **Tool settings UI — per-companion overrides** — ✓ DONE (2026-05-01). 3-state Global/On/Off chips in Companion Settings > Tools. Backend enforcement also wired (`tools/list` + `tools/call` now filter by global + per-companion overrides).
@@ -193,10 +193,10 @@ See `design/SETTINGS-REDESIGN.md`. Tab structure locked. Implementation order:
 See `design/IDENTITY.md`. Full rework of soul/mind tools and file naming.
 1. ✓ Evolution level UI: 4-level card selector (Settled/Reflective/Adaptive/Unbound) replaces old radio buttons (2026-05-02)
 2. ✓ Unbound transition modal + `unbound.md` creation from template (2026-05-02)
-3. Add filename constants to `scripts/paths.py`
-4. Rename `companion_identity.md` → `soul.md`, `self_notes.md` → `soul_reflections.md` across codebase (requires step 3 first)
-5. New tool files: `soul_identity.py`, `soul_reflect.py`, `soul_user.py`, `note.py`
-6. Tool availability gated by `evolution_level` in tool discovery + system prompt updated
+3. ✓ Filename constants in `scripts/paths.py`: `SOUL_FILE`, `REFLECTIONS_FILE`, `USER_PROFILE_FILE`, `UNBOUND_FILE` (2026-05-03)
+4. ✓ Rename `companion_identity.md` → `soul.md`, `self_notes.md` → `soul_reflections.md` across codebase + boot-time migration (2026-05-03)
+5. ✓ New tool files: `soul_identity.py`, `soul_reflect.py`, `soul_user.py`, `note.py` (2026-05-03)
+6. ✓ Tool availability gated by `evolution_level` in `_get_enabled_tools()` (2026-05-03)
 7. Chaos orb redesign: smooth color-shifting cycle (used for Unbound transition + as presence preset)
 8. One-shot Unbound heartbeat: custom prompt parameter in server heartbeat endpoint
 9. Presence autonomy tools: `set_presence`, `create_mood`, `edit_mood` (Unbound level)

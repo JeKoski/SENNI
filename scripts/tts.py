@@ -201,28 +201,23 @@ def synthesise(req: dict) -> bytes:
 def _list_kokoro_voices() -> list:
     """
     Return available voice names.
-    Tries the HuggingFace cache first (instant if already downloaded), then
-    triggers a one-time download of all voices (~28 MB) from hexgrad/Kokoro-82M.
+    Downloads all voices from hexgrad/Kokoro-82M via HuggingFace Hub on first call
+    (~28 MB). Subsequent calls hit the local cache instantly.
     Falls back to scanning the kokoro package directory on any error.
     """
     try:
         from huggingface_hub import snapshot_download
         from pathlib import Path as _Path
-        try:
-            snap = snapshot_download(
-                repo_id="hexgrad/Kokoro-82M",
-                allow_patterns=["voices/*.pt"],
-                local_files_only=True,
-            )
-        except Exception:
-            sys.stderr.write("[tts] Downloading Kokoro voices (~28 MB)…\n")
-            sys.stderr.flush()
-            snap = snapshot_download(
-                repo_id="hexgrad/Kokoro-82M",
-                allow_patterns=["voices/*.pt"],
-            )
-        names = sorted(p.stem for p in _Path(snap).glob("voices/*.pt"))
+        sys.stderr.write("[tts] Fetching Kokoro voice list from HuggingFace…\n")
+        sys.stderr.flush()
+        snap = snapshot_download(
+            repo_id="hexgrad/Kokoro-82M",
+            allow_patterns=["voices/"],
+        )
+        names = sorted(p.stem for p in _Path(snap).glob("voices/**/*.pt"))
         if names:
+            sys.stderr.write(f"[tts] {len(names)} voices available\n")
+            sys.stderr.flush()
             return names
     except Exception as e:
         sys.stderr.write(f"[tts] Voice download failed: {e}\n")

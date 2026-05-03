@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 
 from scripts.boot_service import get_boot_status, kill_llama_server
 from scripts.boot_service import router as boot_router
-from scripts.paths import FEATURES_PACKAGES_DIR, FEATURES_VENV_DIR, LOGS_DIR, STATIC_DIR, venv_site_packages
+from scripts.paths import FEATURES_PACKAGES_DIR, FEATURES_VENV_DIR, LOGS_DIR, STATIC_DIR, venv_site_packages, SOUL_FILE, REFLECTIONS_FILE
 from scripts.config import (
     PROJECT_ROOT,
     CONFIG_FILE,
@@ -169,20 +169,32 @@ except ImportError:
 _tool_manifest: list[dict] = []
 
 
+# Tools that require a minimum evolution level to be visible/callable.
+# Tools not listed here are available at all levels.
+_EVOLUTION_REQUIRED: dict[str, set[str]] = {
+    "soul_identity": {"adaptive", "unbound"},
+    "soul_reflect":  {"reflective", "adaptive", "unbound"},
+}
+
+
 def _get_enabled_tools() -> dict[str, bool]:
-    """Return {tool_name: bool} merging global config + active companion overrides.
+    """Return {tool_name: bool} merging global config + companion overrides + evolution gating.
 
     Per-companion explicit True/False wins; absent keys inherit global default (True).
+    Evolution-gated tools are suppressed if the companion's level is too low.
     """
     cfg = load_config()
     global_enabled: dict = cfg.get("tools_enabled", {})
 
-    companion_folder = cfg.get("companion_folder", "default")
+    companion_folder = cfg.get("companion_folder") or DEFAULTS["companion_folder"]
     try:
         comp_cfg = load_companion_config(companion_folder)
         per_companion: dict = comp_cfg.get("tools_enabled", {})
+        _legacy = {"locked": "settled", "self_notes": "reflective", "agentic": "adaptive", "chaos": "unbound"}
+        evolution_level = comp_cfg.get("evolution_level") or _legacy.get(comp_cfg.get("soul_edit_mode", "locked"), "settled")
     except Exception:
         per_companion = {}
+        evolution_level = "settled"
 
     merged: dict[str, bool] = {}
     all_names = set(global_enabled) | set(per_companion)
@@ -191,6 +203,12 @@ def _get_enabled_tools() -> dict[str, bool]:
             merged[name] = bool(per_companion[name])
         else:
             merged[name] = global_enabled.get(name, True)
+
+    # Suppress evolution-gated tools if the companion's level is insufficient
+    for tool_name, required_levels in _EVOLUTION_REQUIRED.items():
+        if evolution_level not in required_levels:
+            merged[tool_name] = False
+
     return merged
 
 
@@ -201,25 +219,61 @@ _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="senni-worker")
 
 # ── Startup / shutdown ─────────────────────────────────────────────────────────
 
+def _migrate_soul_filenames() -> None:
+    """Rename old soul filenames to the new conventions across all companion folders."""
+    renames = [
+        ("companion_identity.md", SOUL_FILE),
+        ("self_notes.md", REFLECTIONS_FILE),
+    ]
+    if not COMPANIONS_DIR.is_dir():
+        return
+    for companion_dir in COMPANIONS_DIR.iterdir():
+        soul_dir = companion_dir / "soul"
+        if not soul_dir.is_dir():
+            continue
+        for old_name, new_name in renames:
+            old_path = soul_dir / old_name
+            new_path = soul_dir / new_name
+            if old_path.exists() and not new_path.exists():
+                old_path.rename(new_path)
+                log.info("Migrated %s → %s in companion '%s'", old_name, new_name, companion_dir.name)
+
+
 @app.on_event("startup")
 async def on_startup():
     global _tool_manifest
     _tool_manifest = load_tools()
     log.info("Server ready. %d tools loaded.", len(_tool_manifest))
 
+    _migrate_soul_filenames()
+
     cfg = load_config()
     results = run_startup_checks(cfg, PROJECT_ROOT, COMPANIONS_DIR)
     log_results(results, label="Startup diagnostics")
 
-    # Seed default companion from template on first boot
+    # Migrate stale companion_folder value: if config still says "default" but
+    # companions/default/ doesn't exist as a real companion (no config.json),
+    # rewrite config to point at the proper default ("senni") instead.
     cfg = load_config()
-    default_folder = cfg.get("companion_folder", DEFAULTS["companion_folder"])
-    if not (COMPANIONS_DIR / default_folder).exists():
-        result = instantiate_companion_template(default_folder, default_folder)
+    stored_folder = cfg.get("companion_folder") or ""
+    real_default  = DEFAULTS["companion_folder"]
+    if stored_folder != real_default:
+        default_cfg_path = COMPANIONS_DIR / stored_folder / "config.json"
+        real_default_exists = (COMPANIONS_DIR / real_default).exists()
+        if not default_cfg_path.exists() and real_default_exists:
+            cfg["companion_folder"] = real_default
+            save_config(cfg)
+            log.info("Migrated companion_folder '%s' → '%s' in config.", stored_folder, real_default)
+            cfg = load_config()
+
+    # Seed default companion from template on first boot
+    active_folder = cfg.get("companion_folder") or real_default
+    if not (COMPANIONS_DIR / active_folder).exists():
+        result = instantiate_companion_template(active_folder, active_folder)
         if result["ok"]:
-            log.info("Seeded companion '%s' from template.", default_folder)
+            log.info("Seeded companion '%s' from template.", active_folder)
         elif result["reason"] == "not_found":
-            log.warning("No template found for companion '%s' — skipping seed.", default_folder)
+            log.warning("No template found for companion '%s' — skipping seed.", active_folder)
 
     # Belt-and-suspenders: also kill on abnormal Python exit
     atexit.register(kill_llama_server)
@@ -743,7 +797,7 @@ async def api_status():
     config = load_config()
 
     boot          = get_boot_status()
-    comp_folder   = config.get("companion_folder", "default")
+    comp_folder   = config.get("companion_folder") or DEFAULTS["companion_folder"]
     companion_cfg = load_companion_config(comp_folder)
     companion_cfg = migrate_avatar(comp_folder, companion_cfg)
     ctx_size      = config.get("server_args", {}).get("ctx", {}).get("value", 16384)
@@ -752,6 +806,7 @@ async def api_status():
     effective_gen = {**global_gen, **companion_gen}
 
     cfg_out = {k: v for k, v in config.items() if k != "first_run"}
+    cfg_out["companion_folder"] = comp_folder  # always pin resolved value so JS never gets empty
     # Companion-level first_mes overrides global config
     if companion_cfg.get("first_mes"):
         cfg_out["first_mes"] = companion_cfg["first_mes"]
@@ -931,7 +986,7 @@ async def api_list_templates():
 async def api_apply_template(request: Request):
     from scripts.config import sanitize_filename, confine_path
     body          = await request.json()
-    comp_folder   = sanitize_folder(body.get("companion_folder", "default"))
+    comp_folder   = sanitize_folder(body.get("companion_folder") or DEFAULTS["companion_folder"])
     tname         = body.get("template_name", "")
     filename      = sanitize_filename(body.get("filename") or tname)
     target_folder = sanitize_folder(body.get("target_folder", "soul"))

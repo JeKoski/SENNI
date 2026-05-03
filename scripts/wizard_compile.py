@@ -1,7 +1,7 @@
 """
 SENNI Wizard compile — converts wizard birth certificate data into:
   companions/<folder>/config.json
-  companions/<folder>/soul/companion_identity.md
+  companions/<folder>/soul/soul.md
   companions/<folder>/soul/user_profile.md
   companions/<folder>/birth_certificate.json
   companions/<folder>/character_card.png  (only if avatar uploaded)
@@ -19,6 +19,7 @@ from .config import (
     save_companion_config,
     write_avatar_file,
 )
+from .paths import SOUL_FILE, USER_PROFILE_FILE
 
 log = logging.getLogger("wizard_compile")
 
@@ -616,14 +617,14 @@ def compile_companion(data: dict) -> dict:
     cfg = _build_config(data, avatar_filename)
     save_companion_config(folder, cfg)
 
-    # soul/companion_identity.md
+    # soul/soul.md
     identity_md = _build_companion_identity(data)
-    (paths["soul"] / "companion_identity.md").write_text(identity_md, encoding="utf-8")
+    (paths["soul"] / SOUL_FILE).write_text(identity_md, encoding="utf-8")
 
     # soul/user_profile.md (only if user data was entered)
     user_md = _build_user_profile(data.get("user") or {})
     if user_md:
-        (paths["soul"] / "user_profile.md").write_text(user_md, encoding="utf-8")
+        (paths["soul"] / USER_PROFILE_FILE).write_text(user_md, encoding="utf-8")
 
     # birth_certificate.json — full V2 card data, always saved
     bc = _build_birth_certificate(data)

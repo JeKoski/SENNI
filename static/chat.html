@@ -663,6 +663,10 @@
         <div class="sp-file-display" id="sp-binary-display">Auto-detect</div>
         <button class="sp-btn-sm" onclick="spBrowse('binary')">Browse</button>
         <button class="sp-btn-sm sp-btn-ghost" onclick="spClearBinary()">Clear</button>
+        <button class="sp-btn-sm sp-btn-ghost" onclick="spReinstallLlama()">Reinstall / Update</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <span id="sp-reinstall-llama-status" style="font-size:11.5px;color:var(--text-dim)"></span>
       </div>
       <div class="sp-row-2col" style="margin-top:14px">
         <div>
@@ -799,6 +803,10 @@
             <span style="font-size:13px;color:var(--text-muted)">Enable Kokoro TTS</span>
           </div>
           <div id="sp-tts-error-hint" style="display:none;font-size:11.5px;color:var(--text-error,#e57373);margin-bottom:12px;line-height:1.4"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+            <button class="sp-btn-sm" onclick="spReinstallExtra('tts')">Reinstall / Update</button>
+            <span id="sp-reinstall-tts-status" style="font-size:11.5px;color:var(--text-dim)"></span>
+          </div>
           <div class="sp-field-label">Python executable <span style="font-size:10.5px;color:var(--text-dim);font-weight:400">(with kokoro installed — blank = auto)</span></div>
           <div class="sp-file-row" style="margin-bottom:10px">
             <div class="sp-file-display" id="sp-tts-python-display">Auto-detect</div>
@@ -836,6 +844,10 @@
             <span style="font-size:13px;color:var(--text-muted)">Enable episodic memory</span>
           </div>
           <p class="sp-note">ChromaDB stores conversation notes that surface as relevant context. Requires ChromaDB Python package.</p>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+            <button class="sp-btn-sm" onclick="spReinstallExtra('memory')">Reinstall / Update</button>
+            <span id="sp-reinstall-memory-status" style="font-size:11.5px;color:var(--text-dim)"></span>
+          </div>
         </div>
       </div>
     </div>

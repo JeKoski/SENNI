@@ -30,6 +30,7 @@ from scripts.config import (
     save_config,
     write_avatar_file,
 )
+from scripts.paths import SOUL_FILE, USER_PROFILE_FILE
 
 
 def create_settings_router(
@@ -43,7 +44,7 @@ def create_settings_router(
     async def api_get_settings():
         config = load_config()
         companions = list_companions()
-        comp_folder = config.get("companion_folder", "default")
+        comp_folder = config.get("companion_folder") or DEFAULTS["companion_folder"]
         active_cfg = load_companion_config(comp_folder)
         active_cfg = migrate_avatar(comp_folder, active_cfg)
         active_cfg["avatar_url"] = f"/api/companion/{comp_folder}/avatar" if active_cfg.get("avatar_path") else ""
@@ -172,7 +173,7 @@ def create_settings_router(
     async def api_save_companion_settings(request: Request):
         body = await request.json()
         config = load_config()
-        companion_folder = body.get("folder", config.get("companion_folder", "default"))
+        companion_folder = body.get("folder") or config.get("companion_folder") or DEFAULTS["companion_folder"]
         companion_cfg = load_companion_config(companion_folder)
 
         orb_data = body.get("orb_avatar_data", body.get("avatar_data"))
@@ -309,7 +310,7 @@ def create_settings_router(
         filename = sanitize_filename(body.get("filename", ""))
         if not filename:
             return {"ok": False, "error": "Invalid filename"}
-        protected = {"companion_identity.md", "user_profile.md"}
+        protected = {SOUL_FILE, USER_PROFILE_FILE}
         if filename in protected:
             return {"ok": False, "error": f"{filename} is protected and cannot be deleted"}
         target = COMPANIONS_DIR / folder / "soul" / filename

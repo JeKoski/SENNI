@@ -195,6 +195,97 @@ async function spFillTtsDefault(type) {
   }
 }
 
+// ── Reinstall ─────────────────────────────────────────────────────────────────
+
+async function spReinstallExtra(extra) {
+  const statusId = `sp-reinstall-${extra}-status`;
+  const el = document.getElementById(statusId);
+  if (el) { el.textContent = 'Installing…'; el.style.color = 'var(--text-dim)'; }
+
+  try {
+    const res = await fetch('/api/setup/reinstall-extra', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ extra }),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let msg;
+        try { msg = JSON.parse(line.slice(6)); } catch { continue; }
+        if (msg.type === 'status' && el) {
+          el.textContent = msg.label;
+        } else if (msg.type === 'done' && el) {
+          el.textContent = 'Done ✓';
+          el.style.color = 'var(--accent-green, #81c784)';
+          setTimeout(() => { el.textContent = ''; }, 4000);
+          spPopulateFeatures();
+        } else if (msg.type === 'error' && el) {
+          el.textContent = '✕ ' + msg.message;
+          el.style.color = 'var(--text-error, #e57373)';
+        }
+      }
+    }
+  } catch (e) {
+    if (el) { el.textContent = '✕ ' + e.message; el.style.color = 'var(--text-error, #e57373)'; }
+  }
+}
+
+async function spReinstallLlama() {
+  const el = document.getElementById('sp-reinstall-llama-status');
+  if (el) { el.textContent = 'Downloading…'; el.style.color = 'var(--text-dim)'; }
+
+  const gpu = document.getElementById('sp-gpu')?.value || '';
+
+  try {
+    const res = await fetch('/api/setup/reinstall-llama', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gpu_type: gpu }),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let msg;
+        try { msg = JSON.parse(line.slice(6)); } catch { continue; }
+        if (msg.type === 'status' && el) {
+          el.textContent = msg.label;
+        } else if (msg.type === 'progress' && el && msg.total > 0) {
+          el.textContent = `${msg.pct ?? 0}%`;
+        } else if (msg.type === 'done' && el) {
+          el.textContent = 'Done ✓ — restart server to use new binary';
+          el.style.color = 'var(--accent-green, #81c784)';
+        } else if (msg.type === 'error' && el) {
+          el.textContent = '✕ ' + msg.message;
+          el.style.color = 'var(--text-error, #e57373)';
+        }
+      }
+    }
+  } catch (e) {
+    if (el) { el.textContent = '✕ ' + e.message; el.style.color = 'var(--text-error, #e57373)'; }
+  }
+}
+
 // ── Save ──────────────────────────────────────────────────────────────────────
 async function spSaveFeatures(andClose = false) {
   // TTS

@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
-from scripts.paths import CONFIG_FILE, COMPANIONS_DIR
+from scripts.paths import CONFIG_FILE, COMPANIONS_DIR, SOUL_FILE, REFLECTIONS_FILE
 
 TOOL_NAME   = "memory"
 DESCRIPTION = (
@@ -163,16 +163,16 @@ def run(args: dict) -> str:
             if filename == "user_profile.md":
                 pass  # always writable — stores info about the user, not the companion's identity
 
-            elif filename == "companion_identity.md":
+            elif filename == SOUL_FILE:
                 if soul_mode == "settled":
-                    return "Error: companion_identity.md is read-only (Settled). The user edits this in Settings."
+                    return f"Error: {SOUL_FILE} is read-only (Settled). The user edits this in Settings."
                 if soul_mode == "reflective":
-                    return "Error: in Reflective mode, write to soul/self_notes.md instead."
+                    return f"Error: in Reflective mode, write to soul/{REFLECTIONS_FILE} instead."
                 # adaptive / unbound: allowed, backup already done above
 
-            elif filename == "self_notes.md":
+            elif filename == REFLECTIONS_FILE:
                 if soul_mode == "settled":
-                    return "Error: soul/self_notes.md is disabled. Enable Reflective or higher mode in Settings."
+                    return f"Error: soul/{REFLECTIONS_FILE} is disabled. Enable Reflective or higher mode in Settings."
                 # reflective, adaptive, unbound: allowed
 
             else:

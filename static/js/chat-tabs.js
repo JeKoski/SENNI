@@ -18,7 +18,7 @@
 // ── Tab index (localStorage — lightweight only) ───────────────────────────────
 
 function _tabIndexKey() {
-  return `chat_tab_index_${config.companion_folder || 'default'}`;
+  return `chat_tab_index_${config.companion_folder || 'senni'}`;
 }
 
 function _saveTabIndex() {
@@ -145,7 +145,7 @@ async function _saveCurrentSessionToDisk() {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        companion_folder: config.companion_folder || 'default',
+        companion_folder: config.companion_folder || 'senni',
         tab_id:           tab.id,
         session_id:       _currentSessionId,
         title:            tab.title,
@@ -226,7 +226,7 @@ function _hydrateTabShell(t) {
 
 async function _loadTabsFromDisk() {
   try {
-    const res  = await fetch(`/api/history/list?companion_folder=${encodeURIComponent(config.companion_folder || 'default')}`);
+    const res  = await fetch(`/api/history/list?companion_folder=${encodeURIComponent(config.companion_folder || 'senni')}`);
     const data = await res.json();
     if (data.ok && data.tabs?.length) {
       _tabs = data.tabs
@@ -251,7 +251,7 @@ async function _loadSessionFromDisk(tabId) {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        companion_folder: config.companion_folder || 'default',
+        companion_folder: config.companion_folder || 'senni',
         tab_id: tabId,
       }),
     });
@@ -269,7 +269,7 @@ async function _loadSessionFromDisk(tabId) {
 // One-time migration from the old full-history localStorage format.
 
 function _migrateLegacyLocalStorage() {
-  const oldKey = `chat_tabs_${config.companion_folder || 'default'}`;
+  const oldKey = `chat_tabs_${config.companion_folder || 'senni'}`;
   try {
     const raw = localStorage.getItem(oldKey);
     if (!raw) return;
@@ -412,7 +412,7 @@ async function _doCloseTab(id) {
   }
 
   // Delete history from disk
-  const folder = config.companion_folder || 'default';
+  const folder = config.companion_folder || 'senni';
   try {
     await fetch(`/api/history/${encodeURIComponent(folder)}/${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -525,7 +525,7 @@ function _serializeMessages() {
         // Clone bubble and replace data: URLs on image thumbnails with media route URLs.
         // Keeps base64 blobs out of session.json.
         const clone  = bubble.cloneNode(true);
-        const folder = (typeof config !== 'undefined' ? config.companion_folder : null) || 'default';
+        const folder = (typeof config !== 'undefined' ? config.companion_folder : null) || 'senni';
         clone.querySelectorAll('img[data-img-ref]').forEach(img => {
           if (img.src.startsWith('data:')) {
             const ref = img.getAttribute('data-img-ref');

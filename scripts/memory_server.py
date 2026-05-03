@@ -41,7 +41,7 @@ log = logging.getLogger("senni.memory")
 
 router = APIRouter()
 
-from scripts.paths import COMPANIONS_DIR as _COMPANIONS_DIR_DEFAULT
+from scripts.paths import COMPANIONS_DIR as _COMPANIONS_DIR_DEFAULT, SOUL_FILE
 
 
 # ── Store state ────────────────────────────────────────────────────────────────
@@ -188,13 +188,13 @@ def init_memory_store(companion_folder: str) -> bool:
 
 def _sync_identity_block(companion_folder: str) -> None:
     """
-    Read soul/companion_identity.md and sync it to the Tier 1 identity block.
+    Read soul/soul.md and sync it to the Tier 1 identity block.
     Called at session start so the identity block stays in sync with the
     human-editable file.
     """
     if _store is None:
         return
-    identity_path = _companions_dir() / companion_folder / "soul" / "companion_identity.md"
+    identity_path = _companions_dir() / companion_folder / "soul" / SOUL_FILE
     try:
         if identity_path.exists():
             content = identity_path.read_text(encoding="utf-8").strip()

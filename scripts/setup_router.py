@@ -212,6 +212,11 @@ def _download_to_queue(
                               "total": total, "speed_bps": int(speed), "pct": pct})
                         last_push = now
 
+        if total > 0 and downloaded != total:
+            tmp.unlink(missing_ok=True)
+            push({"type": "error", "message": f"Incomplete download: received {downloaded:,} of {total:,} bytes. Try again."})
+            return
+
         tmp.rename(dest)
         push({"type": "download_done"})
 
@@ -759,5 +764,188 @@ async def setup_install_extras(request: Request):
             yield _sse({"type": "progress", "pct": int(step / total * 100)})
 
         yield _sse({"type": "done"})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.post("/api/setup/reinstall-extra")
+async def setup_reinstall_extra(request: Request):
+    """Reinstall a single extra (tts or memory) via pip. Same flow as install-extras."""
+    body = await request.json()
+    key  = body.get("extra", "").strip()
+    if key not in _EXTRAS_META:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"ok": False, "error": f"Unknown extra: {key!r}"}, status_code=400)
+
+    async def stream() -> AsyncGenerator[str, None]:
+        loop  = asyncio.get_event_loop()
+        pkgs, label = _EXTRAS_META[key]
+        mode        = _EXTRAS_INSTALL_MODE[key]
+
+        yield _sse({"type": "status", "label": f"Reinstalling {label}…"})
+
+        FEATURES_PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
+        queue: asyncio.Queue = asyncio.Queue()
+
+        def _run_pip(pkgs: list = pkgs, mode: str = mode) -> None:
+            import subprocess
+
+            def push(obj: dict) -> None:
+                loop.call_soon_threadsafe(queue.put_nowait, obj)
+
+            def push_log(line: str) -> None:
+                line = line.rstrip()
+                if line:
+                    push({"type": "log", "line": line})
+
+            py  = _get_pip_python()
+            cmd = [py, "-m", "pip", "install", "--upgrade", "--no-cache-dir",
+                   "--no-warn-script-location", "--prefer-binary"]
+            if mode == "target":
+                cmd += ["--target", str(FEATURES_PACKAGES_DIR)]
+            cmd.extend(pkgs)
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, bufsize=1,
+                )
+                for line in proc.stdout:
+                    push_log(line)
+                proc.wait()
+                if proc.returncode != 0:
+                    push({"type": "error", "message": f"pip failed for {pkgs} (exit {proc.returncode})"})
+                    return
+                for post_args in _EXTRAS_POST_CMDS.get(key, []):
+                    push_log(f"$ {' '.join(post_args)}")
+                    r = subprocess.run(
+                        [py, *post_args],
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        text=True,
+                    )
+                    for line in (r.stdout or "").splitlines():
+                        push_log(line)
+                    if r.returncode != 0:
+                        push({"type": "error", "message": f"post-install failed: {post_args} (exit {r.returncode})"})
+                        return
+                if key == "tts":
+                    try:
+                        from scripts.config import load_config, save_config
+                        cfg = load_config()
+                        cfg.setdefault("tts", {})["python_path"] = py
+                        save_config(cfg)
+                        push_log(f"[config] tts.python_path → {py}")
+                    except Exception as ce:
+                        push_log(f"[warn] could not save tts python_path: {ce}")
+                push({"type": "pkg_done"})
+            except Exception as exc:
+                push({"type": "error", "message": str(exc)})
+
+        pip_task = loop.run_in_executor(None, _run_pip)
+
+        while True:
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                if await request.is_disconnected():
+                    return
+                continue
+            if msg["type"] == "log":
+                yield _sse(msg)
+            elif msg["type"] == "pkg_done":
+                break
+            elif msg["type"] == "error":
+                yield _sse(msg)
+                return
+
+        await pip_task
+        yield _sse({"type": "done"})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.post("/api/setup/reinstall-llama")
+async def setup_reinstall_llama(request: Request):
+    """Re-download and reinstall the llama-server binary. Uses current GPU detection."""
+    body     = await request.json()
+    gpu      = body.get("gpu_type") or detect_gpu()
+    oneapi   = body.get("oneapi_present", _detect_oneapi())
+    build    = body.get("build_type") or _gpu_to_build(gpu, oneapi)
+    dest_dir = BINARY_DIR
+
+    async def stream() -> AsyncGenerator[str, None]:
+        loop = asyncio.get_event_loop()
+
+        yield _sse({"type": "status", "label": "Checking latest release…"})
+        try:
+            release = await loop.run_in_executor(None, _fetch_latest_release)
+        except Exception as e:
+            yield _sse({"type": "error", "message": f"Could not reach GitHub: {e}"})
+            return
+
+        asset = _find_binary_asset(release.get("assets", []), build)
+        if not asset:
+            yield _sse({"type": "error", "message": f"No binary found for {SYSTEM} / {build}"})
+            return
+
+        archive_path = dest_dir / asset["name"]
+        size_bytes   = asset.get("size", 0)
+        yield _sse({"type": "status", "label": f"Downloading {asset['name']}…", "total": size_bytes})
+
+        queue = asyncio.Queue()
+        dl    = functools.partial(_download_to_queue, asset["browser_download_url"], archive_path, queue, loop)
+        dl_task = loop.run_in_executor(None, dl)
+
+        while True:
+            msg = await queue.get()
+            if msg["type"] == "progress":
+                yield _sse(msg)
+            elif msg["type"] == "download_done":
+                break
+            elif msg["type"] == "error":
+                yield _sse(msg)
+                return
+
+        await dl_task
+
+        if IS_WIN and build == "cuda":
+            cudart_asset = _find_cudart_asset(release.get("assets", []), asset["name"])
+            if cudart_asset:
+                cudart_path = dest_dir / cudart_asset["name"]
+                yield _sse({"type": "status", "label": f"Downloading {cudart_asset['name']}…",
+                            "total": cudart_asset.get("size", 0)})
+                cudart_queue = asyncio.Queue()
+                cudart_dl = functools.partial(
+                    _download_to_queue, cudart_asset["browser_download_url"],
+                    cudart_path, cudart_queue, loop
+                )
+                cudart_task = loop.run_in_executor(None, cudart_dl)
+                while True:
+                    msg = await cudart_queue.get()
+                    if msg["type"] == "progress":
+                        yield _sse(msg)
+                    elif msg["type"] == "download_done":
+                        break
+                    elif msg["type"] == "error":
+                        yield _sse({"type": "status", "label": "cudart download failed — continuing anyway"})
+                        break
+                await cudart_task
+                if cudart_path.exists():
+                    await loop.run_in_executor(
+                        None, functools.partial(_extract_binary, cudart_path, dest_dir)
+                    )
+                    cudart_path.unlink(missing_ok=True)
+
+        yield _sse({"type": "status", "label": "Extracting…"})
+        binary_path = await loop.run_in_executor(
+            None, functools.partial(_extract_binary, archive_path, dest_dir)
+        )
+        archive_path.unlink(missing_ok=True)
+
+        if not binary_path:
+            yield _sse({"type": "error", "message": f"Could not find {BINARY_NAME} in archive"})
+            return
+
+        yield _sse({"type": "done", "binary": str(binary_path)})
 
     return StreamingResponse(stream(), media_type="text/event-stream")

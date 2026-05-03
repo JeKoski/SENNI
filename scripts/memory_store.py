@@ -624,7 +624,7 @@ class MemoryStore:
 
     def update_identity_block(self, new_identity: str) -> None:
         """
-        Sync identity block from soul/companion_identity.md content.
+        Sync identity block from soul/soul.md content.
         Called at session start to keep Tier 1 in sync with the human-editable file.
         """
         self._meta["identity_block"] = new_identity.strip()

@@ -129,7 +129,7 @@ async function cpLoad() {
   try {
     const res  = await fetch('/api/settings');
     cpSettings = await res.json();
-    cpFolder   = cpSettings.config?.companion_folder || 'default';
+    cpFolder   = cpSettings.config?.companion_folder || 'senni';
     _cpAvatarChanged = false;
     _cpNewAvatarData = null;
     cpClearDirty();
