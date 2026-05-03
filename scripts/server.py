@@ -251,15 +251,29 @@ async def on_startup():
     results = run_startup_checks(cfg, PROJECT_ROOT, COMPANIONS_DIR)
     log_results(results, label="Startup diagnostics")
 
-    # Seed default companion from template on first boot
+    # Migrate stale companion_folder value: if config still says "default" but
+    # companions/default/ doesn't exist as a real companion (no config.json),
+    # rewrite config to point at the proper default ("senni") instead.
     cfg = load_config()
-    default_folder = cfg.get("companion_folder", DEFAULTS["companion_folder"])
-    if not (COMPANIONS_DIR / default_folder).exists():
-        result = instantiate_companion_template(default_folder, default_folder)
+    stored_folder = cfg.get("companion_folder") or ""
+    real_default  = DEFAULTS["companion_folder"]
+    if stored_folder != real_default:
+        default_cfg_path = COMPANIONS_DIR / stored_folder / "config.json"
+        real_default_exists = (COMPANIONS_DIR / real_default).exists()
+        if not default_cfg_path.exists() and real_default_exists:
+            cfg["companion_folder"] = real_default
+            save_config(cfg)
+            log.info("Migrated companion_folder '%s' → '%s' in config.", stored_folder, real_default)
+            cfg = load_config()
+
+    # Seed default companion from template on first boot
+    active_folder = cfg.get("companion_folder") or real_default
+    if not (COMPANIONS_DIR / active_folder).exists():
+        result = instantiate_companion_template(active_folder, active_folder)
         if result["ok"]:
-            log.info("Seeded companion '%s' from template.", default_folder)
+            log.info("Seeded companion '%s' from template.", active_folder)
         elif result["reason"] == "not_found":
-            log.warning("No template found for companion '%s' — skipping seed.", default_folder)
+            log.warning("No template found for companion '%s' — skipping seed.", active_folder)
 
     # Belt-and-suspenders: also kill on abnormal Python exit
     atexit.register(kill_llama_server)
