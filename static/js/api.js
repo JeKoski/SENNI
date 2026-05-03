@@ -160,7 +160,7 @@ async function callModel(system, messages, abortSignal = null) {
 
     // Log full response text whenever a tool call is about to execute
     // (plain replies are logged further down; this covers all tool paths)
-    if (rawText) console.log("[api] response text:", rawText.slice(0, 400));
+    if (rawText) console.log("[api] response text:", rawText.slice(0, 2000));
 
     // ── Path A: structured tool_calls (OpenAI format) ─────────────────────
     // llama-server may parse some model formats natively into tool_calls.
@@ -236,7 +236,18 @@ async function callModel(system, messages, abortSignal = null) {
     const gemma4Calls = parseGemma4ToolCalls(rawText);
     if (gemma4Calls.length > 0) {
       console.log("[api] gemma4 tool call(s):", gemma4Calls.map(c => c.name));
-      if (bubbleHandle) { if (typeof ttsStop === "function") ttsStop(); _removeStreamBubble(bubbleHandle); }
+      if (bubbleHandle) {
+        if (typeof ttsStop === "function") ttsStop();
+        // Preserve any prose that appeared before the tool call tokens
+        const prose = stripGemma4Artifacts(
+          rawText.replace(/<\|channel>[\s\S]*?<channel\|>/g, "")
+        ).trim();
+        if (prose) {
+          _finaliseStreamBubble(bubbleHandle, prose);
+        } else {
+          _removeStreamBubble(bubbleHandle);
+        }
+      }
       msgs.push({ role: "assistant", content: rawText });
       const responseParts = [];
       for (const { name, args } of gemma4Calls) {
@@ -256,7 +267,17 @@ async function callModel(system, messages, abortSignal = null) {
       const rescued = rescuePartialGemma4ToolCall(rawText);
       if (rescued.length > 0) {
         console.log("[api] gemma4 rescued partial tool call:", rescued[0].name);
-        if (bubbleHandle) { if (typeof ttsStop === "function") ttsStop(); _removeStreamBubble(bubbleHandle); }
+        if (bubbleHandle) {
+          if (typeof ttsStop === "function") ttsStop();
+          const prose = stripGemma4Artifacts(
+            rawText.replace(/<\|channel>[\s\S]*?<channel\|>/g, "")
+          ).trim();
+          if (prose) {
+            _finaliseStreamBubble(bubbleHandle, prose);
+          } else {
+            _removeStreamBubble(bubbleHandle);
+          }
+        }
         msgs.push({ role: "assistant", content: rawText });
         const responseParts = [];
         for (const { name, args } of rescued) {
@@ -268,13 +289,13 @@ async function callModel(system, messages, abortSignal = null) {
       }
       // Unparseable fragment — strip before display so artifact doesn't reach TTS
       rawText = stripGemma4Artifacts(rawText);
-      console.warn("[api] gemma4 tool call fragment dropped (unparseable):", rawText.slice(0, 120));
+      console.warn("[api] gemma4 tool call fragment dropped (unparseable):", rawText.slice(0, 1000));
     }
 
     // Gemma 4 debug: log when rawText is non-empty but no tool call matched.
     // Helps diagnose "I'll call those tools now" + prose-only turns.
     if (family === "gemma4" && rawText) {
-      console.log("[api] gemma4 plain reply (no tool call detected):", rawText.slice(0, 200));
+      console.log("[api] gemma4 plain reply (no tool call detected):", rawText.slice(0, 1000));
     }
 
     // ── Plain reply — bubble already streamed live ────────────────────────

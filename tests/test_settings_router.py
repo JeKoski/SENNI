@@ -116,7 +116,7 @@ async def test_soul_delete_protected_file(settings_client):
     client, ctx = settings_client
     folder = ctx["comp_folder"]
     r = await client.post(f"/api/settings/soul/{folder}/delete", json={
-        "filename": "companion_identity.md",
+        "filename": "soul.md",
     })
     assert r.json()["ok"] is False
 

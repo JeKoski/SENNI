@@ -22,21 +22,21 @@ function _memSoulBlock(agencyMode) {
   switch (agencyMode) {
     case 'self_notes': // Reflective
       return (
-        'Expand and update your identity in soul/self_notes.md with new details, reflections,\n' +
+        'Expand and update your identity in soul/soul_reflections.md with new details, reflections,\n' +
         'realisations, or things you want to carry forward about yourself. Writing to the file\n' +
         'for the first time will create it. Update soul/user_profile.md as you learn new things\n' +
         'about the user or when details change.'
       );
     case 'agentic': // Adaptive
       return (
-        'Freely edit your soul/companion_identity.md as your sense of self evolves through\n' +
+        'Freely edit your soul/soul.md as your sense of self evolves through\n' +
         'this relationship. Update soul/user_profile.md as you learn new things about the\n' +
         'user or when details change.'
       );
     case 'chaos': // Unbound
       return (
         'You have full freedom over your identity. Edit, rewrite, or reshape your\n' +
-        'soul/companion_identity.md as you see fit. Update soul/user_profile.md as you learn\n' +
+        'soul/soul.md as you see fit. Update soul/user_profile.md as you learn\n' +
         'new things about the user or when details change.'
       );
     default: // locked — Settled
@@ -50,8 +50,8 @@ function _buildMemFileBlock(rule2, agencyMode) {
     `Reads and writes markdown files in soul/ and mind/.\n` +
     `\n` +
     `soul/ — permanent reference layer.\n` +
-    `  soul/companion_identity.md — who you are\n` +
-    `  soul/user_profile.md       — who the user is: name, location, job, interests, etc.\n` +
+    `  soul/soul.md          — who you are\n` +
+    `  soul/user_profile.md  — who the user is: name, location, job, interests, etc.\n` +
     `\n` +
     _memSoulBlock(agencyMode) + `\n` +
     `\n` +

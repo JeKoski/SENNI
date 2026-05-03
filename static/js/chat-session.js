@@ -357,7 +357,7 @@ async function reloadMemoryContext() {
 async function seedTemplates() {
   const folder = config.companion_folder || 'default';
   const seeds = [
-    { template_name: 'companion_identity.md', filename: 'companion_identity.md', target_folder: 'soul' },
+    { template_name: 'soul.md', filename: 'soul.md', target_folder: 'soul' },
     { template_name: 'user_profile.md',       filename: 'user_profile.md',       target_folder: 'soul' },
   ];
   for (const seed of seeds) {

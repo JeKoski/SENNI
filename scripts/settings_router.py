@@ -30,6 +30,7 @@ from scripts.config import (
     save_config,
     write_avatar_file,
 )
+from scripts.paths import SOUL_FILE, USER_PROFILE_FILE
 
 
 def create_settings_router(
@@ -309,7 +310,7 @@ def create_settings_router(
         filename = sanitize_filename(body.get("filename", ""))
         if not filename:
             return {"ok": False, "error": "Invalid filename"}
-        protected = {"companion_identity.md", "user_profile.md"}
+        protected = {SOUL_FILE, USER_PROFILE_FILE}
         if filename in protected:
             return {"ok": False, "error": f"{filename} is protected and cannot be deleted"}
         target = COMPANIONS_DIR / folder / "soul" / filename

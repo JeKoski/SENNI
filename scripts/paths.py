@@ -64,3 +64,11 @@ def venv_site_packages(venv_dir: Path) -> Path | None:
 # Windows: full Python embeddable with pip bootstrapped in.
 # Linux:   not used — falls back to system Python at runtime.
 PYTHON_EMBED_DIR = RESOURCE_ROOT / "python-embed"
+
+# ── Companion soul/mind filename constants ────────────────────────────────────
+# Use these instead of string literals so renames are a one-line change.
+
+SOUL_FILE         = "soul.md"
+REFLECTIONS_FILE  = "soul_reflections.md"
+USER_PROFILE_FILE = "user_profile.md"
+UNBOUND_FILE      = "unbound.md"
