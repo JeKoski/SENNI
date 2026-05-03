@@ -143,74 +143,37 @@ Copying a companion folder between installs:
 
 ---
 
-## Session notes — 2026-05-03 (Voice download + Identity Evolution fix)
+## Session notes — 2026-05-03 (TTS voices / Gemma prose / Identity refactor / Reinstall / Default folder fix)
 
-**Kokoro voices now auto-download from HuggingFace on first TTS boot. Identity Evolution write permissions fixed in `memory.py`.**
+**All four backlog items completed. `companions/default/` bug root-caused and fixed.**
 
 ### What changed
 
-**`scripts/tts.py`:**
-- `_list_kokoro_voices()` now uses `huggingface_hub.snapshot_download` to pre-download all voices (~28 MB) from `hexgrad/Kokoro-82M` on first boot. Subsequent boots are instant (HF cache hit). Falls back to scanning the kokoro package dir. `huggingface_hub` is already a kokoro dependency so no new deps needed.
+**`scripts/tts.py`:** `_list_kokoro_voices()` now calls `snapshot_download` once (no `local_files_only`) with `allow_patterns=["voices/"]` and recursive glob. Fixes the 6-voice cap from partial HF cache.
 
-**`tools/memory.py`:**
-- `run()` was reading `soul_edit_mode` via raw JSON (`_load_companion_cfg` bypasses `config.py` migration). Fixed: now reads `evolution_level` with a backward-compat fallback that maps old values (`locked→settled`, `self_notes→reflective`, `agentic→adaptive`, `chaos→unbound`).
-- All string comparisons updated to new names (`settled`/`reflective`/`adaptive`/`unbound`).
-- Error messages updated to reference new level names and "Unbound mode" instead of "chaos mode".
+**`static/js/api.js`:** Gemma prose before tool calls now preserved — Path E/F finalize the stream bubble with clean prose instead of removing it. Log truncation limits raised (400→2000, 120/200→1000).
+
+**`scripts/paths.py`:** Added `SOUL_FILE`, `REFLECTIONS_FILE`, `USER_PROFILE_FILE`, `UNBOUND_FILE` constants.
+
+**Identity rename (steps 3–6):** `companion_identity.md`→`soul.md`, `self_notes.md`→`soul_reflections.md` throughout codebase. Boot-time migration in `_migrate_soul_filenames()`. New tools: `soul_identity.py`, `soul_reflect.py`, `soul_user.py`, `note.py`. Evolution-level gating in `_get_enabled_tools()` via `_EVOLUTION_REQUIRED`.
+
+**`scripts/setup_router.py`:** `POST /api/setup/reinstall-extra` and `POST /api/setup/reinstall-llama` endpoints with SSE streaming. Download size validation in `_download_to_queue()`.
+
+**`static/js/settings-features.js`:** `spReinstallExtra()` and `spReinstallLlama()` wired to new endpoints with inline progress/status.
+
+**`companions/default/` bug:** Root cause — `config.json` had stale `companion_folder: "default"` from old DEFAULTS. Fixed two ways: (1) all `"default"` companion_folder fallbacks in Python + JS replaced with `DEFAULTS["companion_folder"]` / `'senni'`; (2) boot-time migration in `on_startup()` rewrites config.json if the stored folder has no companion config.json but the real default exists.
 
 ### Still open
-- TTS voices not fetching on restart on an existing installation — `snapshot_download` may not be running as expected. Needs fresh-install test to isolate whether it's a cache/path issue or something else. See BACKLOG.
+- **Double memory-server shutdown message** — cosmetic, not investigated.
+- **TTS voice list on existing install** — verified working on this machine after fix. Fresh-install test still recommended.
 
 ---
 
 ## Session notes — 2026-05-03 (Kokoro TTS boot + folder picker + venv local install)
 
-**Kokoro TTS now boots reliably. Modern IFileOpenDialog folder picker replaces old SHBrowseForFolderW. Dev-mode local install now uses a `features/venv/` with Python 3.12 (not 3.13). Voice list populated from subprocess via `importlib`. Diagnostics show where packages are found.**
+**Kokoro TTS now boots reliably. IFileOpenDialog folder picker. Dev-mode `features/venv/` with Python 3.12. Voice list from subprocess `__ready__`. Diagnostics show resolved paths.**
 
-### What changed
-
-**`scripts/server.py`:**
-- Added `_win_folder_dialog_ifiledialog()` using IFileOpenDialog COM vtable (CoCreateInstance, SetOptions FOS_PICKFOLDERS|FOS_FORCEFILESYSTEM, SetTitle, Show, GetResult→IShellItem.GetDisplayName SIGDN_FILESYSPATH). Proper CoTaskMemFree + Release.
-- `_run_folder_dialog()` tries IFileDialog first, falls back to old `_win_folder_dialog_ctypes` on failure.
-- Dev-mode venv sys.path injection at startup: inserts `features/venv/Lib/site-packages` into `sys.path` so kokoro/chromadb can be found without modifying the system Python.
-
-**`scripts/tts.py`:**
-- Moved `import numpy as np` to after `_fatal()` is defined; wrapped in `try/except Exception`.
-- All three dep imports (numpy, soundfile, kokoro) now catch `Exception` (not just `ImportError`) so DLL load errors surface correctly.
-- Added `_list_kokoro_voices()`: uses `importlib.util.find_spec("kokoro")` to find the package directory, then globs `voices/**/*.pt`. Called in `main()` and included in the `__ready__` JSON message.
-
-**`scripts/tts_server.py`:**
-- Added `_tts_voices: list = []` global; populated from `__ready__` message on subprocess boot.
-- `api_tts_status()` and `api_tts_voices()` use `_tts_voices` when populated, fall back to `discover_voices()`.
-- `discover_voices()` glob changed from `*.pt` → `**/*.pt` (recursive).
-- Added `reset_tts_unavailable()`: clears `_tts_unavailable`, `_tts_error_msg`, `_tts_voices`.
-- `_resolve_python()`: prefers venv Python (`features/venv/Scripts/python.exe`) in dev mode.
-
-**`scripts/settings_router.py`:**
-- `api_save_tts_settings()`: calls `reset_tts_unavailable()` before `_ensure_tts_running()` so saving settings always retries boot without a full server restart.
-
-**`static/chat.html` + `static/js/settings-features.js`:**
-- Added `#sp-tts-error-hint` element below the TTS enable toggle.
-- `spPopulateFeatures()` fetches `/api/tts/status`; if `reason === 'tts_unavailable'` and `data.error` is set, shows the error string in the hint + flips badge to `error` class.
-
-**`scripts/setup_router.py`:**
-- Added `_EXTRAS_DETECT = {"tts": "kokoro", "memory": "chromadb"}` — wizard now checks the right primary package (was checking numpy, causing false positives).
-- Added `_find_preferred_python()`: tries `py -3.12`, `py -3.11`, then `python3.12`, `python3.11`, `python3` — avoids Python 3.13 compatibility issues.
-- `_get_pip_python()`: creates `features/venv/` via `subprocess.run([base_py, "-m", "venv", ...])` using preferred Python. Returns venv Python path.
-- After successful TTS install: updates `config["tts"]["python_path"]` so tts_server uses the venv Python on next boot.
-- `_detect_extra()` updated to check venv in dev mode (mirrors diagnostics.py).
-
-**`scripts/paths.py`:**
-- Added `FEATURES_VENV_DIR = DATA_ROOT / "features" / "venv"`.
-- Added `venv_site_packages(venv_dir)`: cross-platform helper returning the site-packages dir (Windows: `Lib/site-packages`, Linux: `lib/python3.x/site-packages`).
-
-**`scripts/diagnostics.py`:**
-- `_check_extra()`: checks `features/venv/` in dev mode (was checking `FEATURES_PACKAGES_DIR` which is always empty). Shows the resolved path in the result detail.
-
-### Still open
-- **Double memory-server shutdown message** — cosmetic, logged twice on exit. Not investigated.
-- **"default" companion folder created on restart** — shouldn't happen; `server.py` copies `templates/companions/senni` only if it's missing, not "default". Needs investigation.
-- **Voice list** — voices now populated from subprocess `__ready__` via `importlib`; needs confirmation in-app after venv install.
-- **`features/venv/` in `.gitignore`** — should be added if not already present.
+Key changes: `_win_folder_dialog_ifiledialog()` in server.py; venv sys.path injection at startup; `_list_kokoro_voices()` via `importlib.util.find_spec`; `_tts_voices` global in tts_server; `reset_tts_unavailable()` called on TTS settings save; `features/venv/` creation with preferred Python in setup_router; `FEATURES_VENV_DIR` + `venv_site_packages()` in paths.py; diagnostics checks venv path.
 
 ---
 
