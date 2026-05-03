@@ -23,7 +23,6 @@ Graceful degradation:
 import io
 import json
 import sys
-import numpy as np
 
 # ── Process name ───────────────────────────────────────────────────────────────
 def _set_process_name(name: str) -> None:
@@ -43,8 +42,10 @@ _set_process_name("SENNI Voice Server")
 from contextlib import redirect_stderr, redirect_stdout, contextmanager
 
 # ── Dependency check ───────────────────────────────────────────────────────────
-# Write a machine-readable error and exit cleanly if kokoro isn't available.
+# Write a machine-readable error and exit cleanly if a dep isn't available.
 # tts_server.py watches for exit code 2 specifically.
+# Broad Exception catches are intentional: DLL load failures (OSError), missing
+# native extensions, etc. must surface here rather than as an uncaught crash.
 
 def _fatal(msg: str) -> None:
     sys.stdout.write(json.dumps({"id": "__init__", "ok": False, "error": msg}) + "\n")
@@ -53,14 +54,19 @@ def _fatal(msg: str) -> None:
 
 
 try:
+    import numpy as np
+except Exception as e:
+    _fatal(f"numpy not available: {e}")
+
+try:
     import soundfile as sf
-except ImportError:
-    _fatal("soundfile not installed — run: pip install soundfile")
+except Exception as e:
+    _fatal(f"soundfile not available: {e}")
 
 try:
     from kokoro import KPipeline
-except ImportError:
-    _fatal("kokoro not installed — run: pip install kokoro")
+except Exception as e:
+    _fatal(f"kokoro not available: {e}")
 
 
 @contextmanager
@@ -190,11 +196,59 @@ def synthesise(req: dict) -> bytes:
     return buf.getvalue()
 
 
+# ── Voice discovery ────────────────────────────────────────────────────────────
+
+def _list_kokoro_voices() -> list:
+    """
+    Return available voice names.
+    Tries the HuggingFace cache first (instant if already downloaded), then
+    triggers a one-time download of all voices (~28 MB) from hexgrad/Kokoro-82M.
+    Falls back to scanning the kokoro package directory on any error.
+    """
+    try:
+        from huggingface_hub import snapshot_download
+        from pathlib import Path as _Path
+        try:
+            snap = snapshot_download(
+                repo_id="hexgrad/Kokoro-82M",
+                allow_patterns=["voices/*.pt"],
+                local_files_only=True,
+            )
+        except Exception:
+            sys.stderr.write("[tts] Downloading Kokoro voices (~28 MB)…\n")
+            sys.stderr.flush()
+            snap = snapshot_download(
+                repo_id="hexgrad/Kokoro-82M",
+                allow_patterns=["voices/*.pt"],
+            )
+        names = sorted(p.stem for p in _Path(snap).glob("voices/*.pt"))
+        if names:
+            return names
+    except Exception as e:
+        sys.stderr.write(f"[tts] Voice download failed: {e}\n")
+        sys.stderr.flush()
+
+    # Fallback: scan kokoro package directory
+    try:
+        import importlib.util
+        from pathlib import Path as _Path
+        spec = importlib.util.find_spec("kokoro")
+        if not spec or not spec.origin:
+            return []
+        voices_dir = _Path(spec.origin).parent / "voices"
+        if not voices_dir.is_dir():
+            return []
+        return sorted(p.stem for p in voices_dir.glob("**/*.pt"))
+    except Exception:
+        return []
+
+
 # ── Main loop ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    # Signal readiness to tts_server.py
-    sys.stdout.write(json.dumps({"id": "__ready__", "ok": True}) + "\n")
+    # Signal readiness to tts_server.py, including available voices
+    voices = _list_kokoro_voices()
+    sys.stdout.write(json.dumps({"id": "__ready__", "ok": True, "voices": voices}) + "\n")
     sys.stdout.flush()
 
     stdin  = sys.stdin

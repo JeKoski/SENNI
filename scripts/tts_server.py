@@ -59,6 +59,7 @@ _tts_lock         = threading.Lock()
 _tts_unavailable  = False   # True if kokoro/espeak not installed (exit code 2)
 _tts_error_msg    = ""      # Human-readable reason for unavailability
 _tts_ready        = False   # True once subprocess sent {"id":"__ready__","ok":true}
+_tts_voices:      list      = []  # Populated from subprocess __ready__ message
 
 # Serialises stdin writes — only one request in-flight at a time.
 _tts_request_lock = threading.Lock()
@@ -127,7 +128,7 @@ def discover_voices(voices_path: str = "") -> list[str]:
 
     for d in search_dirs:
         if d.is_dir():
-            names = sorted(p.stem for p in d.glob("*.pt"))
+            names = sorted(p.stem for p in d.glob("**/*.pt"))
             if names:
                 return names
 
@@ -151,8 +152,9 @@ def _resolve_python(tts_cfg: dict) -> str:
     Resolve the Python executable that has kokoro installed.
     Priority:
       1. config["tts"]["python_path"] — explicit path set by user
-      2. Bundled Python embeddable (frozen mode — sys.executable is the bundle binary)
-      3. sys.executable (source mode — already a real Python)
+      2. Bundled Python embeddable (frozen mode)
+      3. features/venv Python (dev mode — where wizard installs packages)
+      4. sys.executable fallback
     """
     explicit = tts_cfg.get("python_path", "").strip()
     if explicit:
@@ -165,6 +167,11 @@ def _resolve_python(tts_cfg: dict) -> str:
             if candidate.exists():
                 return str(candidate)
         return shutil.which("python3") or shutil.which("python") or sys.executable
+    # Dev mode: prefer features/venv so subprocess uses the same env as the install
+    from scripts.paths import FEATURES_VENV_DIR
+    venv_py = FEATURES_VENV_DIR / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    if venv_py.exists():
+        return str(venv_py)
     return sys.executable
 
 
@@ -173,7 +180,7 @@ def _start_tts_process() -> bool:
     Start the tts.py subprocess. Returns True if started successfully.
     Must be called with _tts_lock held.
     """
-    global _tts_process, _tts_unavailable, _tts_error_msg, _tts_ready
+    global _tts_process, _tts_unavailable, _tts_error_msg, _tts_ready, _tts_voices
 
     if _tts_unavailable:
         return False
@@ -221,8 +228,9 @@ def _start_tts_process() -> bool:
         msg = json.loads(first_line)
 
         if msg.get("id") == "__ready__" and msg.get("ok"):
-            _tts_ready = True
-            log.info("TTS subprocess ready (pid %d)", proc.pid)
+            _tts_ready  = True
+            _tts_voices = msg.get("voices", [])
+            log.info("TTS subprocess ready (pid %d), %d voices", proc.pid, len(_tts_voices))
             return True
         else:
             err = msg.get("error", "unknown startup error")
@@ -272,6 +280,18 @@ def _ensure_tts_running() -> bool:
             _tts_process = None
 
         return _start_tts_process()
+
+
+def reset_tts_unavailable() -> None:
+    """
+    Clear the _tts_unavailable flag so the next _ensure_tts_running() will retry.
+    Called from settings_router when TTS settings are saved, allowing a fresh
+    attempt without a full server restart.
+    """
+    global _tts_unavailable, _tts_error_msg, _tts_voices
+    _tts_unavailable = False
+    _tts_error_msg   = ""
+    _tts_voices      = []
 
 
 def kill_tts_server() -> None:
@@ -366,7 +386,8 @@ async def api_tts_status():
 
     # Check/start the process on status poll if enabled
     running = _ensure_tts_running()
-    voices  = discover_voices(tts_cfg.get("voices_path", ""))
+    # Prefer voices reported by the subprocess (authoritative); fall back to filesystem scan
+    voices  = _tts_voices or discover_voices(tts_cfg.get("voices_path", ""))
 
     return {
         "ok":        True,
@@ -402,7 +423,7 @@ async def api_tts_stop():
 async def api_tts_voices():
     """Return list of discovered voice names."""
     tts_cfg = _load_tts_config()
-    voices  = discover_voices(tts_cfg.get("voices_path", ""))
+    voices  = _tts_voices or discover_voices(tts_cfg.get("voices_path", ""))
     return {"ok": True, "voices": voices}
 
 

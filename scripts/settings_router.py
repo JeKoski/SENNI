@@ -114,8 +114,9 @@ def create_settings_router(
         }
         save_config(config)
         if tts_available:
+            from scripts.tts_server import _ensure_tts_running, reset_tts_unavailable
+            reset_tts_unavailable()
             if config["tts"].get("enabled"):
-                from scripts.tts_server import _ensure_tts_running
                 _ensure_tts_running()
             else:
                 kill_tts_server()

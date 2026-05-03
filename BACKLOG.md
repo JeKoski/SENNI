@@ -54,6 +54,7 @@ Goal: reduce packaging risk before PyInstaller + Tauri by shrinking the biggest 
 - **Sidecar runtime contract** — define how Tauri launches, monitors, and shuts down the Python backend sidecar without changing the current HTTP model.
 - **espeak bundling** — bundle a portable espeak-ng binary (like llama-server). Currently still a system dependency. Wizard warns if missing; auto-set `config["tts"]["espeak_path"]` on detection. Target: Phase 3 / Tauri packaging.
 - **Settings "Install features" button** — post-wizard install path for users who skipped features in the wizard. Triggers same pip flow as wizard extras step.
+- **Dev-mode local install** ✓ (2026-05-03) — Setup Wizard now creates `features/venv/` using preferred Python (3.12 → 3.11 → fallback) and installs kokoro/chromadb there. `server.py` injects venv site-packages into `sys.path` at startup. `_EXTRAS_DETECT` ensures wizard detects the right primary package (kokoro, not numpy).
 
 **Do later - after first packaged build works**
 - **Deep memory subsystem cleanup**
@@ -132,7 +133,15 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 ## Bugs
 
-- **Kokoro TTS install on Python 3.13** — `numpy>=2.0` added to install list and `--prefer-binary` flag added, but install still fails. The dep chain (kokoro → misaki or similar) pulls in something that tries to compile from source on Python 3.13. Needs: check exact error trace in a fresh session, identify which transitive dep is the culprit, pin or pre-install it. Workaround for now: install kokoro manually in a venv with Python 3.11/3.12.
+- **Kokoro TTS install on Python 3.13** — Partially resolved: `_find_preferred_python()` now selects Python 3.12 for venv creation, and the local install goes into `features/venv/` (not system Python). If 3.12 is not installed, fallback may still land on 3.13. Long-term: bundle Python 3.12 embeddable for dev mode or document the 3.12 requirement explicitly.
+
+- **TTS voice list empty on existing install** — `_list_kokoro_voices()` now uses `snapshot_download` from `huggingface_hub` to auto-download all Kokoro voices (~28 MB) from `hexgrad/Kokoro-82M`. Verified via code that `load_voice()` uses the HF cache and this should pre-warm it. However, voices still not populating on restart on an existing installation. Needs: fresh-install test to confirm whether it works there, then check if the HF cache path is wrong or `snapshot_download` is silently erroring. Check stderr logs from the TTS subprocess on next session.
+
+- **Identity Evolution write permissions** ✓ FIXED (2026-05-03) — `tools/memory.py` was reading `soul_edit_mode` via raw JSON, bypassing the `config.py` migration to `evolution_level`. All companions were effectively locked regardless of their saved level. Fixed with a backward-compat fallback in `run()`.
+
+- **Double memory-server shutdown message** — cosmetic: memory server shutdown log line appears twice on exit. Not investigated. Likely a duplicate handler or two shutdown calls.
+
+- **"default" companion folder created on restart** — unexpected: a `companions/default/` folder with an empty `soul/` subfolder is created on server restart. Should not happen — `server.py` only copies `templates/companions/senni`. Needs investigation.
 
 - **Server restart overlay disconnected** — `showRestartOverlay()` + `watchBootLog()` exist in `chat-session.js` but weren't being called from `restartServer()` or `spRestartServer()` after the UI redesign. ✅ Fixed 2026-04-29.
 - **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks; `stripGemma4Artifacts()` cleans trailing artifacts. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging in place — check browser console on next occurrence.
@@ -155,7 +164,8 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 - **Performance mode toggle** — setting that reduces CPU/GPU load for lower-end hardware. Disables orb animations (glow/particle effects become static), disables CSS transitions where possible, potentially reduces polling frequency. Context: i5-7600K hits 20-30% CPU just from orb animation + TTS. CSS hooks (`body.perf-mode`) already in place. *(Deferred to post-Tauri.)*
 - **llama-server args drift** — launch args in `server.py` may have drifted from current llama.cpp API. Needs a pass against current docs.
 - **Import QA round-trip** — ongoing edge case testing as real use surfaces issues.
-- **Settings — show resolved paths for extras** — after wizard or detection, Settings should display `./features/packages/` path and espeak binary path so user can verify what's actually being used. Paths already stored in config; just needs Settings UI wiring.
+- **Settings — show resolved paths for extras** ✓ DONE (2026-05-03) — diagnostics now shows the exact path where each extra was found (venv in dev, python-embed in frozen). TTS error hint in Settings > Features also shows boot error message inline.
+- **`features/venv/` in `.gitignore`** — should be excluded from version control (local dev install dir, path-dependent). Quick add.
 
 ---
 

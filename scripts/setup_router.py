@@ -508,27 +508,60 @@ async def setup_download_model(request: Request):
 
 # ── Extras: pip Python resolver ───────────────────────────────────────────────
 
+def _find_preferred_python() -> str:
+    """
+    Find the best Python for creating the features venv.
+    Prefers 3.12 (most compatible with kokoro + chromadb deps).
+    Falls back through 3.11, system python3, then sys.executable.
+    """
+    import shutil, sys, subprocess
+    # Windows py launcher — covers standard python.org installs
+    py_launcher = shutil.which("py")
+    if py_launcher:
+        for ver in ("3.12", "3.11"):
+            try:
+                r = subprocess.run([py_launcher, f"-{ver}", "-c",
+                                    "import sys; print(sys.executable)"],
+                                   capture_output=True, text=True, timeout=5)
+                if r.returncode == 0 and r.stdout.strip():
+                    return r.stdout.strip()
+            except Exception:
+                pass
+    for name in ("python3.12", "python3.11", "python3"):
+        hit = shutil.which(name)
+        if hit:
+            return hit
+    return sys.executable
+
+
 def _get_pip_python() -> str:
     """
     Return the Python executable to use for pip installs.
 
     Priority:
-      1. Bundled Python embeddable (python-embed/python.exe) — zero system deps
-      2. System Python via PATH — Linux fallback / source-mode installs
-      3. sys.executable — source-mode dev (always has Python)
+      1. Bundled Python embeddable (python-embed/python.exe) — frozen mode
+      2. features/venv Python — dev mode (venv created with Python 3.12 if available)
+      3. sys.executable fallback if venv creation fails
     """
-    import shutil
-    import sys
-    from scripts.paths import PYTHON_EMBED_DIR
+    import sys, subprocess
+    from scripts.paths import PYTHON_EMBED_DIR, FEATURES_VENV_DIR
 
     if getattr(sys, "frozen", False):
+        import shutil
         for name in ("python.exe", "python3", "python"):
             candidate = PYTHON_EMBED_DIR / name
             if candidate.exists():
                 return str(candidate)
         return shutil.which("python3") or shutil.which("python") or sys.executable
 
-    return sys.executable
+    # Dev mode — create venv with preferred Python (3.12) if it doesn't exist yet
+    is_win  = sys.platform == "win32"
+    venv_py = FEATURES_VENV_DIR / ("Scripts/python.exe" if is_win else "bin/python")
+    if not venv_py.exists():
+        base_py = _find_preferred_python()
+        subprocess.run([base_py, "-m", "venv", str(FEATURES_VENV_DIR), "--upgrade-deps"],
+                       check=True)
+    return str(venv_py) if venv_py.exists() else sys.executable
 
 
 # ── Extras: package labels, pip names, install modes ──────────────────────────
@@ -552,6 +585,15 @@ _EXTRAS_INSTALL_MODE = {
     "memory": "embed",
 }
 
+# Package name used to detect whether an extra is installed.
+# Kept separate from _EXTRAS_META install order so detection checks the actual
+# feature package (e.g. "kokoro") rather than a common dep like "numpy" that
+# may already be present on the system and give a false positive.
+_EXTRAS_DETECT = {
+    "tts":    "kokoro",
+    "memory": "chromadb",
+}
+
 # Extra commands to run via the pip Python after the main install.
 # Each entry is a list of args passed to [python, *args].
 _EXTRAS_POST_CMDS = {
@@ -562,30 +604,23 @@ _EXTRAS_POST_CMDS = {
 
 def _detect_extra(key: str) -> dict:
     """
-    Check if an extra is installed, looking in the right location per install mode.
-    Uses the first package in the list as the primary indicator.
+    Check if an extra is installed in the right location for the current run mode.
+    Uses _EXTRAS_DETECT[key] as the indicator package.
     """
-    import sys, re
-    primary = _EXTRAS_META[key][0][0]  # first package in the list
-    mode    = _EXTRAS_INSTALL_MODE[key]
-    # Strip version specifiers so "numpy>=2.0" → "numpy" for import/path checks
-    primary_mod = re.split(r'[><=!~]', primary)[0].strip()
+    import sys
+    from scripts.paths import PYTHON_EMBED_DIR, FEATURES_VENV_DIR, venv_site_packages
+    primary_mod = _EXTRAS_DETECT[key]
 
-    if getattr(sys, "frozen", False) and mode == "embed":
-        from scripts.paths import PYTHON_EMBED_DIR
+    if getattr(sys, "frozen", False):
         embed_sp = PYTHON_EMBED_DIR / "Lib" / "site-packages" / primary_mod
         if embed_sp.is_dir():
             return {"installed": True, "path": str(embed_sp.parent), "source": "local"}
         return {"installed": False, "path": "", "source": ""}
 
-    if (FEATURES_PACKAGES_DIR / primary_mod).is_dir():
-        return {"installed": True, "path": str(FEATURES_PACKAGES_DIR), "source": "local"}
-
-    import importlib.util
-    spec = importlib.util.find_spec(primary_mod)
-    if spec and spec.origin:
-        return {"installed": True, "path": str(Path(spec.origin).parent.parent), "source": "system"}
-
+    # Dev mode — look in features/venv only (avoids false positives from system Python)
+    sp = venv_site_packages(FEATURES_VENV_DIR)
+    if sp and (sp / primary_mod).is_dir():
+        return {"installed": True, "path": str(sp), "source": "local"}
     return {"installed": False, "path": "", "source": ""}
 
 
@@ -688,6 +723,17 @@ async def setup_install_extras(request: Request):
                         if r.returncode != 0:
                             push({"type": "error", "message": f"post-install failed: {post_args} (exit {r.returncode})"})
                             return
+                    # Persist the install location in config so other components
+                    # know which Python / path to use without re-detecting.
+                    if key == "tts":
+                        try:
+                            from scripts.config import load_config, save_config
+                            cfg = load_config()
+                            cfg.setdefault("tts", {})["python_path"] = py
+                            save_config(cfg)
+                            push_log(f"[config] tts.python_path → {py}")
+                        except Exception as ce:
+                            push_log(f"[warn] could not save tts python_path: {ce}")
                     push({"type": "pkg_done"})
                 except Exception as exc:
                     push({"type": "error", "message": str(exc)})
