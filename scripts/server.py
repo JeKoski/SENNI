@@ -186,7 +186,7 @@ def _get_enabled_tools() -> dict[str, bool]:
     cfg = load_config()
     global_enabled: dict = cfg.get("tools_enabled", {})
 
-    companion_folder = cfg.get("companion_folder", "default")
+    companion_folder = cfg.get("companion_folder") or DEFAULTS["companion_folder"]
     try:
         comp_cfg = load_companion_config(companion_folder)
         per_companion: dict = comp_cfg.get("tools_enabled", {})
@@ -783,7 +783,7 @@ async def api_status():
     config = load_config()
 
     boot          = get_boot_status()
-    comp_folder   = config.get("companion_folder", "default")
+    comp_folder   = config.get("companion_folder") or DEFAULTS["companion_folder"]
     companion_cfg = load_companion_config(comp_folder)
     companion_cfg = migrate_avatar(comp_folder, companion_cfg)
     ctx_size      = config.get("server_args", {}).get("ctx", {}).get("value", 16384)
@@ -792,6 +792,7 @@ async def api_status():
     effective_gen = {**global_gen, **companion_gen}
 
     cfg_out = {k: v for k, v in config.items() if k != "first_run"}
+    cfg_out["companion_folder"] = comp_folder  # always pin resolved value so JS never gets empty
     # Companion-level first_mes overrides global config
     if companion_cfg.get("first_mes"):
         cfg_out["first_mes"] = companion_cfg["first_mes"]
@@ -971,7 +972,7 @@ async def api_list_templates():
 async def api_apply_template(request: Request):
     from scripts.config import sanitize_filename, confine_path
     body          = await request.json()
-    comp_folder   = sanitize_folder(body.get("companion_folder", "default"))
+    comp_folder   = sanitize_folder(body.get("companion_folder") or DEFAULTS["companion_folder"])
     tname         = body.get("template_name", "")
     filename      = sanitize_filename(body.get("filename") or tname)
     target_folder = sanitize_folder(body.get("target_folder", "soul"))

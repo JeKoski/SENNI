@@ -301,7 +301,7 @@ function _setOnlineIndicator(isOnline) {
 
 // ── Soul file helpers ─────────────────────────────────────────────────────────
 async function reloadSoulFiles() {
-  const folder = config.companion_folder || 'default';
+  const folder = config.companion_folder || (console.warn('[session] companion_folder missing from config, falling back to senni'), 'senni');
   try {
     const res  = await fetch(`/api/settings/soul/${folder}`);
     const data = await res.json();
@@ -325,7 +325,7 @@ async function reloadSoulFiles() {
 
 // ── Memory context helpers ────────────────────────────────────────────────────
 async function reloadMemoryContext() {
-  const folder = config.companion_folder || 'default';
+  const folder = config.companion_folder || (console.warn('[session] companion_folder missing from config, falling back to senni'), 'senni');
   const mood   = config.active_mood || null;
   try {
     const res  = await fetch('/api/memory/init', {
@@ -355,7 +355,7 @@ async function reloadMemoryContext() {
 }
 
 async function seedTemplates() {
-  const folder = config.companion_folder || 'default';
+  const folder = config.companion_folder || (console.warn('[session] companion_folder missing from config, falling back to senni'), 'senni');
   const seeds = [
     { template_name: 'soul.md', filename: 'soul.md', target_folder: 'soul' },
     { template_name: 'user_profile.md',       filename: 'user_profile.md',       target_folder: 'soul' },

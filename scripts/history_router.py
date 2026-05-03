@@ -17,7 +17,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import FileResponse
 
-from scripts.config import COMPANIONS_DIR, sanitize_folder
+from scripts.config import COMPANIONS_DIR, DEFAULTS, sanitize_folder
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def _sanitise_tab_id(tab_id: str) -> str:
 async def api_history_save(request: Request):
     """Save the current session for a tab."""
     body = await request.json()
-    comp_folder = body.get("companion_folder", "default")
+    comp_folder = body.get("companion_folder") or DEFAULTS["companion_folder"]
     tab_id = _sanitise_tab_id(body.get("tab_id", ""))
     session_id = body.get("session_id", _session_ts())
     title = body.get("title", "New chat")
@@ -114,7 +114,7 @@ async def api_history_save(request: Request):
 async def api_history_load(request: Request):
     """Load the latest session for a tab."""
     body = await request.json()
-    comp_folder = body.get("companion_folder", "default")
+    comp_folder = body.get("companion_folder") or DEFAULTS["companion_folder"]
     tab_id = _sanitise_tab_id(body.get("tab_id", ""))
 
     if not tab_id:
@@ -148,8 +148,9 @@ async def api_history_load(request: Request):
 
 
 @router.get("/api/history/list")
-async def api_history_list(companion_folder: str = "default"):
+async def api_history_list(companion_folder: str = ""):
     """List all tabs for a companion, returning their meta.json contents."""
+    companion_folder = companion_folder or DEFAULTS["companion_folder"]
     history_root = COMPANIONS_DIR / companion_folder / "history"
     if not history_root.exists():
         return {"ok": True, "tabs": []}

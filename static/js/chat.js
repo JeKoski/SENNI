@@ -154,7 +154,7 @@ function _openImageLightbox(src, alt) {
 
 // ── Conversation persistence ──────────────────────────────────────────────────
 function _historyKey() {
-  return `chat_history_${config.companion_folder || 'default'}`;
+  return `chat_history_${config.companion_folder || 'senni'}`;
 }
 
 function saveHistory() {
