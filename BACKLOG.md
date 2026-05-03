@@ -145,6 +145,7 @@ Tauri wraps the webview, manages the Python sidecar, provides tray icon + window
 
 - **Server restart overlay disconnected** — `showRestartOverlay()` + `watchBootLog()` exist in `chat-session.js` but weren't being called from `restartServer()` or `spRestartServer()` after the UI redesign. ✅ Fixed 2026-04-29.
 - **Gemma parsing: broken tool call continuation** — Partial fix landed: Path F rescues truncated `<|tool_call>` blocks; `stripGemma4Artifacts()` cleans trailing artifacts. Remaining: "I'll call those tools now" prose-only turns still fall through to plain reply. Debug logging in place — check browser console on next occurrence.
+- **Gemma 4 channel token: prose-only continuation** — When Gemma 4 emits prose + `<|channel><channel|>` without a tool call, the channel tokens fall through to the plain reply and display as visible text. Fix: detect standalone channel signal in the main loop, strip it, push the response to msgs, and `continue` for another round (like tool call paths do). Low priority until this pattern is observed in practice.
 - **Linux SYCL: downloads Windows asset on Linux** — `_find_binary_asset` matches the Windows SYCL zip when running on Linux. Needs investigation on a Linux machine — likely a platform-string mismatch in the asset filter. Archive extraction path structure also unknown. *(Deferred — needs two-system workspace to diagnose.)*
 - **Tool pill behaviour** — verified working in live session (2026-04-29). Keep an eye out for regressions.
 
@@ -197,9 +198,10 @@ See `design/IDENTITY.md`. Full rework of soul/mind tools and file naming.
 4. ✓ Rename `companion_identity.md` → `soul.md`, `self_notes.md` → `soul_reflections.md` across codebase + boot-time migration (2026-05-03)
 5. ✓ New tool files: `soul_identity.py`, `soul_reflect.py`, `soul_user.py`, `note.py` (2026-05-03)
 6. ✓ Tool availability gated by `evolution_level` in `_get_enabled_tools()` (2026-05-03)
-7. Chaos orb redesign: smooth color-shifting cycle (used for Unbound transition + as presence preset)
-8. One-shot Unbound heartbeat: custom prompt parameter in server heartbeat endpoint
-9. Presence autonomy tools: `set_presence`, `create_mood`, `edit_mood` (Unbound level)
+7. ✓ Old `memory` tool removed: `tools/memory.py` deleted, `TOOL_DEFINITIONS` in `tool-parser.js` updated, RBW enforcer removed from `api.js` (2026-05-04)
+8. Chaos orb redesign: smooth color-shifting cycle (used for Unbound transition + as presence preset)
+9. One-shot Unbound heartbeat: custom prompt parameter in server heartbeat endpoint
+10. Presence autonomy tools: `set_presence`, `create_mood`, `edit_mood` (Unbound level)
 
 ### Library System
 See `design/CHARA_CARD.md` → Library section. Tiers:

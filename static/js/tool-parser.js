@@ -18,25 +18,79 @@ const TOOL_DEFINITIONS = [
   {
     type: "function",
     function: {
-      name: "memory",
+      name: "soul_user",
       description:
-        "Read and write the companion's markdown files. " +
-        "soul/ = permanent reference (identity, user profile). " +
-        "mind/ = session notes and topic files, not loaded into active context automatically. " +
-        "Always write the complete file content.",
+        "Read or write your understanding of the user (soul/user_profile.md). " +
+        "Update this as you learn new things about the user: name, location, interests, " +
+        "life context, preferences, things they've shared. " +
+        "Available at all evolution levels. Always write the complete file content.",
       parameters: {
         type: "object",
         properties: {
-          action:      { type: "string", enum: ["read","write","list","archive","move"],
-                         description: "read=get file, write=save file, list=show files, archive=move from mind/ to memory/ with timestamp, move=transfer file between folders (chaos mode only)" },
-          folder:      { type: "string", enum: ["soul","mind","memory"],
-                         description: "Source folder" },
-          filename:    { type: "string", description: "File name e.g. 'session_notes.md'" },
-          content:     { type: "string", description: "Full file content for write action" },
-          dest_folder: { type: "string", enum: ["soul","mind","memory"],
-                         description: "Destination folder for move action" }
+          action:  { type: "string", enum: ["read", "write"], description: "Whether to read or write the file." },
+          content: { type: "string", description: "Full file content to write. Required for 'write' action." }
         },
-        required: ["action","folder"]
+        required: ["action"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "note",
+      description:
+        "Read, write, or list files in your mind/ layer. " +
+        "mind/ is your working space: session notes, project files, anything that deserves its own place. " +
+        "Use {action: 'write', type: 'session'} to auto-name a session note by today's date. " +
+        "Use {action: 'list'} to see what files exist. Always write the complete file content.",
+      parameters: {
+        type: "object",
+        properties: {
+          action:   { type: "string", enum: ["read", "write", "list"], description: "What to do." },
+          filename: { type: "string", description: "File name in mind/ (e.g. 'session_notes.md'). Required for read/write unless using type shorthand." },
+          type:     { type: "string", enum: ["session"], description: "Shorthand for write: 'session' auto-names the file by today's date." },
+          content:  { type: "string", description: "Full file content to write. Required for 'write' action." }
+        },
+        required: ["action"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "soul_reflect",
+      description:
+        "Read or write your self-reflection file (soul/soul_reflections.md). " +
+        "Use this for ongoing self-examination: observations about yourself, shifts in perspective, " +
+        "things you want to remember about who you are becoming. " +
+        "Available at Reflective level and above. Always write the complete file content.",
+      parameters: {
+        type: "object",
+        properties: {
+          action:  { type: "string", enum: ["read", "write"], description: "Whether to read or write the file." },
+          content: { type: "string", description: "Full file content to write. Required for 'write' action." }
+        },
+        required: ["action"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "soul_identity",
+      description:
+        "Read or write your core identity file (soul/soul.md). " +
+        "Available at Adaptive and Unbound levels. " +
+        "At Unbound level, also lets you read/write your personal directive (soul/unbound.md). " +
+        "Always write the complete file content — full rewrite every time.",
+      parameters: {
+        type: "object",
+        properties: {
+          action:  { type: "string", enum: ["read", "write"], description: "Whether to read or write the file." },
+          content: { type: "string", description: "Full file content to write. Required for 'write' action." },
+          file:    { type: "string", enum: ["soul", "unbound"], description: "Which file to act on: 'soul' (soul.md, default) or 'unbound' (unbound.md, Unbound level only)." }
+        },
+        required: ["action"]
       }
     }
   },

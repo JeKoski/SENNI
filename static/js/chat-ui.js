@@ -82,19 +82,23 @@ function scrollToBottom() {
   const el = document.getElementById('messages');
   if (el) {
     el.scrollTop = el.scrollHeight;
-    _userScrolled = false;  // hard scroll always resets the flag
+    _userScrolled    = false;
+    _scrollLockUntil = 0;  // hard scroll (user action) always clears the lock
   }
 }
 
 // ── Auto-scroll tracking ──────────────────────────────────────────────────────
-// When the user manually scrolls up during streaming we stop auto-scrolling.
-// scrollToBottom() (used on send, tab switch, etc.) always resets the flag.
-// scrollIfFollowing() is used by the streaming path — only scrolls when the
-// user hasn't scrolled away.
-let _userScrolled = false;
+// When the user scrolls up during streaming we stop auto-scrolling immediately
+// and hold off for 1.5 s so streaming can't fight them back to the bottom.
+// scrollToBottom() (send, tab switch, etc.) resets both flag and lock.
+// scrollIfFollowing() is used by the streaming path only.
+let _userScrolled    = false;
+let _scrollLockUntil = 0;    // epoch ms — ignore auto-scroll until this time
+let _prevScrollTop   = 0;
 
 function scrollIfFollowing() {
-  if (!_userScrolled) scrollToBottom();
+  if (_userScrolled || Date.now() < _scrollLockUntil) return;
+  scrollToBottom();
 }
 
 (function _initScrollTracking() {
@@ -104,8 +108,18 @@ function scrollIfFollowing() {
     el.addEventListener('scroll', () => {
       // Consider "at bottom" if within 80px — accounts for rounding and
       // the small gap that appears before the last bubble fully renders.
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-      _userScrolled = !atBottom;
+      const atBottom   = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      const scrolledUp = el.scrollTop < _prevScrollTop;
+      _prevScrollTop   = el.scrollTop;
+
+      if (atBottom) {
+        _userScrolled    = false;
+        _scrollLockUntil = 0;
+      } else {
+        _userScrolled = true;
+        // Upward scroll: lock auto-scroll so streaming can't immediately fight back.
+        if (scrolledUp) _scrollLockUntil = Date.now() + 1500;
+      }
     }, { passive: true });
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);

@@ -82,7 +82,7 @@ body.orb-inline .msg-row.companion .msg-controls {
 
 /* Only give the last message bottom clearance so the orb doesn't overlap it */
 .messages > :last-child {
-  margin-bottom: calc(var(--orb-size, 36px) - var(--orb-overlap-y) + 8px);
+  margin-bottom: 8px;
 }
 
 /* ── Scroll-to-bottom button ──────────────────────────────────────────────── */
