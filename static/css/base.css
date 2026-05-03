@@ -449,9 +449,9 @@ body::before {
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  /* Bottom padding accounts for #orb-home height (orb-size + 20px padding)
-     plus comfortable clearance above it so content never hides behind the orb. */
-  padding: 32px 40px calc(var(--orb-size, 36px) + 56px);
+  /* Bottom padding clears the #orb-home overlay (orb + its own padding ≈ 56px).
+     Extra clearance is provided by the last-child margin-bottom in orb.css. */
+  padding: 32px 40px calc(var(--orb-size, 36px) + 24px);
   display: flex;
   flex-direction: column;
   gap: 6px;

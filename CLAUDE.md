@@ -143,6 +143,27 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-05-04 (Channel token fix / Memory tool removal / UI polish)
+
+**Three fixes shipped.**
+
+### What changed
+
+**`static/js/api.js` — channel token prose preservation:** Path E/F were discarding prose inside `<|channel>...<channel|>` blocks (`.replace(..., "")` → `.replace(..., "$1")`). When Gemma 4 wraps its response inside a channel block before a tool call, the prose is now extracted rather than stripped, preventing bubble deletion.
+
+**`tools/memory.py` deleted.** Old generic memory tool removed. `static/js/tool-parser.js` `TOOL_DEFINITIONS` updated: `memory` replaced with `soul_user`, `note`, `soul_reflect`, `soul_identity` (in order of usage frequency / restriction level). `_enforceReadBeforeWrite` and `_readCache` stack removed from `api.js`. Soul-write side effect (`reloadSoulFiles`) updated to fire on the three new soul tools.
+
+**`static/js/chat-ui.js` — scroll lock:** Added `_scrollLockUntil` timestamp + `_prevScrollTop` tracker. Upward scroll now sets a 1.5 s lock — `scrollIfFollowing()` bails if the lock is active, so streaming can't fight the user back to the bottom. `scrollToBottom()` (send, tab switch) clears the lock.
+
+**`static/css/base.css` + `static/css/orb.css` — bottom spacing:** Bottom padding reduced from `orb-size + 56px` to `orb-size + 24px`; last-child margin-bottom simplified from `calc(orb-size - overlap + 8px)` to `8px`. Total clearance below last message: ~68px (down from ~128px), leaving ~12px gap above the orb.
+
+### Still open
+- **Double memory-server shutdown message** — cosmetic, not investigated.
+- **TTS voice list on existing install** — fresh-install test still recommended.
+- **Channel token: prose-only continuation** — when Gemma 4 emits prose + `<|channel><channel|>` without a tool call, the channel tokens currently fall through to the plain reply path and display as visible text. Future: detect standalone channel signal, strip it, and give the model another turn.
+
+---
+
 ## Session notes — 2026-05-03 (TTS voices / Gemma prose / Identity refactor / Reinstall / Default folder fix)
 
 **All four backlog items completed. `companions/default/` bug root-caused and fixed.**

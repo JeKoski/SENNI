@@ -80,8 +80,6 @@ async function callModel(system, messages, abortSignal = null) {
   const gen       = config.generation || {};
   const maxRounds = gen.max_tool_rounds ?? 8;
 
-  _clearReadCache();
-
   const _activeTab = (typeof _tabs !== "undefined") && _tabs.find(t => t.id === _activeTabId);
   // visionMode drives how images in conversationHistory are sent to the model.
   // 'once'   = encode only on the message that introduced the image; substitute text for older turns.
@@ -240,7 +238,7 @@ async function callModel(system, messages, abortSignal = null) {
         if (typeof ttsStop === "function") ttsStop();
         // Preserve any prose that appeared before the tool call tokens
         const prose = stripGemma4Artifacts(
-          rawText.replace(/<\|channel>[\s\S]*?<channel\|>/g, "")
+          rawText.replace(/<\|channel>([\s\S]*?)<channel\|>/g, "$1")
         ).trim();
         if (prose) {
           _finaliseStreamBubble(bubbleHandle, prose);
@@ -270,7 +268,7 @@ async function callModel(system, messages, abortSignal = null) {
         if (bubbleHandle) {
           if (typeof ttsStop === "function") ttsStop();
           const prose = stripGemma4Artifacts(
-            rawText.replace(/<\|channel>[\s\S]*?<channel\|>/g, "")
+            rawText.replace(/<\|channel>([\s\S]*?)<channel\|>/g, "$1")
           ).trim();
           if (prose) {
             _finaliseStreamBubble(bubbleHandle, prose);
@@ -557,28 +555,6 @@ function _removeStreamBubble({ row } = {}) {
   row?.remove();
 }
 
-// ── Read-before-write enforcer ────────────────────────────────────────────────
-const _readCache = {};
-
-function _clearReadCache() {
-  Object.keys(_readCache).forEach(k => delete _readCache[k]);
-}
-
-async function _enforceReadBeforeWrite(args) {
-  if (args.action !== "write" || !args.filename) return;
-  const key = `${args.folder}/${args.filename}`;
-  if (_readCache[key] !== undefined) return;
-
-  console.log(`[rbw] auto-reading ${key} before write`);
-  try {
-    const current = await callTool("memory", { action: "read", folder: args.folder, filename: args.filename });
-    _readCache[key] = current;
-    console.log(`[rbw] current content (${current.length} chars)`);
-  } catch {
-    _readCache[key] = "";
-  }
-}
-
 // ── Execute one tool ──────────────────────────────────────────────────────────
 async function _execTool(name, args) {
   console.log(`[tool] ${name}`, JSON.stringify(args).slice(0, 300));
@@ -586,26 +562,12 @@ async function _execTool(name, args) {
 
   let result = "";
   try {
-    if (name === "memory") {
-      if (args.action === "read" && args.filename) {
-        _readCache[`${args.folder}/${args.filename}`] = "__pending__";
-      }
-      if (args.action === "write") {
-        await _enforceReadBeforeWrite(args);
-      }
-    }
-
     result = await callTool(name, args);
 
-    if (name === "memory" && args.action === "read" && args.filename) {
-      _readCache[`${args.folder}/${args.filename}`] = result;
-    }
-
-    if (name === "memory" && args.action === "write" && args.folder === "soul") {
+    const isSoulWrite = args.action === "write" &&
+      (name === "soul_identity" || name === "soul_reflect" || name === "soul_user");
+    if (isSoulWrite) {
       await reloadSoulFiles();
-    }
-    if (name === "memory" && args.action === "write") {
-      if (typeof updateMemoryCounts === "function") updateMemoryCounts();
     }
 
   } catch (e) {
