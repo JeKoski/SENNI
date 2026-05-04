@@ -33,7 +33,8 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
-    "externalBin": ["../dist/senni-backend"]
+    "externalBin": ["../dist/senni-backend"],
+    "createUpdaterArtifacts": true
   },
   "plugins": {
     "updater": {
