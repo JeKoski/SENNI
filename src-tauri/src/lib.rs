@@ -132,20 +132,22 @@ fn dirs_home() -> PathBuf {
 // ── Health poll ────────────────────────────────────────────────────────────────
 
 fn poll_health(timeout_secs: u64) -> Result<(), String> {
-    let deadline =
-        std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    // Use 127.0.0.1 explicitly — on Windows 11 "localhost" resolves to ::1 (IPv6)
+    // first, but uvicorn binds to 127.0.0.1 (IPv4), causing every attempt to fail.
+    let url      = "http://127.0.0.1:8000/api/health";
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    let mut last_err = String::from("no attempts made");
 
     loop {
         if std::time::Instant::now() >= deadline {
-            return Err(format!("health check timed out after {timeout_secs}s"));
+            return Err(format!(
+                "health check timed out after {timeout_secs}s\nLast error: {last_err}"
+            ));
         }
-        let result = ureq::get("http://localhost:8000/api/health")
-            .timeout(std::time::Duration::from_secs(2))
-            .call();
-        if let Ok(resp) = result {
-            if resp.status() == 200 {
-                return Ok(());
-            }
+        match ureq::get(url).timeout(std::time::Duration::from_secs(2)).call() {
+            Ok(resp) if resp.status() == 200 => return Ok(()),
+            Ok(resp) => last_err = format!("HTTP {}", resp.status()),
+            Err(e)   => last_err = e.to_string(),
         }
         std::thread::sleep(std::time::Duration::from_millis(250));
     }
