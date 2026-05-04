@@ -186,3 +186,66 @@ async function spLoad() {
     if (title) title.textContent = origTitle;
   }
 }
+
+// ── About tab — Tauri-only server controls ────────────────────────────────────
+
+function spInitAboutTauri() {
+  if (!window.__TAURI__) return;
+  document.getElementById('tauri-server-section').style.display = '';
+  window.__TAURI__.core.invoke('get_tauri_prefs_cmd').then(prefs => {
+    const tog = document.getElementById('tog-show-console');
+    if (tog) tog.classList.toggle('on', !!prefs?.show_console);
+  }).catch(() => {});
+  window.__TAURI__.core.invoke('get_log_file_path').then(path => {
+    const el  = document.getElementById('server-log-path-row');
+    const txt = document.getElementById('server-log-path');
+    if (el && txt && path) { txt.textContent = path; el.style.display = ''; }
+  }).catch(() => {});
+}
+
+async function openServerLog(forceOpen = false) {
+  if (!window.__TAURI__) return;
+  const overlay = document.getElementById('settings-overlay');
+  if (!overlay?.classList.contains('open')) await openSettings();
+  spSwitchTab('about');
+
+  const panel      = document.getElementById('server-log-panel');
+  const refreshBtn = document.getElementById('btn-refresh-log');
+  if (!panel) return;
+
+  if (!forceOpen && panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    if (refreshBtn) refreshBtn.style.display = 'none';
+    return;
+  }
+
+  panel.textContent = 'Loading…';
+  panel.style.display = '';
+  if (refreshBtn) refreshBtn.style.display = '';
+  await _loadServerLog(panel);
+}
+
+async function refreshServerLog() {
+  const panel = document.getElementById('server-log-panel');
+  if (!panel || !window.__TAURI__) return;
+  panel.textContent = 'Loading…';
+  await _loadServerLog(panel);
+}
+
+async function _loadServerLog(panel) {
+  try {
+    const lines = await window.__TAURI__.core.invoke('get_sidecar_log');
+    panel.textContent = lines.length ? lines.join('\n') : '(no output captured yet)';
+    panel.scrollTop = panel.scrollHeight;
+  } catch (e) {
+    panel.textContent = `Error: ${e}`;
+  }
+}
+
+function spToggleShowConsole(el) {
+  if (!window.__TAURI__) return;
+  el.classList.toggle('on');
+  const note = document.getElementById('show-console-note');
+  if (note) note.style.display = el.classList.contains('on') ? '' : 'none';
+  window.__TAURI__.core.invoke('set_show_console', { value: el.classList.contains('on') }).catch(() => {});
+}

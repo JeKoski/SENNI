@@ -58,6 +58,25 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+# When running as a Tauri sidecar, also write all logs to a rotating file so
+# users can share senni.log for bug reports.
+if os.environ.get("SENNI_TAURI"):
+    try:
+        import logging.handlers as _lh
+        from scripts.paths import DATA_ROOT as _DATA_ROOT
+        _log_path = _DATA_ROOT / "senni.log"
+        _log_path.parent.mkdir(parents=True, exist_ok=True)
+        _fh = _lh.RotatingFileHandler(
+            _log_path, maxBytes=5 * 1024 * 1024, backupCount=2, encoding="utf-8"
+        )
+        _fh.setFormatter(logging.Formatter(
+            "%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
+            datefmt="%H:%M:%S",
+        ))
+        logging.getLogger().addHandler(_fh)
+    except Exception:
+        pass
+
 # ── Dependency check ───────────────────────────────────────────────────────────
 
 REQUIRED = ["fastapi", "uvicorn"]

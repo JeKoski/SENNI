@@ -307,6 +307,7 @@ def _run_subprocess(full_cmd, shell_args: dict, env: dict) -> None:
                 continue
 
             print(f"[llama-server] {line}", flush=True)
+            log.info("[llama-server] %s", line)   # also routes to file handler in Tauri
             _boot_log.append(line)
             if len(_boot_log) > 2000:
                 _boot_log = _boot_log[-1000:]

@@ -184,55 +184,11 @@ function spPopulateAbout() {
     (cfg.mmproj_path   ? `mmproj: ${cfg.mmproj_path}\n`   : '') +
     (cfg.server_binary ? `binary: ${cfg.server_binary}\n` : '');
 
-  // Show Tauri-only server controls when running inside Tauri
-  if (window.__TAURI__) {
-    document.getElementById('tauri-server-section').style.display = '';
-    window.__TAURI__.core.invoke('get_tauri_prefs_cmd').then(prefs => {
-      const tog = document.getElementById('tog-show-console');
-      if (tog) tog.classList.toggle('on', !!prefs?.show_console);
-    }).catch(() => {});
-  }
+  spInitAboutTauri();
 }
 
-// ── Tauri server log + console toggle ─────────────────────────────────────────
-
-async function openServerLog(forceOpen = false) {
-  if (!window.__TAURI__) return;
-  // Make sure Settings is open and About tab is active
-  const overlay = document.getElementById('settings-overlay');
-  if (!overlay?.classList.contains('open')) await openSettings();
-  spSwitchTab('about');
-
-  const panel = document.getElementById('server-log-panel');
-  if (!panel) return;
-
-  // Toggle unless forced open by tray
-  if (!forceOpen && panel.style.display !== 'none') {
-    panel.style.display = 'none';
-    return;
-  }
-
-  panel.textContent = 'Loading…';
-  panel.style.display = '';
-
-  try {
-    const lines = await window.__TAURI__.core.invoke('get_sidecar_log');
-    panel.textContent = lines.length ? lines.join('\n') : '(no output captured yet)';
-    // Scroll to bottom so newest lines are visible
-    panel.scrollTop = panel.scrollHeight;
-  } catch (e) {
-    panel.textContent = `Error: ${e}`;
-  }
-}
-
-function spToggleShowConsole(el) {
-  if (!window.__TAURI__) return;
-  el.classList.toggle('on');
-  const enabled = el.classList.contains('on');
-  const note = document.getElementById('show-console-note');
-  if (note) note.style.display = enabled ? '' : 'none';
-  window.__TAURI__.core.invoke('set_show_console', { value: enabled }).catch(() => {});
-}
+// spInitAboutTauri, openServerLog, refreshServerLog, spToggleShowConsole
+// live in settings.js — they belong to the main Settings panel, not companion settings.
 
 // ── Avatar crop ────────────────────────────────────────────────────────────────
 function spAvatarBrowse() { document.getElementById('sp-avatar-input')?.click(); }

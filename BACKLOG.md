@@ -119,11 +119,17 @@ Compile Python backend (`main.py` + all scripts + static files) into a single bi
 - `build-full.bat`: one-command full local build from clean worktree ✓
 
 **Phase 3 — remaining polish**
-- Loading screen: replace bare dark placeholder with existing boot animation; show active companion avatar — needs design decision (companion face vs generic spinner)
-- Crash monitor: auto-restart sidecar on unexpected exit, show dialog after N failures
-- Sidecar stdout/stderr capture → Tauri log
-- Linux AppImage CI job
-- Code signing (SmartScreen) via SignPath Foundation (free for OSS)
+- Loading screen ✓ (2026-05-04) — styled dark page, indigo spinner, companion avatar embedded from disk, 1s fade-out before app loads
+- Shutdown screen ✓ (2026-05-04) — "Shutting down…" page with 0.5s fade-in, shown on tray Quit
+- Console hidden ✓ (2026-05-04) — `CREATE_NO_WINDOW` on Windows; `tauri-prefs.json` toggle to opt back in; log accessible via About tab + tray right-click
+- Sidecar log capture ✓ (2026-05-04) — stdout/stderr piped to in-memory buffer + `senni.log` file (5MB rotating); llama-server output forwarded via Python logger; Tauri command returns log file contents
+- Crash monitor ✓ (2026-05-04) — polls sidecar every 2s; blocking error dialog on unexpected exit; Windows Job Object kills all children (including llama-server) if SENNI hard-crashes
+- `withGlobalTauri: true` ✓ (2026-05-04) — required for `window.__TAURI__` in Tauri v2; was silently breaking all frontend→Tauri commands
+- **`settings-companion.js` cleanup** — `spPopulateAbout` still lives there (pre-existing location) but Tauri About-tab helpers now correctly live in `settings.js`. Future: extract `spPopulateAbout` into `settings.js` or a new `settings-about.js`, rename/split `settings-companion.js` to reflect what it actually contains.
+- Crash monitor auto-restart — offer "Restart" button in the crash dialog rather than just quitting. Deferred.
+- Sidecar log live streaming — auto-refresh the log panel rather than manual Refresh button. Deferred.
+- Linux AppImage CI job — deferred
+- Code signing (SmartScreen) via SignPath Foundation (free for OSS) — deferred
 
 *Note: macOS not a current target. Requires Apple Developer account ($99/yr) for notarization.*
 
