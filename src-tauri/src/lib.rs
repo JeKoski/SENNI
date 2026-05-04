@@ -11,6 +11,13 @@ struct SidecarState(Mutex<Option<Child>>);
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // A second instance tried to launch — focus the existing window instead.
+            if let Some(win) = app.get_webview_window("main") {
+                win.show().ok();
+                win.set_focus().ok();
+            }
+        }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
