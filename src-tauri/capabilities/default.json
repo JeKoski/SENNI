@@ -4,7 +4,6 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "single-instance:default",
     "updater:default",
     "dialog:default"
   ]
