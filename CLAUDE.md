@@ -143,6 +143,48 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-05-04 (Tauri polish — boot/shutdown/CI fixes)
+
+**Installer boots correctly. Shutdown fast. Loading screen on startup.**
+
+### What changed
+
+**`src-tauri/tauri.conf.json`:** Replaced `externalBin` with `resources: {"../dist/senni-backend/": "senni-backend/"}` — was only bundling the exe, not the full one-dir PyInstaller output (DLLs etc). Changed identifier `com.senni.app` → `com.senni.desktop`.
+
+**`src-tauri/src/lib.rs`:**
+- `spawn_sidecar()` simplified — looks for `resources/senni-backend/senni-backend.exe`, no more triple-suffix gymnastics
+- `poll_health()` + `shutdown_sidecar()` — changed `localhost` → `127.0.0.1` throughout; Windows 11 resolves `localhost` to `::1` (IPv6) first but uvicorn binds IPv4 only, causing all health polls and shutdown POSTs to silently fail
+- Added `tauri-plugin-single-instance` — prevents multiple instances competing for port 8000
+- Loading screen: window now shows immediately with a minimal dark loading page; `navigate_to_app()` called after health passes instead of `show_window()`
+- `SENNI_TAURI=1` env var passed to sidecar on spawn
+
+**`main.py`:** Skip `webbrowser.open()` when `SENNI_TAURI` env var is set (running as Tauri sidecar).
+
+**`build-full.bat` (new):** Single script for full local builds from a clean worktree. Installs Rust, tauri-cli, python-embed, deps, PyInstaller, then builds Tauri installer. `--rebuild` flag forces PyInstaller rebuild; otherwise skips if sidecar already exists.
+
+**`.github/workflows/release.yml`:** Removed triple-suffix copy step (no longer needed with `resources` approach).
+
+**`build-embed.bat` + `dev-tauri.bat`:** Removed triple-suffix copy steps and placeholder creation.
+
+### Key gotchas
+
+- `localhost` vs `127.0.0.1` — Windows 11 prefers IPv6 for `localhost`. Use `127.0.0.1` everywhere in Rust for loopback connections.
+- `externalBin` only bundles a single exe — use `resources` to bundle a full one-dir PyInstaller output.
+- `tauri-plugin-single-instance` has no capability permission — don't add one, it works via OS mutex only.
+- Signing env vars (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) set as User variables in Windows for local builds.
+
+### Loading screen — design note
+Current loading screen is a bare dark placeholder. Existing boot animation (spinner → server log) already exists in the web UI and is used on boot, wizard completion, and server restart. Next step: wire the Tauri loading screen into this existing flow — consider showing the active companion's face/avatar rather than a generic spinner, since SENNI is a framework and the companion is the personality.
+
+### Still open
+- Crash monitor (auto-restart on unexpected sidecar exit) — deferred
+- Sidecar stdout/stderr capture to Tauri log — deferred
+- Linux AppImage CI job — deferred
+- Code signing (SmartScreen) via SignPath Foundation — deferred
+- Loading screen: wire into existing boot animation, show active companion avatar
+
+---
+
 ## Session notes — 2026-05-04 (Auto-updater + CI/CD — Phase 3 complete)
 
 **Phase 3 fully shippable. Signed installers + auto-updater live on GitHub Releases.**

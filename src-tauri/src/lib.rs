@@ -22,9 +22,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
         .setup(|app| {
+            // Show the loading screen immediately so the window appears at once.
+            show_loading(app.handle());
+
             if std::env::var("SENNI_SKIP_SIDECAR").is_ok() {
                 // Dev mode: Python server assumed to be running on :8000 externally
-                show_window(app.handle());
+                navigate_to_app(app.handle());
                 spawn_update_check(app.handle());
                 setup_tray(app)?;
                 return Ok(());
@@ -37,7 +40,7 @@ pub fn run() {
             std::thread::spawn(move || {
                 match poll_health(60) {
                     Ok(()) => {
-                        show_window(&handle);
+                        navigate_to_app(&handle);
                         spawn_update_check(&handle);
                     }
                     Err(e) => {
@@ -155,18 +158,38 @@ fn poll_health(timeout_secs: u64) -> Result<(), String> {
 
 // ── Window helpers ─────────────────────────────────────────────────────────────
 
-fn show_window(app: &tauri::AppHandle) {
+fn show_loading(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
+        let _ = win.navigate(
+            "data:text/html,<!DOCTYPE html>\
+            <html><head><meta charset='utf-8'>\
+            <style>*{margin:0;padding:0}body{background:#0d0d0f;display:flex;\
+            align-items:center;justify-content:center;height:100vh;\
+            color:#555;font:16px system-ui,sans-serif;letter-spacing:.05em}\
+            </style></head><body>SENNI</body></html>"
+                .parse()
+                .expect("loading URL"),
+        );
         win.show().ok();
         win.set_focus().ok();
+    }
+}
+
+fn navigate_to_app(app: &tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.navigate(
+            "http://127.0.0.1:8000"
+                .parse()
+                .expect("app URL"),
+        );
     }
 }
 
 // ── Graceful shutdown ──────────────────────────────────────────────────────────
 
 fn shutdown_sidecar(app: &tauri::AppHandle) {
-    // Ask the sidecar to shut down cleanly first
-    let _ = ureq::post("http://localhost:8000/api/shutdown")
+    // Use 127.0.0.1 explicitly — same IPv6 resolution issue as the health poll.
+    let _ = ureq::post("http://127.0.0.1:8000/api/shutdown")
         .timeout(std::time::Duration::from_secs(2))
         .call();
 

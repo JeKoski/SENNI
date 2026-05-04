@@ -114,7 +114,16 @@ Compile Python backend (`main.py` + all scripts + static files) into a single bi
 - Tauri v2 shell: sidecar spawn, health poll, graceful shutdown, tray ✓
 - Auto-updater: `tauri-plugin-updater` + `tauri-plugin-dialog`, background check on startup, native dialog ✓
 - CI/CD: `tauri-apps/tauri-action@v0` — signed `.msi` + NSIS `.exe` + `.sig` + `latest.json` on GitHub Releases ✓
-- Deferred: crash monitor, sidecar log capture, Linux AppImage CI job, SmartScreen code signing (SignPath Foundation)
+- Single-instance enforcement: `tauri-plugin-single-instance` ✓
+- Installer boots correctly, shutdown fast, loading screen on startup ✓
+- `build-full.bat`: one-command full local build from clean worktree ✓
+
+**Phase 3 — remaining polish**
+- Loading screen: replace bare dark placeholder with existing boot animation; show active companion avatar — needs design decision (companion face vs generic spinner)
+- Crash monitor: auto-restart sidecar on unexpected exit, show dialog after N failures
+- Sidecar stdout/stderr capture → Tauri log
+- Linux AppImage CI job
+- Code signing (SmartScreen) via SignPath Foundation (free for OSS)
 
 *Note: macOS not a current target. Requires Apple Developer account ($99/yr) for notarization.*
 
