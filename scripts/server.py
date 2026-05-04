@@ -245,6 +245,12 @@ async def on_startup():
     _tool_manifest = load_tools()
     log.info("Server ready. %d tools loaded.", len(_tool_manifest))
 
+    # First-run seed: if DATA_ROOT is freshly created (e.g. Tauri install with
+    # SENNI_DATA_ROOT pointing at a new platform data dir), write default config.
+    if not CONFIG_FILE.exists():
+        save_config(load_config())
+        log.info("First run: wrote default config to %s", CONFIG_FILE)
+
     _migrate_soul_filenames()
 
     cfg = load_config()
@@ -295,6 +301,26 @@ async def on_shutdown():
     kill_tts_server()
     kill_memory_server()
     _executor.shutdown(wait=False)
+
+
+# ── Sidecar management (used by Tauri shell) ───────────────────────────────────
+
+@app.get("/api/health")
+async def api_health():
+    return {"status": "ok"}
+
+
+@app.post("/api/shutdown")
+async def api_shutdown():
+    """Tauri sidecar: graceful shutdown. Kills child processes then exits."""
+    async def _deferred_exit():
+        await asyncio.sleep(0.5)  # let the HTTP response flush
+        kill_llama_server()
+        kill_tts_server()
+        kill_memory_server()
+        os._exit(0)
+    asyncio.create_task(_deferred_exit())
+    return {"ok": True}
 
 
 # ── UI routes ──────────────────────────────────────────────────────────────────

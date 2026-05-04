@@ -1,0 +1,8 @@
+{
+  "identifier": "default",
+  "description": "Default capability — local webview talking to localhost:8000",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}

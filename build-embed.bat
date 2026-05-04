@@ -32,4 +32,12 @@ if errorlevel 1 (
 )
 
 "%PYTHON%" -m PyInstaller senni-backend.spec
+if errorlevel 1 ( echo PyInstaller build failed & pause & exit /b 1 )
+
+:: Tauri v2 expects the sidecar binary suffixed with the target triple.
+:: Copy the output so both names exist alongside each other.
+echo Copying dist\senni-backend.exe to triple-suffixed name for Tauri...
+copy /Y "dist\senni-backend.exe" "dist\senni-backend-x86_64-pc-windows-msvc.exe"
+if errorlevel 1 ( echo Copy failed & pause & exit /b 1 )
+
 pause
