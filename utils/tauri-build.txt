@@ -1,0 +1,13 @@
+# Automates installing all dependencies for building PyInstaller sidecar for SENNI server & Tauri for frontend
+
+1) Install Rust via rustup if missing
+2) Install tauri-cli if missing
+3) Download + bootstrap python-embed if missing
+4) Install deps + PyInstaller into python-embed if missing, then build the sidecar
+5) Build the Tauri installer
+
+Run `build-full.bat` in main folder
+
+## To rerun step 4 (PyInstaller + Sidecar build) - when python code changes, run in cmd/terminal:
+
+`build-full.bat --rebuild`
