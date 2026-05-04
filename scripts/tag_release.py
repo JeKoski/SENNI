@@ -18,6 +18,13 @@ def _run(cmd: list[str], capture: bool = False) -> str | int:
     return result.stdout.strip() if capture else result.returncode
 
 
+def _remote() -> str:
+    """Return the push remote name (falls back to 'origin')."""
+    out = _run(["git", "remote"], capture=True)
+    remotes = out.splitlines()
+    return remotes[0] if remotes else "origin"
+
+
 def _latest_tag() -> str | None:
     out = _run(["git", "tag", "--sort=-version:refname"], capture=True)
     tags = [t for t in out.splitlines() if t.startswith("v")]
@@ -86,13 +93,13 @@ def main() -> None:
         print("ERROR: git tag failed.")
         sys.exit(1)
 
-    if _run(["git", "push", "origin", tag]) != 0:
+    remote = _remote()
+    if _run(["git", "push", remote, tag]) != 0:
         print("ERROR: git push failed — rolling back local tag.")
         _run(["git", "tag", "-d", tag])
         sys.exit(1)
 
     print(f"  Done! Release workflow triggered for {tag}.")
-    print(f"  https://github.com/JeKoski/SENNI/actions")
     print()
 
 
