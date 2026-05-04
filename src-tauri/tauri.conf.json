@@ -34,5 +34,13 @@
       "icons/icon.png"
     ],
     "externalBin": ["../dist/senni-backend"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ0RTUzN0VCNjUzNDA3QUEKUldTcUJ6Umw2emZsMUphNElDMEN0VHJ5dGlqalNjQ1E3cEcrM1ZGcXBOWjF0RDA4d1NacWprby8K",
+      "endpoints": [
+        "https://github.com/JeKoski/SENNI/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

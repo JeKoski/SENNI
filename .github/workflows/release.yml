@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── Python sidecar ─────────────────────────────────────────────────────
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -30,13 +31,31 @@ jobs:
       - name: Install PyInstaller into python-embed
         run: .\python-embed\python.exe -m pip install --no-warn-script-location pyinstaller
 
-      - name: Build with PyInstaller
+      - name: Build Python sidecar
         run: .\python-embed\python.exe -m PyInstaller senni-backend.spec
 
-      - name: Zip output
-        run: Compress-Archive -Path dist\senni-backend\* -DestinationPath senni-backend-windows-x64.zip
+      - name: Copy triple-suffixed sidecar binary
+        run: copy dist\senni-backend.exe "dist\senni-backend-x86_64-pc-windows-msvc.exe"
 
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
+      # ── Tauri build + sign + release ───────────────────────────────────────
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust build cache
+        uses: swatinem/rust-cache@v2
         with:
-          files: senni-backend-windows-x64.zip
+          workspaces: "./src-tauri -> target"
+
+      - name: Build and publish Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "SENNI ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install SENNI."
+          releaseDraft: false
+          prerelease: false
+          updaterJsonPreferNsis: true

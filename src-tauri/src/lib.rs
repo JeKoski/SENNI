@@ -11,11 +11,14 @@ struct SidecarState(Mutex<Option<Child>>);
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
         .setup(|app| {
             if std::env::var("SENNI_SKIP_SIDECAR").is_ok() {
                 // Dev mode: Python server assumed to be running on :8000 externally
                 show_window(app.handle());
+                spawn_update_check(app.handle());
                 setup_tray(app)?;
                 return Ok(());
             }
@@ -26,7 +29,10 @@ pub fn run() {
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 match poll_health(30) {
-                    Ok(()) => show_window(&handle),
+                    Ok(()) => {
+                        show_window(&handle);
+                        spawn_update_check(&handle);
+                    }
                     Err(e) => {
                         eprintln!("SENNI: sidecar health check failed: {e}");
                         handle.exit(1);
@@ -192,6 +198,41 @@ fn force_kill(child: &mut Child) {
         // SIGKILL — atexit won't run, but we already sent /api/shutdown above
         let _ = child.kill();
     }
+}
+
+// ── Auto-updater ───────────────────────────────────────────────────────────────
+
+fn spawn_update_check(app: &tauri::AppHandle) {
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = check_for_updates(&handle).await {
+            eprintln!("SENNI: update check: {e}");
+        }
+    });
+}
+
+async fn check_for_updates(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri_plugin_dialog::DialogExt;
+    use tauri_plugin_updater::UpdaterExt;
+
+    let Some(update) = app.updater()?.check().await? else {
+        return Ok(());
+    };
+
+    let version = update.version.clone();
+    let notes   = update.body.clone().unwrap_or_default();
+    let msg     = format!("SENNI {version} is available.\n\n{notes}\n\nInstall now?");
+
+    let install = app.dialog()
+        .message(msg)
+        .title("Update Available")
+        .blocking_show();
+
+    if install {
+        update.download_and_install(|_, _| {}, || {}).await?;
+        app.restart();
+    }
+    Ok(())
 }
 
 // ── System tray ────────────────────────────────────────────────────────────────
