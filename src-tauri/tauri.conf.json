@@ -1,7 +1,7 @@
 {
   "productName": "SENNI",
   "version": "0.1.0",
-  "identifier": "com.senni.app",
+  "identifier": "com.senni.desktop",
   "build": {
     "devUrl": "http://localhost:8000",
     "frontendDist": "http://localhost:8000"
@@ -33,7 +33,9 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
-    "externalBin": ["../dist/senni-backend"],
+    "resources": {
+      "../dist/senni-backend/": "senni-backend/"
+    },
     "createUpdaterArtifacts": true
   },
   "plugins": {

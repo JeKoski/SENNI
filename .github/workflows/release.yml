@@ -34,9 +34,6 @@ jobs:
       - name: Build Python sidecar
         run: .\python-embed\python.exe -m PyInstaller senni-backend.spec
 
-      - name: Copy triple-suffixed sidecar binary
-        run: copy dist\senni-backend\senni-backend.exe "dist\senni-backend-x86_64-pc-windows-msvc.exe"
-
       # ── Tauri build + sign + release ───────────────────────────────────────
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable

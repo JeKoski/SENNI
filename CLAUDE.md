@@ -143,6 +143,39 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-05-04 (Auto-updater + CI/CD — Phase 3 complete)
+
+**Phase 3 fully shippable. Signed installers + auto-updater live on GitHub Releases.**
+
+### What changed
+
+**`src-tauri/Cargo.toml`:** Added `tauri-plugin-updater = "2"` and `tauri-plugin-dialog = "2"`.
+
+**`src-tauri/tauri.conf.json`:** Added `plugins.updater` block (pubkey + GitHub `latest.json` endpoint). Added `bundle.createUpdaterArtifacts: true` — required for Tauri to generate `.sig` + `.nsis.zip` update packages. Changed identifier from `com.senni.app` → `com.senni.desktop` (avoid macOS `.app` extension conflict).
+
+**`src-tauri/capabilities/default.json`:** Added `updater:default` and `dialog:default` permissions.
+
+**`src-tauri/src/lib.rs`:** Registered `tauri_plugin_updater` and `tauri_plugin_dialog`. Added `spawn_update_check()` called after window is shown (both normal and `SENNI_SKIP_SIDECAR` paths). Added `check_for_updates()` async fn — background check on startup, native dialog if update found, `download_and_install` + `app.restart()` on confirm.
+
+**`.github/workflows/release.yml`:** Full rewrite. Now: (1) builds Python sidecar via PyInstaller, (2) copies triple-suffixed binary, (3) runs `tauri-apps/tauri-action@v0` which compiles Tauri, signs installers, creates GitHub Release, uploads `.msi` + NSIS `.exe` + `.sig` files + `latest.json`.
+
+**`build-embed.bat`:** Fixed sidecar copy path — was `dist\senni-backend.exe` (wrong), now `dist\senni-backend\senni-backend.exe` (correct for one-dir PyInstaller output).
+
+### Gotchas for future reference
+
+- `createUpdaterArtifacts: true` goes in `bundle`, not `plugins.updater` — without it, no `.sig` files are generated and `latest.json` is never produced
+- `tauri-action` input is `includeUpdaterJson`, not `uploadUpdaterJson`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` must be set as a GitHub secret if key was generated with a password; absent secret = empty string (correct for passwordless keys)
+- PyInstaller one-dir output: exe is at `dist\senni-backend\senni-backend.exe`, not `dist\senni-backend.exe`
+
+### Still open
+- Crash monitor (auto-restart on unexpected sidecar exit) — deferred
+- Sidecar stdout/stderr capture to Tauri log — deferred
+- Linux AppImage CI job — deferred
+- Code signing (SmartScreen) via SignPath Foundation — deferred
+
+---
+
 ## Session notes — 2026-05-04 (Tauri v2 core shell — Phase 3)
 
 **Tauri v2 shell scaffolded and booting. First dev run successful.**
