@@ -43,6 +43,7 @@ pub fn run() {
         .manage(SidecarLog(Mutex::new(VecDeque::new())))
         .invoke_handler(tauri::generate_handler![
             get_sidecar_log,
+            get_log_file_path,
             get_tauri_prefs_cmd,
             set_show_console,
         ])
@@ -143,6 +144,11 @@ fn spawn_sidecar(app: &tauri::AppHandle) -> Result<Child, Box<dyn std::error::Er
     let mut child = cmd.spawn()?;
     eprintln!("SENNI: sidecar spawned (pid {})", child.id());
 
+    // Place all child processes under a Windows Job Object so they are
+    // automatically terminated when SENNI.exe exits (even on hard crash).
+    #[cfg(windows)]
+    attach_job_object(&child);
+
     // Take pipe handles before storing child; spawn log reader threads.
     if let Some(stdout) = child.stdout.take() {
         spawn_log_reader(app.clone(), Box::new(stdout));
@@ -164,6 +170,37 @@ fn spawn_log_reader(app: tauri::AppHandle, reader: Box<dyn std::io::Read + Send>
             log.push_back(line);
         }
     });
+}
+
+// ── Windows Job Object ─────────────────────────────────────────────────────────
+
+#[cfg(windows)]
+fn attach_job_object(child: &std::process::Child) {
+    use std::os::windows::io::AsRawHandle;
+
+    extern "system" {
+        fn CreateJobObjectW(attrs: usize, name: usize) -> isize;
+        fn SetInformationJobObject(job: isize, class: u32, info: *const u8, len: u32) -> i32;
+        fn AssignProcessToJobObject(job: isize, process: isize) -> i32;
+    }
+
+    unsafe {
+        let job = CreateJobObjectW(0, 0);
+        if job == 0 { return; }
+
+        // JOBOBJECT_EXTENDED_LIMIT_INFORMATION — 144 bytes on x64 Windows.
+        // LimitFlags (u32) lives at offset 16 (after two LARGE_INTEGER fields).
+        // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000: all processes in the job
+        // are killed when the last handle to the job object is closed (i.e. when
+        // SENNI.exe exits), preventing orphaned llama-server processes.
+        let mut info = [0u8; 144];
+        info[16..20].copy_from_slice(&0x2000u32.to_ne_bytes());
+        SetInformationJobObject(job, 9, info.as_ptr(), 144); // 9 = JobObjectExtendedLimitInformation
+        AssignProcessToJobObject(job, child.as_raw_handle() as isize);
+
+        // The job handle (isize = Copy, no Drop) is intentionally never closed here.
+        // The OS holds it open for the lifetime of SENNI.exe and auto-closes on exit.
+    }
 }
 
 fn platform_data_root() -> PathBuf {
@@ -332,11 +369,37 @@ fn show_loading(app: &tauri::AppHandle) {
 
 fn navigate_to_app(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
-        let _ = win.navigate(
-            "http://127.0.0.1:8000"
-                .parse()
-                .expect("app URL"),
-        );
+        // Fade out the loading screen over 1 s before handing off to the app.
+        win.eval(
+            "document.body.style.transition='opacity 1s ease';\
+             document.body.style.opacity='0'"
+        ).ok();
+        std::thread::sleep(std::time::Duration::from_millis(1050));
+        let _ = win.navigate("http://127.0.0.1:8000".parse().expect("app URL"));
+    }
+}
+
+fn build_shutdown_html() -> String {
+    "<!DOCTYPE html><html><head><meta charset='utf-8'><style>\
+    *{margin:0;padding:0;box-sizing:border-box}\
+    body{background:#0d0d0f;display:flex;flex-direction:column;\
+      align-items:center;justify-content:center;height:100vh;gap:14px;\
+      font-family:Georgia,'Times New Roman',serif;\
+      opacity:0;animation:fi .5s ease forwards}\
+    .lb{font-size:16px;color:rgba(238,240,251,0.7);letter-spacing:.04em}\
+    @keyframes fi{to{opacity:1}}\
+    </style></head><body>\
+    <div class='lb'>Shutting down\u{2026}</div>\
+    </body></html>".into()
+}
+
+fn show_shutdown_screen(app: &tauri::AppHandle) {
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(build_shutdown_html().as_bytes());
+    let url = format!("data:text/html;base64,{b64}");
+    if let Some(win) = app.get_webview_window("main") {
+        win.show().ok();
+        let _ = win.navigate(url.parse().expect("shutdown URL"));
     }
 }
 
@@ -425,7 +488,23 @@ async fn check_for_updates(app: &tauri::AppHandle) -> Result<(), Box<dyn std::er
 
 #[tauri::command]
 fn get_sidecar_log(state: tauri::State<'_, SidecarLog>) -> Vec<String> {
+    // Prefer the persistent log file — it includes Python logging + llama-server output.
+    let log_path = platform_data_root().join("senni.log");
+    if let Ok(content) = std::fs::read_to_string(&log_path) {
+        let all: Vec<String> = content.lines().map(String::from).collect();
+        if !all.is_empty() {
+            let start = all.len().saturating_sub(1000);
+            return all[start..].to_vec();
+        }
+    }
+    // Fall back to in-memory stdout/stderr capture
     state.0.lock().unwrap().iter().cloned().collect()
+}
+
+#[tauri::command]
+fn get_log_file_path() -> Option<String> {
+    let path = platform_data_root().join("senni.log");
+    path.exists().then(|| path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -489,6 +568,8 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
             "quit" => {
                 let app = app.clone();
                 std::thread::spawn(move || {
+                    show_shutdown_screen(&app);
+                    std::thread::sleep(std::time::Duration::from_millis(600));
                     shutdown_sidecar(&app);
                     app.exit(0);
                 });

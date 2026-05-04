@@ -143,6 +143,54 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-05-04 (Tauri UX polish — loading/shutdown screens, log capture, crash guard)
+
+**Loading screen styled. Shutdown screen added. Server console hidden. Log capture wired. Crash dialog on unexpected exit.**
+
+### What changed
+
+**`src-tauri/tauri.conf.json`:** Added `"withGlobalTauri": true` — without this, `window.__TAURI__` is undefined in the frontend, silently breaking all Tauri commands (was root cause of About section not showing and tray "Server Log" doing nothing).
+
+**`src-tauri/Cargo.toml`:** Added `base64 = "0.22"`.
+
+**`src-tauri/src/lib.rs`:**
+- **Loading screen** — replaced bare "SENNI" text with styled dark page matching app visual language: indigo CSS spinner, "Starting SENNI…" serif label, companion avatar embedded as base64 data URI (reads `DATA_ROOT/config.json` → companion folder → `avatar_path`; falls back to spinner-only on first run)
+- **Loading fade-out** — `navigate_to_app()` injects a 1s CSS opacity transition before navigating, avoiding flashbang effect
+- **Shutdown screen** — `show_shutdown_screen()` navigates to a styled page with 0.5s CSS fade-in showing "Shutting down…"; called from tray Quit handler before `shutdown_sidecar()`
+- **Console hidden by default** — `CREATE_NO_WINDOW` flag (Windows only) on sidecar spawn; skipped if `tauri-prefs.json` has `show_console: true`
+- **Log capture** — sidecar stdout + stderr piped into `SidecarLog(Mutex<VecDeque<String>>)` app state (last 500 lines) via reader threads
+- **Crash monitor** — polls `child.try_wait()` every 2s after health passes; shows blocking dialog if sidecar exits unexpectedly; `ShutdownFlag(AtomicBool)` prevents false alarm on intentional quit
+- **Windows Job Object** — `attach_job_object()` creates a Win32 job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`; all child processes (including llama-server) are killed automatically when SENNI.exe exits, preventing orphans on hard crash. Raw `extern "system"` FFI, no new deps.
+- **Tray menu** — "Server Log" item added; handler shows window + calls `openServerLog(true)` in the frontend
+- **Tauri commands** — `get_sidecar_log` (prefers `senni.log` file, falls back to in-memory buffer), `get_log_file_path`, `get_tauri_prefs_cmd`, `set_show_console`
+- **`tauri-prefs.json`** — new per-install prefs file in `DATA_ROOT`; currently stores `show_console: bool`
+
+**`main.py`:** When `SENNI_TAURI` is set, adds a `RotatingFileHandler` (5 MB, 2 backups) writing to `DATA_ROOT/senni.log`. All Python logging (uvicorn, FastAPI, tool calls) goes to this file.
+
+**`scripts/boot_service.py`:** `_run_subprocess` now calls `log.info("[llama-server] %s", line)` alongside the existing `print()`, routing llama-server output through the file handler into `senni.log`.
+
+**`static/chat.html`:** About tab gets a "Server" section (hidden unless `window.__TAURI__`): show-terminal toggle, log file path display, "Server log" button + collapsible log panel with Refresh button.
+
+**`static/js/settings.js`:** Added `spInitAboutTauri()`, `openServerLog()`, `refreshServerLog()`, `_loadServerLog()`, `spToggleShowConsole()` — all About-tab Tauri logic lives here (main Settings file), not in `settings-companion.js`.
+
+**`static/js/settings-companion.js`:** `spPopulateAbout()` now ends with `spInitAboutTauri()` call (implementation in `settings.js`). Tauri helper functions removed from this file.
+
+### Key gotchas
+
+- `withGlobalTauri: true` is required for `window.__TAURI__` to exist in Tauri v2 — without it all `invoke()` calls silently do nothing.
+- `CREATE_NO_WINDOW` hides the cmd.exe console but stdout/stderr are still captured via pipes (they're independent of the console window).
+- Job Object handle is an `isize` (Copy, no Drop) — intentionally never closed so the OS keeps it alive and kills children on SENNI exit.
+- `spPopulateAbout` is defined in `settings-companion.js` because that's where it pre-existed — the file name is misleading (it serves both companion panel and About tab). Refactor pending.
+
+### Still open
+- **Tauri code in `settings-companion.js`** — `spPopulateAbout` still lives there. Should be extracted into a proper `settings-about.js` or merged into `settings.js` in a future cleanup session.
+- Crash monitor auto-restart (offer "Restart" button in dialog) — deferred
+- Sidecar log streaming (live updates in the log panel rather than manual refresh) — deferred
+- Linux AppImage CI job — deferred
+- Code signing (SmartScreen) via SignPath Foundation — deferred
+
+---
+
 ## Session notes — 2026-05-04 (Tauri polish — boot/shutdown/CI fixes)
 
 **Installer boots correctly. Shutdown fast. Loading screen on startup.**
