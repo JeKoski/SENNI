@@ -110,13 +110,11 @@ Compile Python backend (`main.py` + all scripts + static files) into a single bi
 - **`output_dir` refactor** ✓ — `wizard_compile.py` uses `COMPANIONS_DIR` from `scripts.paths`, which resolves to `DATA_ROOT/companions` (writable) in bundled mode. No fix needed.
 - **Next: write PyInstaller spec** — after Phase C audit completes.
 
-**Phase 3 — Tauri shell**
-Tauri wraps the webview, manages the Python sidecar, provides tray icon + window chrome.
-- Webview points to `http://localhost:8000` (same as browser today)
-- Sidecar: the PyInstaller binary from Phase 2
-- Auto-updater wired to GitHub Releases
-- GitHub Actions builds full Tauri package for Windows (.msi / .exe) and Linux (.AppImage)
-- `output_dir` refactor in `wizard_compile.py` prerequisite for clean packaging
+**Phase 3 — Tauri shell** ✓ (2026-05-04)
+- Tauri v2 shell: sidecar spawn, health poll, graceful shutdown, tray ✓
+- Auto-updater: `tauri-plugin-updater` + `tauri-plugin-dialog`, background check on startup, native dialog ✓
+- CI/CD: `tauri-apps/tauri-action@v0` — signed `.msi` + NSIS `.exe` + `.sig` + `latest.json` on GitHub Releases ✓
+- Deferred: crash monitor, sidecar log capture, Linux AppImage CI job, SmartScreen code signing (SignPath Foundation)
 
 *Note: macOS not a current target. Requires Apple Developer account ($99/yr) for notarization.*
 
@@ -254,4 +252,3 @@ Several small-to-medium improvements documented in `design/CHARA_CARD.md` — `d
 - **TTS upgrade** — newer realistic TTS models (Qwen Audio etc.) worth evaluating once new PC is up. Kokoro on CPU is too slow on current i5-7600K; CUDA on 5060 Ti should be near-instant.
 - **App Sounds** — Just an idea right now. App has only TTS, no other audio. Would add a lot of ambiance and polish.
 - **Cozy Mode** — full sensory layer (lighting, ambient sounds, warm orb). Wishlist, needs visual/interaction design. See `design/FEATURES.md` → Cozy Mode.
-- **Tauri shell (Phase 3)** — waiting on Phase 1 + 2. See Tauri roadmap in High Priority.

@@ -62,26 +62,14 @@ pub fn run() {
 // ── Sidecar spawn ──────────────────────────────────────────────────────────────
 
 fn spawn_sidecar(app: &tauri::AppHandle) -> Result<Child, Box<dyn std::error::Error>> {
-    // Tauri v2 bundles externalBin with the target triple appended to the name.
-    let bin_name = if cfg!(windows) {
-        concat!("senni-backend-", env!("TAURI_ENV_TARGET_TRIPLE"), ".exe")
-    } else {
-        concat!("senni-backend-", env!("TAURI_ENV_TARGET_TRIPLE"))
-    };
+    // The full PyInstaller one-dir output is bundled under resources/senni-backend/.
+    let bin_name = if cfg!(windows) { "senni-backend.exe" } else { "senni-backend" };
 
-    // Tauri v2 places externalBin entries in the resource dir alongside the bundle.
-    let resource_dir = app.path().resource_dir()?;
-    let candidate = resource_dir.join(bin_name);
-
-    let bin_path = if candidate.exists() {
-        candidate
-    } else {
-        // Fallback: same directory as the Tauri binary (common in dev builds)
-        let exe = std::env::current_exe()?;
-        exe.parent()
-            .ok_or("cannot determine exe directory")?
-            .join(bin_name)
-    };
+    let bin_path = app
+        .path()
+        .resource_dir()?
+        .join("senni-backend")
+        .join(bin_name);
 
     if !bin_path.exists() {
         return Err(format!("sidecar binary not found at {}", bin_path.display()).into());

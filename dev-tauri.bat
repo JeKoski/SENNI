@@ -30,13 +30,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM ── Ensure dist\ placeholder exists (tauri-build requires the file at compile time) ──
-
-if not exist "dist\" mkdir dist
-if not exist "dist\senni-backend-x86_64-pc-windows-msvc.exe" (
-    type nul > "dist\senni-backend-x86_64-pc-windows-msvc.exe"
-)
-
 REM ── Launch Python server in a separate window ─────────────────────────────────
 
 echo.
