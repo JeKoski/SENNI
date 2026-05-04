@@ -1,0 +1,7 @@
+# If your companion's memory entries seem to have grown suddenly, there might be duplication happening. Use these commands in cmd/terminal to check for duplicates and to delete duplicate entries
+
+## Dry run (safe default even without ?dry_run=true)
+curl -X POST http://localhost:8000/api/memory/dedup
+
+## Actually delete duplicates
+curl -X POST "http://localhost:8000/api/memory/dedup?dry_run=false"

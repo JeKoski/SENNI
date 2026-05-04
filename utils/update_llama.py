@@ -2,6 +2,8 @@
 """
 SENNI — llama.cpp Installer & Updater
 Supports Intel Arc / oneAPI (SYCL) builds on Linux.
+
+WARNING: Legacy script! Use Setup Wizard instead for a smoother experience with better error handling and guidance. Runs automatically on first boot, or rerun manually from Settings → About → Re-run wizard. 
 """
 
 import os
@@ -30,6 +32,8 @@ def banner():
     print()
     print(c("╔══════════════════════════════════════════════════════╗", CYAN, BOLD))
     print(c("║        SENNI — llama.cpp Installer & Updater         ║", CYAN, BOLD))
+    print(c("║                 WARNING: Legacy script!              ║", CYAN, BOLD))
+    print(c("║                Use Setup Wizard instead              ║", CYAN, BOLD))
     print(c("╚══════════════════════════════════════════════════════╝", CYAN, BOLD))
     print()
 
