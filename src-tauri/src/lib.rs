@@ -1,11 +1,29 @@
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::process::Child;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::Manager;
 
 // ── App state ──────────────────────────────────────────────────────────────────
 
 struct SidecarState(Mutex<Option<Child>>);
+struct ShutdownFlag(AtomicBool);
+struct SidecarLog(Mutex<VecDeque<String>>);
+
+// ── Tauri prefs (tauri-prefs.json in data root) ────────────────────────────────
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct TauriPrefs {
+    show_console: bool,
+}
+
+fn read_tauri_prefs(data_root: &std::path::Path) -> TauriPrefs {
+    std::fs::read_to_string(data_root.join("tauri-prefs.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
 
 // ── Entry point ────────────────────────────────────────────────────────────────
 
@@ -21,6 +39,13 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
+        .manage(ShutdownFlag(AtomicBool::new(false)))
+        .manage(SidecarLog(Mutex::new(VecDeque::new())))
+        .invoke_handler(tauri::generate_handler![
+            get_sidecar_log,
+            get_tauri_prefs_cmd,
+            set_show_console,
+        ])
         .setup(|app| {
             // Show the loading screen immediately so the window appears at once.
             show_loading(app.handle());
@@ -42,6 +67,7 @@ pub fn run() {
                     Ok(()) => {
                         navigate_to_app(&handle);
                         spawn_update_check(&handle);
+                        spawn_crash_monitor(&handle);
                     }
                     Err(e) => {
                         eprintln!("SENNI: sidecar health check failed: {e}");
@@ -78,6 +104,9 @@ pub fn run() {
 
 // ── Sidecar spawn ──────────────────────────────────────────────────────────────
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 fn spawn_sidecar(app: &tauri::AppHandle) -> Result<Child, Box<dyn std::error::Error>> {
     // The full PyInstaller one-dir output is bundled under resources/senni-backend/.
     let bin_name = if cfg!(windows) { "senni-backend.exe" } else { "senni-backend" };
@@ -95,13 +124,46 @@ fn spawn_sidecar(app: &tauri::AppHandle) -> Result<Child, Box<dyn std::error::Er
     let data_root = platform_data_root();
     std::fs::create_dir_all(&data_root)?;
 
-    let child = std::process::Command::new(&bin_path)
-        .env("SENNI_DATA_ROOT", &data_root)
-        .env("SENNI_TAURI", "1")
-        .spawn()?;
+    let mut cmd = std::process::Command::new(&bin_path);
+    cmd.env("SENNI_DATA_ROOT", &data_root)
+       .env("SENNI_TAURI", "1")
+       .stdout(std::process::Stdio::piped())
+       .stderr(std::process::Stdio::piped());
 
+    #[cfg(windows)]
+    {
+        // Hide the console window unless the user has opted in via tauri-prefs.json.
+        // Windows 11 shows a cmd.exe window for console-subsystem executables spawned
+        // from a GUI process unless CREATE_NO_WINDOW is set.
+        if !read_tauri_prefs(&data_root).show_console {
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+    }
+
+    let mut child = cmd.spawn()?;
     eprintln!("SENNI: sidecar spawned (pid {})", child.id());
+
+    // Take pipe handles before storing child; spawn log reader threads.
+    if let Some(stdout) = child.stdout.take() {
+        spawn_log_reader(app.clone(), Box::new(stdout));
+    }
+    if let Some(stderr) = child.stderr.take() {
+        spawn_log_reader(app.clone(), Box::new(stderr));
+    }
+
     Ok(child)
+}
+
+fn spawn_log_reader(app: tauri::AppHandle, reader: Box<dyn std::io::Read + Send>) {
+    std::thread::spawn(move || {
+        use std::io::BufRead;
+        for line in std::io::BufReader::new(reader).lines().flatten() {
+            let log_state = app.state::<SidecarLog>();
+            let mut log = log_state.0.lock().unwrap();
+            if log.len() >= 500 { log.pop_front(); }
+            log.push_back(line);
+        }
+    });
 }
 
 fn platform_data_root() -> PathBuf {
@@ -156,20 +218,113 @@ fn poll_health(timeout_secs: u64) -> Result<(), String> {
     }
 }
 
+// ── Crash monitor ──────────────────────────────────────────────────────────────
+
+fn spawn_crash_monitor(app: &tauri::AppHandle) {
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+
+            if handle.state::<ShutdownFlag>().0.load(Ordering::SeqCst) { break; }
+
+            let exit_status = {
+                let sidecar_state = handle.state::<SidecarState>();
+                let mut state = sidecar_state.0.lock().unwrap();
+                match state.as_mut() {
+                    Some(child) => match child.try_wait() {
+                        Ok(Some(status)) => Some(status),
+                        _ => None,
+                    },
+                    None => break, // child was cleared by shutdown
+                }
+            };
+
+            if let Some(status) = exit_status {
+                // Double-check flag — shutdown might have raced us.
+                if handle.state::<ShutdownFlag>().0.load(Ordering::SeqCst) { break; }
+                use tauri_plugin_dialog::DialogExt;
+                handle.dialog()
+                    .message(format!(
+                        "The SENNI backend stopped unexpectedly.\n\nExit code: {}\n\nOpen the server log in Settings \u{2192} About for details.",
+                        status.code().map(|c| c.to_string()).unwrap_or_else(|| "unknown".into())
+                    ))
+                    .title("SENNI backend stopped")
+                    .blocking_show();
+                handle.exit(1);
+                break;
+            }
+        }
+    });
+}
+
 // ── Window helpers ─────────────────────────────────────────────────────────────
 
+fn try_read_avatar_data_uri(data_root: &std::path::Path) -> Option<String> {
+    use base64::Engine;
+    let cfg: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(data_root.join("config.json")).ok()?
+    ).ok()?;
+    let folder = cfg["companion_folder"].as_str()?;
+    let comp: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(
+            data_root.join("companions").join(folder).join("config.json")
+        ).ok()?
+    ).ok()?;
+    let avatar_file = comp["avatar_path"].as_str()?;
+    let avatar_path = data_root.join("companions").join(folder).join(avatar_file);
+    let ext = avatar_path.extension()?.to_str()?.to_lowercase();
+    let mime = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png"          => "image/png",
+        "webp"         => "image/webp",
+        _              => return None,
+    };
+    let bytes = std::fs::read(&avatar_path).ok()?;
+    Some(format!(
+        "data:{};base64,{}",
+        mime,
+        base64::engine::general_purpose::STANDARD.encode(&bytes)
+    ))
+}
+
+fn build_loading_html(avatar_uri: Option<&str>) -> String {
+    let avatar_html = match avatar_uri {
+        Some(uri) => format!("<img class='av' src='{}'>", uri),
+        None      => String::new(),
+    };
+    format!(
+        "<!DOCTYPE html><html><head><meta charset='utf-8'><style>\
+        *{{margin:0;padding:0;box-sizing:border-box}}\
+        body{{background:#0d0d0f;display:flex;flex-direction:column;\
+          align-items:center;justify-content:center;height:100vh;gap:18px;\
+          font-family:Georgia,'Times New Roman',serif}}\
+        .av{{width:88px;height:88px;border-radius:50%;object-fit:cover;\
+          border:2px solid rgba(129,140,248,0.25);margin-bottom:6px}}\
+        .sp{{width:34px;height:34px;border-radius:50%;\
+          border:2px solid rgba(129,140,248,0.15);border-top-color:#818cf8;\
+          animation:spin 1s linear infinite}}\
+        .lb{{font-size:16px;color:#eef0fb;letter-spacing:.04em}}\
+        @keyframes spin{{to{{transform:rotate(360deg)}}}}\
+        </style></head><body>\
+        {}\
+        <div class='sp'></div>\
+        <div class='lb'>Starting SENNI\u{2026}</div>\
+        </body></html>",
+        avatar_html
+    )
+}
+
 fn show_loading(app: &tauri::AppHandle) {
+    use base64::Engine;
+    let data_root  = platform_data_root();
+    let avatar_uri = try_read_avatar_data_uri(&data_root);
+    let html       = build_loading_html(avatar_uri.as_deref());
+    let b64        = base64::engine::general_purpose::STANDARD.encode(html.as_bytes());
+    let url        = format!("data:text/html;base64,{b64}");
+
     if let Some(win) = app.get_webview_window("main") {
-        let _ = win.navigate(
-            "data:text/html,<!DOCTYPE html>\
-            <html><head><meta charset='utf-8'>\
-            <style>*{margin:0;padding:0}body{background:#0d0d0f;display:flex;\
-            align-items:center;justify-content:center;height:100vh;\
-            color:#555;font:16px system-ui,sans-serif;letter-spacing:.05em}\
-            </style></head><body>SENNI</body></html>"
-                .parse()
-                .expect("loading URL"),
-        );
+        let _ = win.navigate(url.parse().expect("loading URL"));
         win.show().ok();
         win.set_focus().ok();
     }
@@ -188,6 +343,9 @@ fn navigate_to_app(app: &tauri::AppHandle) {
 // ── Graceful shutdown ──────────────────────────────────────────────────────────
 
 fn shutdown_sidecar(app: &tauri::AppHandle) {
+    // Signal the crash monitor not to fire on this intentional exit.
+    app.state::<ShutdownFlag>().0.store(true, Ordering::SeqCst);
+
     // Use 127.0.0.1 explicitly — same IPv6 resolution issue as the health poll.
     let _ = ureq::post("http://127.0.0.1:8000/api/shutdown")
         .timeout(std::time::Duration::from_secs(2))
@@ -263,15 +421,37 @@ async fn check_for_updates(app: &tauri::AppHandle) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+// ── Tauri commands ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn get_sidecar_log(state: tauri::State<'_, SidecarLog>) -> Vec<String> {
+    state.0.lock().unwrap().iter().cloned().collect()
+}
+
+#[tauri::command]
+fn get_tauri_prefs_cmd() -> TauriPrefs {
+    read_tauri_prefs(&platform_data_root())
+}
+
+#[tauri::command]
+fn set_show_console(value: bool) -> Result<(), String> {
+    let prefs = TauriPrefs { show_console: value };
+    let path  = platform_data_root().join("tauri-prefs.json");
+    let json  = serde_json::to_string_pretty(&prefs).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())
+}
+
 // ── System tray ────────────────────────────────────────────────────────────────
 
 fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
-    use tauri::menu::{Menu, MenuItem};
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
     use tauri::tray::TrayIconBuilder;
 
-    let show_hide = MenuItem::with_id(app, "show_hide", "Show / Hide", true, None::<&str>)?;
-    let quit      = MenuItem::with_id(app, "quit",      "Quit SENNI",  true, None::<&str>)?;
-    let menu      = Menu::with_items(app, &[&show_hide, &quit])?;
+    let show_hide  = MenuItem::with_id(app, "show_hide",  "Show / Hide", true, None::<&str>)?;
+    let server_log = MenuItem::with_id(app, "server_log", "Server Log",  true, None::<&str>)?;
+    let sep        = PredefinedMenuItem::separator(app)?;
+    let quit       = MenuItem::with_id(app, "quit",       "Quit SENNI",  true, None::<&str>)?;
+    let menu       = Menu::with_items(app, &[&show_hide, &server_log, &sep, &quit])?;
 
     // Decode the embedded PNG to raw RGBA at startup — Image::new requires raw pixels.
     let png_bytes = include_bytes!("../icons/128x128.png");
@@ -294,6 +474,16 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
                         win.show().ok();
                         win.set_focus().ok();
                     }
+                }
+            }
+            "server_log" => {
+                if let Some(win) = app.get_webview_window("main") {
+                    win.show().ok();
+                    win.set_focus().ok();
+                    // Open settings → About tab and show log panel
+                    win.eval(
+                        "typeof openServerLog === 'function' && openServerLog(true)"
+                    ).ok();
                 }
             }
             "quit" => {
