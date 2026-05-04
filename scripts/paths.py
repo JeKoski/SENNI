@@ -8,6 +8,7 @@ Bundled mode: RESOURCE_ROOT = sys._MEIPASS  (read-only temp extraction dir)
 Import named constants from here instead of computing paths in individual modules.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -15,7 +16,12 @@ _bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
 
 if _bundled:
     RESOURCE_ROOT = Path(sys._MEIPASS)
-    DATA_ROOT     = Path(sys.executable).parent
+    _data_override = os.environ.get("SENNI_DATA_ROOT")
+    if _data_override:
+        DATA_ROOT = Path(_data_override)
+        DATA_ROOT.mkdir(parents=True, exist_ok=True)
+    else:
+        DATA_ROOT = Path(sys.executable).parent
 else:
     DATA_ROOT     = Path(__file__).resolve().parent.parent
     RESOURCE_ROOT = DATA_ROOT

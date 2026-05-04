@@ -184,12 +184,12 @@ Crash restart should re-enter the `LAUNCHING` state (re-spawn + re-poll). Do not
 Items required before Phase 3 development can begin. The doc/contract is complete when these are shipped; the Tauri scaffolding can then be built against a stable sidecar interface.
 
 **Python sidecar (`scripts/server.py` + `scripts/paths.py`):**
-- [ ] `GET /api/health` → `{"status": "ok"}`
-- [ ] `POST /api/shutdown` → graceful teardown
-- [ ] CORS: add `tauri://localhost` to allowed origins
-- [ ] `SENNI_DATA_ROOT` env var override in `paths.py`
-- [ ] Frozen-mode `DATA_ROOT` → platform user-data dir
-- [ ] First-run seed: copy defaults from `RESOURCE_ROOT` when `DATA_ROOT` is empty
+- [x] `GET /api/health` → `{"status": "ok"}`
+- [x] `POST /api/shutdown` → graceful teardown
+- [x] CORS: already wildcard `["*"]` — `tauri://localhost` covered, no change needed
+- [x] `SENNI_DATA_ROOT` env var override in `scripts/paths.py`
+- [x] `DATA_ROOT.mkdir()` when `SENNI_DATA_ROOT` is set (platform dir created on first launch)
+- [x] First-run seed: write default `config.json` to `DATA_ROOT` on first boot if missing
 
 **Tauri (`src-tauri/`):**
 - [ ] `tauri.conf.json`: declare `senni-backend[.exe]` in `tauri.bundle.externalBin`
