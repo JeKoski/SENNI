@@ -143,6 +143,43 @@ Copying a companion folder between installs:
 
 ---
 
+## Session notes — 2026-05-04 (Tauri v2 core shell — Phase 3)
+
+**Tauri v2 shell scaffolded and booting. First dev run successful.**
+
+### What changed
+
+**`design/TAURI_SIDECAR.md` (new):** Sidecar runtime contract — entry point, health check, lifecycle states, IPC model, process termination (per-OS), path layout, error states, full implementation checklist.
+
+**`scripts/server.py`:** `GET /api/health` → `{"status": "ok"}`; `POST /api/shutdown` → kills child processes then `os._exit(0)` after 500 ms async delay. First-run seed: writes default `config.json` to `DATA_ROOT` if missing (Tauri fresh-install path).
+
+**`scripts/paths.py`:** `SENNI_DATA_ROOT` env var override in frozen mode — Tauri sets this to the platform user-data dir (`%APPDATA%\SENNI` / `~/.local/share/SENNI`); plain PyInstaller builds unaffected. `DATA_ROOT.mkdir()` called when override is active.
+
+**`src-tauri/` (new):** Full Tauri v2 scaffold — `Cargo.toml` (`tauri 2` + `tray-icon` feature, `ureq`, `image`), `build.rs`, `tauri.conf.json` (window hidden until ready, `devUrl` + `frontendDist` both `:8000`, `externalBin`), `capabilities/default.json`, `src/main.rs`, `src/lib.rs` (sidecar spawn → health poll → show window, graceful shutdown, tray with Show/Hide + Quit, `SENNI_SKIP_SIDECAR` dev escape hatch).
+
+**`scripts/create_tauri_icons.py` (new):** Generates placeholder icons from `assets/icon.png` or solid-colour stubs. Run once before first build.
+
+**`setup-tauri.bat` (new):** Checks/installs Rust + tauri-cli v2. Safe to re-run.
+
+**`dev-tauri.bat` (new):** Starts Python server in a separate window + `cargo tauri dev` with `SENNI_SKIP_SIDECAR=1`. Creates `dist/` placeholder on fresh checkout.
+
+**`build-embed.bat`:** Now copies `dist/senni-backend.exe` → `dist/senni-backend-x86_64-pc-windows-msvc.exe` after PyInstaller build (Tauri v2 requires the target-triple suffix).
+
+**`.gitignore`:** Added `src-tauri/target/` and `src-tauri/gen/`.
+
+### Tauri v2 quirks hit during bringup
+- `tauri-plugin-tray` doesn't exist — tray is built into `tauri` with `features = ["tray-icon"]`
+- `tauri.conf.json` needs both `build.devUrl` (dev) and `build.frontendDist` (production)
+- `externalBin` requires the file to exist at build time, named with the target triple appended
+- `tauri::image::Image` has no `from_bytes` — decode PNG with the `image` crate, then use `Image::new_owned`
+
+### Still open
+- Crash monitor (auto-restart on unexpected sidecar exit) — deferred
+- Sidecar stdout/stderr capture to Tauri log — deferred
+- Auto-updater + GitHub Actions CI/CD — next Phase 3 step
+
+---
+
 ## Session notes — 2026-05-04 (Channel token fix / Memory tool removal / UI polish)
 
 **Three fixes shipped.**

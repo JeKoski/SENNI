@@ -38,6 +38,10 @@ dist/
 
 python-embed/
 
+# Tauri / Rust build artifacts
+src-tauri/target/
+src-tauri/gen/
+
 static/style-rulebook/
 
 .dev/

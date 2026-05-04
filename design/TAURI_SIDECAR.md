@@ -192,11 +192,13 @@ Items required before Phase 3 development can begin. The doc/contract is complet
 - [x] First-run seed: write default `config.json` to `DATA_ROOT` on first boot if missing
 
 **Tauri (`src-tauri/`):**
-- [ ] `tauri.conf.json`: declare `senni-backend[.exe]` in `tauri.bundle.externalBin`
-- [ ] On app start: spawn sidecar with `DATA_ROOT` as cwd; poll `/api/health`
-- [ ] On app quit: POST `/api/shutdown`; wait 5 s; force-kill if needed
-- [ ] Crash monitor: watch sidecar PID; show restart dialog on unexpected exit (max 3 restarts / 60 s)
-- [ ] Log capture: pipe sidecar stdout/stderr into Tauri log
+- [x] `tauri.conf.json`: `bundle.externalBin = ["../dist/senni-backend"]`, window hidden until ready
+- [x] On app start: spawn sidecar via `std::process::Command`, set `SENNI_DATA_ROOT`, poll `/api/health` in background thread, show window on 200 OK
+- [x] On app quit: POST `/api/shutdown`; wait 5 s; force-kill (`taskkill /F /T` on Windows, SIGKILL on Linux)
+- [x] System tray: Show/Hide + Quit; close button hides to tray rather than quitting
+- [x] `SENNI_SKIP_SIDECAR` dev escape hatch — skips spawn + poll, shows window immediately
+- [ ] Crash monitor: watch sidecar PID, show restart dialog on unexpected exit (max 3 restarts / 60 s) — deferred
+- [ ] Log capture: pipe sidecar stdout/stderr into Tauri log — deferred
 
 **Verification:**
 - Launch app → sidecar starts → webview loads chat UI
