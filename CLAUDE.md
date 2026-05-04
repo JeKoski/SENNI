@@ -220,3 +220,4 @@ Large design decisions live in `design/` as standalone docs. These are NOT loade
 | `design/SETUP_WIZARD.md`    | Setup wizard — step flow, GPU→binary mapping, animation principles, backend endpoints needed.                                       |
 | `design/WIZARD.md`          | Companion Creation Wizard — V2 character card format, Birth Certificate architecture, step flow, appearance sub-steps.              |
 | `design/CHARA_CARD.md`      | Chara card V2 field reference, SENNI alignment, soul file best practices, first_mes, system_prompt, character_book/lorebook design. |
+| `design/TAURI_SIDECAR.md`  | Sidecar runtime contract — how Tauri launches, monitors, and shuts down the Python backend. Entry point, health check, lifecycle states, IPC model, process termination, path layout, error states, implementation checklist. |
