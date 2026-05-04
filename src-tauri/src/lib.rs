@@ -28,13 +28,20 @@ pub fn run() {
 
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                match poll_health(30) {
+                match poll_health(60) {
                     Ok(()) => {
                         show_window(&handle);
                         spawn_update_check(&handle);
                     }
                     Err(e) => {
                         eprintln!("SENNI: sidecar health check failed: {e}");
+                        use tauri_plugin_dialog::DialogExt;
+                        handle.dialog()
+                            .message(format!(
+                                "SENNI failed to start.\n\n{e}\n\nCheck that no other instance is running, then try again."
+                            ))
+                            .title("SENNI startup failed")
+                            .blocking_show();
                         handle.exit(1);
                     }
                 }
@@ -80,6 +87,7 @@ fn spawn_sidecar(app: &tauri::AppHandle) -> Result<Child, Box<dyn std::error::Er
 
     let child = std::process::Command::new(&bin_path)
         .env("SENNI_DATA_ROOT", &data_root)
+        .env("SENNI_TAURI", "1")
         .spawn()?;
 
     eprintln!("SENNI: sidecar spawned (pid {})", child.id());

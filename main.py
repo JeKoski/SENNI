@@ -12,6 +12,7 @@ What it does:
 """
 
 import logging
+import os
 import platform
 import subprocess
 import sys
@@ -99,10 +100,12 @@ def main():
     print("     Press Ctrl+C to stop.")
     print()
 
-    def _open():
-        time.sleep(1.2)
-        webbrowser.open(url)
-    threading.Thread(target=_open, daemon=True).start()
+    # Don't open the browser when running as a Tauri sidecar — Tauri manages the window.
+    if not os.environ.get("SENNI_TAURI"):
+        def _open():
+            time.sleep(1.2)
+            webbrowser.open(url)
+        threading.Thread(target=_open, daemon=True).start()
 
     uvicorn.run(
         app,
