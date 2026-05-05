@@ -130,6 +130,7 @@ Compile Python backend (`main.py` + all scripts + static files) into a single bi
 - Sidecar log live streaming — auto-refresh the log panel rather than manual Refresh button. Deferred.
 - Linux AppImage CI job — deferred
 - Code signing (SmartScreen) via SignPath Foundation (free for OSS) — deferred
+- **NSIS installer customisation** — brand the installer to match Senni's visual style. Plan: (1) dark sidebar image 164×314px (welcome + finish pages) featuring Senni avatar + wordmark; (2) dark header image 150×57px for inner pages; (3) custom NSIS template snippet for finish page — add "first launch takes a moment while Windows checks our files" note + uncheck "Launch SENNI" by default so Defender finishes scanning before the user opens the app. Do together with app icon session.
 
 *Note: macOS not a current target. Requires Apple Developer account ($99/yr) for notarization.*
 
@@ -169,7 +170,7 @@ Compile Python backend (`main.py` + all scripts + static files) into a single bi
 
 *Ready to build — no design conversation needed.*
 
-- **Senni app icon** — design and add an icon for the binary (`.ico` for Windows PyInstaller spec), wizard header, and elsewhere in the UI. Needs design conversation for the visual; wiring into the spec is straightforward once an `.ico` exists.
+- **Senni app icon + installer branding** — design the app icon (`.ico` for Windows, `icon.png` for Tauri) and matching installer images (sidebar 164×314, header 150×57). Do in the same session as the NSIS installer customisation above — they share the same design conversation and assets. Wiring into `senni-backend.spec` + `tauri.conf.json` is straightforward once assets exist.
 - **Setup: Manual path entry for features** — add optional path fields to the Features step for users who already have kokoro/chromadb installed globally or in a custom location. Entering a path should skip the local install and let setup boot TTS/memory cleanly. Also add a "skip, I'll configure later" option so setup can complete without installing.
 - **Settings: Features tab reinstall buttons** ✅ DONE (2026-05-03) — TTS and ChromaDB reinstall buttons wired to `POST /api/setup/reinstall-extra` with SSE progress. llama.cpp reinstall button wired to `POST /api/setup/reinstall-llama`. Download size validation added to `_download_to_queue()`.
 - **History folder pruning** — WAV voice files + images accumulate in session folders with no cleanup. Need a pruning strategy (auto-delete media older than N days, or manual "clean up" action). See `design/FEATURES.md`. *(Deferred to post-Tauri.)*

@@ -211,10 +211,25 @@ SEARCH_HINTS = [
 
 # ── GPU Detection ──────────────────────────────────────────────────────────────
 
+def _is_discrete_intel_arc(name: str) -> bool:
+    """
+    Return True only for discrete Intel Arc GPUs (A-series or B-series).
+    Integrated Arc on Core Ultra is just "Arc Graphics" / "Arc 140V" — no A/B prefix.
+    Discrete cards always match "Arc A###" or "Arc B###" (e.g. Arc A770, Arc B580).
+    """
+    import re
+    return bool(re.search(r'arc\s+[ab]\d+', name, re.IGNORECASE))
+
+
 def detect_gpu() -> str:
     """
     Try to identify the GPU type automatically.
     Returns one of: 'intel' | 'nvidia' | 'amd' | 'metal' | 'cpu'
+
+    'intel' means discrete Intel Arc A/B-series only (SYCL-capable).
+    Integrated Intel (UHD, Iris Xe, Core Ultra Arc Graphics) returns 'cpu' —
+    iGPUs are not viable for LLM inference and SYCL on them can destabilise
+    graphics drivers.
     """
     system = platform.system()
 
@@ -225,7 +240,7 @@ def detect_gpu() -> str:
                 ["lspci"], capture_output=True, text=True, timeout=5
             )
             output = result.stdout.lower()
-            if "intel" in output and ("arc" in output or "uhd" in output or "iris" in output):
+            if _is_discrete_intel_arc(output):
                 return "intel"
             if "nvidia" in output:
                 return "nvidia"
@@ -245,7 +260,7 @@ def detect_gpu() -> str:
                 return "nvidia"
             if "amd" in o or "radeon" in o:
                 return "amd"
-            if "intel" in o:
+            if _is_discrete_intel_arc(o):
                 return "intel"
             return None
 
