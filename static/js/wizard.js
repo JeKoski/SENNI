@@ -281,23 +281,49 @@ function _updateEngineDlBtn() {
 
 function setDetectedHW(gpu, buildType) {
   const isCpu = !gpu || gpu === 'cpu';
-  const noteLabels = { nvidia: 'NVIDIA GPU detected', amd: 'AMD GPU detected', intel: 'Intel Arc detected', cpu: 'No discrete GPU \u2014 CPU mode' };
-  const noteEl  = document.getElementById('detected-note');
-  const labelEl = document.getElementById('detected-label');
-  if (noteEl)  noteEl.style.display  = 'flex';
-  if (labelEl) labelEl.textContent   = noteLabels[gpu] || (gpu ? gpu + ' detected' : 'No GPU detected');
 
+  const brandColors = { nvidia: '#76c442', amd: '#e05a3a', intel: '#6496f5' };
+  const mainLabels  = {
+    nvidia: 'We found an NVIDIA graphics card',
+    amd:    'We found an AMD graphics card',
+    intel:  'We found an Intel Arc graphics card',
+    cpu:    'No dedicated graphics card found',
+  };
+  const subLabels = {
+    cuda:   "We\u2019ll download the CUDA build \u2014 best performance for NVIDIA.",
+    vulkan: "We\u2019ll download the Vulkan build \u2014 works without extra drivers.",
+    sycl:   "We\u2019ll download the SYCL build \u2014 requires Intel oneAPI Runtime.",
+    cpu:    "We\u2019ll download the CPU build \u2014 works on any hardware, no GPU needed.",
+  };
+
+  const spin   = document.getElementById('hw-detect-spin');
+  const dot    = document.getElementById('hw-detect-dot');
+  const main   = document.getElementById('hw-detect-main');
+  const sub    = document.getElementById('hw-detect-sub');
+  const change = document.getElementById('hw-detect-change');
+
+  if (spin)   spin.style.display   = 'none';
+  if (dot)  { dot.style.display    = 'block'; dot.style.background = brandColors[gpu] || 'var(--text-dim)'; }
+  if (main)   main.textContent     = mainLabels[gpu]  || 'Hardware detected';
+  if (sub)    sub.textContent      = subLabels[buildType] || '';
+  if (change) change.style.display = 'block';
+
+  // Set internal selection state (drives the download button even while card is shown)
   if (isCpu) {
     selectHWCategory('cpu');
   } else {
     selectHWCategory('gpu');
     selectGPUBrand(gpu === 'intel' ? 'intel' : gpu === 'amd' ? 'amd' : gpu === 'nvidia' ? 'nvidia' : 'other');
-    // if status API gave us a specific build, override the auto-selected card
     if (buildType && buildType !== selectedBuild) {
-      const card = document.querySelector(`#hw-opts-${gpuBrand} .model-card[data-build="${buildType}"]`);
-      if (card) selectBuildCard(card, buildType);
+      const buildCard = document.querySelector(`#hw-opts-${gpuBrand} .model-card[data-build="${buildType}"]`);
+      if (buildCard) selectBuildCard(buildCard, buildType);
     }
   }
+}
+
+function wizShowManualPicker() {
+  document.getElementById('hw-detect-card').style.display   = 'none';
+  document.getElementById('hw-manual-section').style.display = 'block';
 }
 
 // ── Engine download ────────────────────────────────────────────────────────

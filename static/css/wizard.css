@@ -524,10 +524,22 @@ html, body {
 .gpu-chip:hover { border-color: rgba(129,140,248,0.35); color: var(--text); }
 .gpu-chip.selected { background: rgba(129,140,248,0.13); border-color: rgba(129,140,248,0.52); color: var(--indigo-hi); }
 .gpu-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.detected-note {
-  font-size: 12px; color: var(--green);
-  margin-bottom: 12px; display: none; align-items: center; gap: 6px;
+/* ── Hardware detection card ─────────────────────────────────────────────── */
+.hw-detect-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px 18px; margin-bottom: 14px;
 }
+.hw-detect-top { display: flex; align-items: center; gap: 12px; }
+.hw-detect-dot {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; display: none;
+}
+.hw-detect-main { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+.hw-detect-sub  { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.hw-detect-change {
+  display: none; margin-top: 12px; font-size: 12px;
+  color: var(--text-dim); text-decoration: none;
+}
+.hw-detect-change:hover { color: var(--text-muted); text-decoration: underline; }
 
 /* ── File chips ──────────────────────────────────────────────────────────── */
 .file-chip-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
