@@ -233,128 +233,17 @@ Current loading screen is a bare dark placeholder. Existing boot animation (spin
 
 ---
 
-## Session notes — 2026-05-04 (Auto-updater + CI/CD — Phase 3 complete)
+## Session notes — 2026-05-06 (Companion Wizard import zone — Tauri fix)
 
-**Phase 3 fully shippable. Signed installers + auto-updater live on GitHub Releases.**
-
-### What changed
-
-**`src-tauri/Cargo.toml`:** Added `tauri-plugin-updater = "2"` and `tauri-plugin-dialog = "2"`.
-
-**`src-tauri/tauri.conf.json`:** Added `plugins.updater` block (pubkey + GitHub `latest.json` endpoint). Added `bundle.createUpdaterArtifacts: true` — required for Tauri to generate `.sig` + `.nsis.zip` update packages. Changed identifier from `com.senni.app` → `com.senni.desktop` (avoid macOS `.app` extension conflict).
-
-**`src-tauri/capabilities/default.json`:** Added `updater:default` and `dialog:default` permissions.
-
-**`src-tauri/src/lib.rs`:** Registered `tauri_plugin_updater` and `tauri_plugin_dialog`. Added `spawn_update_check()` called after window is shown (both normal and `SENNI_SKIP_SIDECAR` paths). Added `check_for_updates()` async fn — background check on startup, native dialog if update found, `download_and_install` + `app.restart()` on confirm.
-
-**`.github/workflows/release.yml`:** Full rewrite. Now: (1) builds Python sidecar via PyInstaller, (2) copies triple-suffixed binary, (3) runs `tauri-apps/tauri-action@v0` which compiles Tauri, signs installers, creates GitHub Release, uploads `.msi` + NSIS `.exe` + `.sig` files + `latest.json`.
-
-**`build-embed.bat`:** Fixed sidecar copy path — was `dist\senni-backend.exe` (wrong), now `dist\senni-backend\senni-backend.exe` (correct for one-dir PyInstaller output).
-
-### Gotchas for future reference
-
-- `createUpdaterArtifacts: true` goes in `bundle`, not `plugins.updater` — without it, no `.sig` files are generated and `latest.json` is never produced
-- `tauri-action` input is `includeUpdaterJson`, not `uploadUpdaterJson`
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` must be set as a GitHub secret if key was generated with a password; absent secret = empty string (correct for passwordless keys)
-- PyInstaller one-dir output: exe is at `dist\senni-backend\senni-backend.exe`, not `dist\senni-backend.exe`
-
-### Still open
-- Crash monitor (auto-restart on unexpected sidecar exit) — deferred
-- Sidecar stdout/stderr capture to Tauri log — deferred
-- Linux AppImage CI job — deferred
-- Code signing (SmartScreen) via SignPath Foundation — deferred
-
----
-
-## Session notes — 2026-05-04 (Tauri v2 core shell — Phase 3)
-
-**Tauri v2 shell scaffolded and booting. First dev run successful.**
+**One-line fix. Import zone now works in Tauri app.**
 
 ### What changed
 
-**`design/TAURI_SIDECAR.md` (new):** Sidecar runtime contract — entry point, health check, lifecycle states, IPC model, process termination (per-OS), path layout, error states, full implementation checklist.
+**`static/companion-wizard.html`:** Import zone changed from `<label>` wrapping hidden `<input type="file">` to `<div onclick="document.getElementById('import-file-input').click()">`. WebView2 (Tauri's renderer on Windows) does not trigger the native file dialog when a label's click activates a `display:none` file input — nothing happens. Explicit `.click()` from a user-gesture handler (the same pattern the review step's avatar upload button already uses) works correctly.
 
-**`scripts/server.py`:** `GET /api/health` → `{"status": "ok"}`; `POST /api/shutdown` → kills child processes then `os._exit(0)` after 500 ms async delay. First-run seed: writes default `config.json` to `DATA_ROOT` if missing (Tauri fresh-install path).
+### Key gotcha
 
-**`scripts/paths.py`:** `SENNI_DATA_ROOT` env var override in frozen mode — Tauri sets this to the platform user-data dir (`%APPDATA%\SENNI` / `~/.local/share/SENNI`); plain PyInstaller builds unaffected. `DATA_ROOT.mkdir()` called when override is active.
-
-**`src-tauri/` (new):** Full Tauri v2 scaffold — `Cargo.toml` (`tauri 2` + `tray-icon` feature, `ureq`, `image`), `build.rs`, `tauri.conf.json` (window hidden until ready, `devUrl` + `frontendDist` both `:8000`, `externalBin`), `capabilities/default.json`, `src/main.rs`, `src/lib.rs` (sidecar spawn → health poll → show window, graceful shutdown, tray with Show/Hide + Quit, `SENNI_SKIP_SIDECAR` dev escape hatch).
-
-**`scripts/create_tauri_icons.py` (new):** Generates placeholder icons from `assets/icon.png` or solid-colour stubs. Run once before first build.
-
-**`setup-tauri.bat` (new):** Checks/installs Rust + tauri-cli v2. Safe to re-run.
-
-**`dev-tauri.bat` (new):** Starts Python server in a separate window + `cargo tauri dev` with `SENNI_SKIP_SIDECAR=1`. Creates `dist/` placeholder on fresh checkout.
-
-**`build-embed.bat`:** Now copies `dist/senni-backend.exe` → `dist/senni-backend-x86_64-pc-windows-msvc.exe` after PyInstaller build (Tauri v2 requires the target-triple suffix).
-
-**`.gitignore`:** Added `src-tauri/target/` and `src-tauri/gen/`.
-
-### Tauri v2 quirks hit during bringup
-- `tauri-plugin-tray` doesn't exist — tray is built into `tauri` with `features = ["tray-icon"]`
-- `tauri.conf.json` needs both `build.devUrl` (dev) and `build.frontendDist` (production)
-- `externalBin` requires the file to exist at build time, named with the target triple appended
-- `tauri::image::Image` has no `from_bytes` — decode PNG with the `image` crate, then use `Image::new_owned`
-
-### Still open
-- Crash monitor (auto-restart on unexpected sidecar exit) — deferred
-- Sidecar stdout/stderr capture to Tauri log — deferred
-- Auto-updater + GitHub Actions CI/CD — next Phase 3 step
-
----
-
-## Session notes — 2026-05-04 (Channel token fix / Memory tool removal / UI polish)
-
-**Three fixes shipped.**
-
-### What changed
-
-**`static/js/api.js` — channel token prose preservation:** Path E/F were discarding prose inside `<|channel>...<channel|>` blocks (`.replace(..., "")` → `.replace(..., "$1")`). When Gemma 4 wraps its response inside a channel block before a tool call, the prose is now extracted rather than stripped, preventing bubble deletion.
-
-**`tools/memory.py` deleted.** Old generic memory tool removed. `static/js/tool-parser.js` `TOOL_DEFINITIONS` updated: `memory` replaced with `soul_user`, `note`, `soul_reflect`, `soul_identity` (in order of usage frequency / restriction level). `_enforceReadBeforeWrite` and `_readCache` stack removed from `api.js`. Soul-write side effect (`reloadSoulFiles`) updated to fire on the three new soul tools.
-
-**`static/js/chat-ui.js` — scroll lock:** Added `_scrollLockUntil` timestamp + `_prevScrollTop` tracker. Upward scroll now sets a 1.5 s lock — `scrollIfFollowing()` bails if the lock is active, so streaming can't fight the user back to the bottom. `scrollToBottom()` (send, tab switch) clears the lock.
-
-**`static/css/base.css` + `static/css/orb.css` — bottom spacing:** Bottom padding reduced from `orb-size + 56px` to `orb-size + 24px`; last-child margin-bottom simplified from `calc(orb-size - overlap + 8px)` to `8px`. Total clearance below last message: ~68px (down from ~128px), leaving ~12px gap above the orb.
-
-### Still open
-- **Double memory-server shutdown message** — cosmetic, not investigated.
-- **TTS voice list on existing install** — fresh-install test still recommended.
-- **Channel token: prose-only continuation** — when Gemma 4 emits prose + `<|channel><channel|>` without a tool call, the channel tokens currently fall through to the plain reply path and display as visible text. Future: detect standalone channel signal, strip it, and give the model another turn.
-
----
-
-## Session notes — 2026-05-03 (TTS voices / Gemma prose / Identity refactor / Reinstall / Default folder fix)
-
-**All four backlog items completed. `companions/default/` bug root-caused and fixed.**
-
-### What changed
-
-**`scripts/tts.py`:** `_list_kokoro_voices()` now calls `snapshot_download` once (no `local_files_only`) with `allow_patterns=["voices/"]` and recursive glob. Fixes the 6-voice cap from partial HF cache.
-
-**`static/js/api.js`:** Gemma prose before tool calls now preserved — Path E/F finalize the stream bubble with clean prose instead of removing it. Log truncation limits raised (400→2000, 120/200→1000).
-
-**`scripts/paths.py`:** Added `SOUL_FILE`, `REFLECTIONS_FILE`, `USER_PROFILE_FILE`, `UNBOUND_FILE` constants.
-
-**Identity rename (steps 3–6):** `companion_identity.md`→`soul.md`, `self_notes.md`→`soul_reflections.md` throughout codebase. Boot-time migration in `_migrate_soul_filenames()`. New tools: `soul_identity.py`, `soul_reflect.py`, `soul_user.py`, `note.py`. Evolution-level gating in `_get_enabled_tools()` via `_EVOLUTION_REQUIRED`.
-
-**`scripts/setup_router.py`:** `POST /api/setup/reinstall-extra` and `POST /api/setup/reinstall-llama` endpoints with SSE streaming. Download size validation in `_download_to_queue()`.
-
-**`static/js/settings-features.js`:** `spReinstallExtra()` and `spReinstallLlama()` wired to new endpoints with inline progress/status.
-
-**`companions/default/` bug:** Root cause — `config.json` had stale `companion_folder: "default"` from old DEFAULTS. Fixed two ways: (1) all `"default"` companion_folder fallbacks in Python + JS replaced with `DEFAULTS["companion_folder"]` / `'senni'`; (2) boot-time migration in `on_startup()` rewrites config.json if the stored folder has no companion config.json but the real default exists.
-
-### Still open
-- **Double memory-server shutdown message** — cosmetic, not investigated.
-- **TTS voice list on existing install** — verified working on this machine after fix. Fresh-install test still recommended.
-
----
-
-## Session notes — 2026-05-03 (Kokoro TTS boot + folder picker + venv local install)
-
-**Kokoro TTS now boots reliably. IFileOpenDialog folder picker. Dev-mode `features/venv/` with Python 3.12. Voice list from subprocess `__ready__`. Diagnostics show resolved paths.**
-
-Key changes: `_win_folder_dialog_ifiledialog()` in server.py; venv sys.path injection at startup; `_list_kokoro_voices()` via `importlib.util.find_spec`; `_tts_voices` global in tts_server; `reset_tts_unavailable()` called on TTS settings save; `features/venv/` creation with preferred Python in setup_router; `FEATURES_VENV_DIR` + `venv_site_packages()` in paths.py; diagnostics checks venv path.
+- **WebView2 + hidden file input via label** — `<label>` wrapping `<input type="file" style="display:none">` silently fails in Tauri's WebView2. Always use `element.click()` called explicitly from an onclick handler instead. The review-step avatar button already used the correct pattern; now import zone matches it.
 
 ---
 

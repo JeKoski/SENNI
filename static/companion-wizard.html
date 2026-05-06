@@ -469,13 +469,14 @@
     </div>
 
     <div class="import-divider"><span>or import an existing card</span></div>
-    <label class="import-zone" id="import-zone">
+    <div class="import-zone" id="import-zone"
+         onclick="document.getElementById('import-file-input').click()">
       <input type="file" id="import-file-input" accept=".png,.json" style="display:none"
         onchange="_handleImportFile(this.files[0]); this.value=''">
       <div class="import-zone-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 19h16"/></svg></div>
       <div class="import-zone-label">Drop a character card here, or click to browse</div>
       <div class="import-zone-note">V2 character card PNG &middot; birth_certificate.json</div>
-    </label>
+    </div>
   </div>
 
   <!-- ════ STEP 2 — Appearance ════ -->
