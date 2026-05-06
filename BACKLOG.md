@@ -147,6 +147,8 @@ Compile Python backend (`main.py` + all scripts + static files) into a single bi
 
 ## Bugs
 
+- **WebView2 hidden file input via label** ✅ FIXED (2026-05-06) — `<label>` wrapping `<input type="file" style="display:none">` silently fails to open file dialog in Tauri's WebView2. Fixed in `companion-wizard.html` import zone: changed `<label>` to `<div onclick="document.getElementById('import-file-input').click()">`. Rule going forward: always use explicit `.click()` from an onclick handler for file inputs — never rely on label-wrapping for hidden inputs.
+
 - **Kokoro TTS install on Python 3.13** — Partially resolved: `_find_preferred_python()` now selects Python 3.12 for venv creation, and the local install goes into `features/venv/` (not system Python). If 3.12 is not installed, fallback may still land on 3.13. Long-term: bundle Python 3.12 embeddable for dev mode or document the 3.12 requirement explicitly.
 
 - **TTS voice list empty on existing install** — `_list_kokoro_voices()` now uses `snapshot_download` from `huggingface_hub` to auto-download all Kokoro voices (~28 MB) from `hexgrad/Kokoro-82M`. Verified via code that `load_voice()` uses the HF cache and this should pre-warm it. However, voices still not populating on restart on an existing installation. Needs: fresh-install test to confirm whether it works there, then check if the HF cache path is wrong or `snapshot_download` is silently erroring. Check stderr logs from the TTS subprocess on next session.
