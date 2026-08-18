@@ -1,4 +1,4 @@
-## ⚠️💤 Project on indeterminate hiatus. No active development is currently taking place. 💤⚠️
+## ⚠️💤 Project on hiatus. No development is currently taking place. 💤⚠️
 
 Due to life circumstances, the Senni app is officially on hold with no foreseeable timeframe for continuation.
 I'm still working on things and tinkering with Senni, but the standalone app is not in active development at the moment.
