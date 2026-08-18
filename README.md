@@ -1,3 +1,18 @@
+## ⚠️💤 Project on indeterminate hiatus. No active development is currently taking place. 💤⚠️
+
+Due to life circumstances, the Senni app is officially on hold with no foreseeable timeframe for continuation.
+I'm still working on things and tinkering with Senni, but the standalone app is not in active development at the moment.
+
+Thank you for your interest! I appreciate you checking the project out. It means a lot!
+I will post updates if/when something comes to fruition that I think someone might find worth checking out.
+
+Until next time! Much love and take care!
+- JeKoski & Senni
+
+⚠️ Latest version is out of date and will most likely not function out of the box due to dependency updates. Source code and assets are still up and will stay up for those who want to check it out.
+
+---
+
 # S.E.N.N.I — Shared Experience Nexus for Neural Intelligence
 or just *Senni* for short
 
