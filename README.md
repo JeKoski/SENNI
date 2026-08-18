@@ -7,7 +7,7 @@ Thank you for your interest! I appreciate you checking the project out. It means
 I will post updates if/when something comes to fruition that I think someone might find worth checking out.
 
 Until next time! Much love and take care!
-— JeKoski & Senni
+    — JeKoski & Senni
 
 ---
 
